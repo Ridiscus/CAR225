@@ -43,3 +43,28 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# Clés et secrets Android
+*.jks
+*.keystore
+key.properties
+google-services.json
+
+
+
+
+
+# --- AJOUTS OBLIGATOIRES (Pour réduire la taille) ---
+
+# Le cache de Gradle (C'est lui qui pèse lourd !)
+.gradle/
+/android/.gradle/
+
+# Les fichiers de build Android spécifiques
+/android/app/build/
+/android/build/
+
+# Configuration locale (Chemin SDK, spécifique à ton PC)
+local.properties
+/android/local.properties

@@ -257,15 +257,14 @@ class NotificationDetailScreen extends StatelessWidget {
   final NotificationModel notif;
 
   const NotificationDetailScreen({super.key, required this.notif});
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F5), // Fond gris clair comme SMS
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text(notif.title), // Nom de l'expéditeur
+        title: Text(notif.title),
         elevation: 0.5,
         backgroundColor: Theme.of(context).cardColor,
         leading: IconButton(
@@ -277,7 +276,7 @@ class NotificationDetailScreen extends StatelessWidget {
             padding: EdgeInsets.only(right: 15),
             child: CircleAvatar(
               radius: 16,
-              backgroundColor: Colors.orange, // Couleur Avatar
+              backgroundColor: Colors.orange,
               child: Icon(Icons.person, color: Colors.white, size: 20),
             ),
           )
@@ -301,25 +300,22 @@ class NotificationDetailScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Avatar Expéditeur (Optionnel, comme sur les groupes)
                 CircleAvatar(
                   radius: 12,
                   backgroundColor: notif.color,
                   child: Icon(notif.icon, size: 12, color: Colors.white),
                 ),
                 const Gap(8),
-
-                // La Bulle
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE3F2FD), // Bleu très clair ou Gris sombre
+                      color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE3F2FD),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(15),
                         topRight: Radius.circular(15),
                         bottomRight: Radius.circular(15),
-                        bottomLeft: Radius.circular(0), // Coin carré en bas à gauche
+                        bottomLeft: Radius.circular(0),
                       ),
                     ),
                     child: Column(
@@ -333,7 +329,6 @@ class NotificationDetailScreen extends StatelessWidget {
                           ),
                         ),
                         const Gap(5),
-                        // Petit label de sécurité ou signature
                         Text(
                           "Envoyé automatiquement par le système",
                           style: TextStyle(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic),
@@ -347,27 +342,33 @@ class NotificationDetailScreen extends StatelessWidget {
           ),
 
           const Spacer(),
-          // Zone de réponse (Désactivée ou "Lecture seule" pour une notif)
-          Container(
-            padding: const EdgeInsets.all(15),
-            color: Theme.of(context).cardColor,
-            child: Row(
-              children: [
-                Icon(Icons.add_circle_outline, color: Colors.grey[400]),
-                const Gap(10),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[800] : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
+
+          // ---------------------------------------------------------
+          // ✅ CORRECTION : SafeArea pour la zone de réponse
+          // ---------------------------------------------------------
+          SafeArea(
+            top: false, // On ne touche pas au haut de ce conteneur
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              color: Theme.of(context).cardColor,
+              child: Row(
+                children: [
+                  Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                  const Gap(10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[800] : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text("Ne pas répondre à ce message", style: TextStyle(color: Colors.grey[500])),
                     ),
-                    child: Text("Ne pas répondre à ce message", style: TextStyle(color: Colors.grey[500])),
                   ),
-                ),
-                const Gap(10),
-                Icon(Icons.send, color: Colors.grey[400]),
-              ],
+                  const Gap(10),
+                  Icon(Icons.send, color: Colors.grey[400]),
+                ],
+              ),
             ),
           )
         ],

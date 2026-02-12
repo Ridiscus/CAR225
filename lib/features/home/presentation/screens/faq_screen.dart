@@ -1,51 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 
+import 'claim_history_screen.dart';
+import 'claim_screen.dart';
+
+// --- ÉCRAN PRINCIPAL FAQ ---
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Variables de thème
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: Text(
-            "FAQ & Aide",
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        title: Text("FAQ & Aide", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
-              "Questions fréquentes",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
-          ),
+          Text("Questions fréquentes", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
           const Gap(15),
 
           const FaqItem(
             question: "Comment recharger mon compte ?",
-            answer: "Allez dans 'Mon Portefeuille', cliquez sur 'Recharger' et choisissez votre méthode de paiement (Orange Money, Wave, MTN).",
+            answer: "Allez dans 'Mon Portefeuille', cliquez sur 'Recharger' et choisissez votre méthode de paiement.",
           ),
+
+          // --- ITEM MODIFIÉ POUR L'OBJET PERDU ---
+          FaqItem(
+            question: "J'ai oublié un objet dans le car",
+            // Au lieu d'un texte simple, on passe un contenu personnalisé
+            customContent: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Vous avez 24h après la fin du trajet pour signaler un objet perdu. Passé ce délai, veuillez nous contacter directement.",
+                  style: TextStyle(color: textColor?.withOpacity(0.8), fontSize: 13),
+                ),
+                const Gap(15),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateClaimScreen())),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                        ),
+                        child: const Text("Faire une réclamation", textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                    const Gap(10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ClaimsHistoryScreen())),
+                        style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: textColor ?? Colors.black),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                        ),
+                        child: Text("Mes réclamations", style: TextStyle(color: textColor, fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+          // ---------------------------------------
+
           const FaqItem(
             question: "Comment annuler un billet ?",
-            answer: "Vous pouvez annuler un billet jusqu'à 2 heures avant le départ dans la section 'Mes Trajets'. Des frais peuvent s'appliquer.",
-          ),
-          const FaqItem(
-            question: "J'ai oublié un objet dans le car",
-            answer: "Contactez immédiatement le service client via la section 'Nous contacter' ou appelez le numéro d'urgence disponible sur votre billet.",
-          ),
-          const FaqItem(
-            question: "Comment modifier mon profil ?",
-            answer: "Rendez-vous dans l'onglet Profil > Informations personnelles pour mettre à jour votre nom, email ou photo.",
+            answer: "Vous pouvez annuler un billet jusqu'à 2 heures avant le départ.",
           ),
         ],
       ),
@@ -53,11 +88,13 @@ class FaqScreen extends StatelessWidget {
   }
 }
 
+// --- WIDGET FAQ ITEM AMÉLIORÉ ---
 class FaqItem extends StatelessWidget {
   final String question;
-  final String answer;
+  final String? answer; // Devient optionnel
+  final Widget? customContent; // Nouveau paramètre
 
-  const FaqItem({super.key, required this.question, required this.answer});
+  const FaqItem({super.key, required this.question, this.answer, this.customContent});
 
   @override
   Widget build(BuildContext context) {
@@ -68,27 +105,19 @@ class FaqItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-          color: cardColor, // <--- BLOC DYNAMIQUE
+          color: cardColor,
           borderRadius: BorderRadius.circular(15),
-          // Optionnel : petite bordure subtile en mode sombre
-          border: isDark ? Border.all(color: Colors.white10) : null
+          border: isDark ? Border.all(color: Colors.white10) : Border.all(color: Colors.grey.shade200)
       ),
       child: ExpansionTile(
-        title: Text(
-            question,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)
-        ),
+        title: Text(question, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        iconColor: Colors.green, // La flèche quand ouvert
-        textColor: Colors.green, // Le titre quand ouvert
-        collapsedIconColor: isDark ? Colors.grey : Colors.black54, // La flèche quand fermé
+        iconColor: Colors.green,
         children: [
-          Text(
-              answer,
-              style: TextStyle(
-                  color: isDark ? Colors.grey[300] : Colors.black87, // <--- TEXTE CONTENU DYNAMIQUE
-                  height: 1.5
-              )
+          // Si customContent existe, on l'affiche, sinon on affiche le texte standard
+          customContent ?? Text(
+              answer ?? "",
+              style: TextStyle(color: isDark ? Colors.grey[300] : Colors.black87, height: 1.5)
           ),
         ],
       ),

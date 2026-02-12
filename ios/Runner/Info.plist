@@ -46,7 +46,12 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
+	<key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
 
+
+    <key>NSFaceIDUsageDescription</key>
+    <string>Nous utilisons FaceID pour sécuriser l'accès à votre compte.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
         <string>Nous avons besoin d'accéder à votre galerie pour choisir votre photo de profil.</string>
         <key>NSCameraUsageDescription</key>

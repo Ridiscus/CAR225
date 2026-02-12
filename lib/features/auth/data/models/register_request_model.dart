@@ -4,7 +4,7 @@ class RegisterRequestModel {
   final String email;
   final String password;
   final String passwordConfirmation;
-  final String adresse;
+  //final String adresse;
   final String contact;
   final String fcmToken;
   final String deviceName;
@@ -16,7 +16,7 @@ class RegisterRequestModel {
     required this.email,
     required this.password,
     required this.passwordConfirmation,
-    required this.adresse,
+    //required this.adresse,
     required this.contact,
     required this.fcmToken,
     required this.deviceName,

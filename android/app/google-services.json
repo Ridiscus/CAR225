@@ -12,7 +12,20 @@
           "package_name": "com.Robinson.car225"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "406826051377-dfobir13dubjran8snumkf43ecvdq90v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Robinson.car225",
+            "certificate_hash": "720f1c48e5668000203cbe379c4a555ff682f9b5"
+          }
+        },
+        {
+          "client_id": "406826051377-1autumn326a90h1pk749hb0ju1513eej.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBzakBOWg4SpjXjv3E-ETXAza2Z2RuZgaY"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "406826051377-1autumn326a90h1pk749hb0ju1513eej.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

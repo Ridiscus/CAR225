@@ -1,5 +1,7 @@
 package com.Robinson.car225
 
-import io.flutter.embedding.android.FlutterActivity
+// ✅ 1. On change l'import pour utiliser FragmentActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// ✅ 2. On change la classe parente ici
+class MainActivity : FlutterFragmentActivity()

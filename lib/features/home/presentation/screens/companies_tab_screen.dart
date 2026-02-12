@@ -1,14 +1,33 @@
-import 'package:car225/features/home/presentation/screens/profil_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/local_badge.dart';
+import '../../../../core/providers/company_provider.dart';
 import '../../../../core/providers/user_provider.dart';
 import '../../../../core/theme/app_colors.dart';
+// Adapte les imports selon ton dossie
+import '../../../booking/data/models/company_model.dart';
 import '../../../booking/presentation/screens/CompanyDetailScreen.dart';
-import 'notification_screen.dart';
+import 'profil_screen.dart'; // Vérifie tes imports
+import 'notification_screen.dart'; // Vérifie tes imports
 
-class CompaniesTabScreen extends StatelessWidget {
+class CompaniesTabScreen extends StatefulWidget {
   const CompaniesTabScreen({super.key});
+
+  @override
+  State<CompaniesTabScreen> createState() => _CompaniesTabScreenState();
+}
+
+class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+    // On charge les compagnies au démarrage de l'écran
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CompanyProvider>().fetchCompanies();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,87 +38,88 @@ class CompaniesTabScreen extends StatelessWidget {
     final secondaryTextColor = isDark ? Colors.grey[400] : Colors.grey;
 
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- 1. HEADER ---
-            _buildHeader(context),
+      backgroundColor: scaffoldColor,
+      body: RefreshIndicator(
+        onRefresh: () => context.read<CompanyProvider>().fetchCompanies(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- 1. HEADER ---
+              _buildHeader(context),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- 2. TITRE ---
-                  Text(
-                    "Nos Compagnies",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-                  ),
-                  Text(
-                    "6 partenaires de confiance",
-                    style: TextStyle(color: secondaryTextColor, fontSize: 13),
-                  ),
-                  const Gap(20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- 2. TITRE & CONSOMMATEUR ---
+                    Consumer<CompanyProvider>(
+                      builder: (context, provider, child) {
+                        if (provider.isLoading) {
+                          return const Center(child: Padding(
+                            padding: EdgeInsets.all(50.0),
+                            child: CircularProgressIndicator(),
+                          ));
+                        }
 
-                  // --- 3. LISTE DES COMPAGNIES ---
-                  _buildCompanyCard(
-                    context,
-                    name: "Robin transport",
-                    slogan: "Transport rapide et confortable",
-                    initials: "RT",
-                    color: Colors.orange,
-                    rating: "4.8",
-                    reviewCount: "1240",
-                    stat1: "15", label1: "Personnels",
-                    stat2: "45", label2: "Car",
-                    stat3: "28", label3: "Trajets",
-                  ),
-                  const Gap(15),
-                  _buildCompanyCard(
-                    context,
-                    name: "Fabiola Transport",
-                    slogan: "Luxe et confort premium",
-                    initials: "FT",
-                    color: const Color(0xFFD35400),
-                    rating: "4.8",
-                    reviewCount: "2150",
-                    stat1: "15", label1: "Personnels",
-                    stat2: "45", label2: "Car",
-                    stat3: "28", label3: "Trajets",
-                  ),
-                  const Gap(15),
-                  _buildCompanyCard(
-                    context,
-                    name: "AVS",
-                    slogan: "Transport rapide et confortable",
-                    initials: "AVS",
-                    color: Colors.redAccent,
-                    rating: "4.8",
-                    reviewCount: "1240",
-                    stat1: "30", label1: "Années",
-                    stat2: "56", label2: "Car",
-                    stat3: "33", label3: "Trajets",
-                  ),
-                  const Gap(15),
-                  _buildCompanyCard(
-                    context,
-                    name: "UTB",
-                    slogan: "Leader du transport urbain",
-                    initials: "UTB",
-                    color: Colors.orangeAccent,
-                    rating: "4.8",
-                    reviewCount: "1890",
-                    stat1: "45", label1: "Années",
-                    stat2: "75", label2: "Car",
-                    stat3: "42", label3: "Trajets",
-                  ),
-                  const Gap(140),
-                ],
+                        if (provider.error != null) {
+                          return Center(
+                            child: Column(
+                              children: [
+                                const Icon(Icons.error_outline, size: 40, color: Colors.red),
+                                const SizedBox(height: 10),
+                                Text("Erreur: ${provider.error}", textAlign: TextAlign.center),
+                                TextButton(
+                                  onPressed: provider.fetchCompanies,
+                                  child: const Text("Réessayer"),
+                                )
+                              ],
+                            ),
+                          );
+                        }
+
+                        // Données chargées
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Nos Compagnies",
+                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                            Text(
+                              "${provider.companies.length} partenaires de confiance",
+                              style: TextStyle(color: secondaryTextColor, fontSize: 13),
+                            ),
+                            const Gap(20),
+
+                            // --- 3. LISTE DES COMPAGNIES DYNAMIQUE ---
+                            if (provider.companies.isEmpty)
+                              const Center(child: Text("Aucune compagnie disponible."))
+                            else
+                              ListView.separated(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true, // Important dans un SingleChildScrollView
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: provider.companies.length,
+                                separatorBuilder: (ctx, index) => const Gap(15),
+                                itemBuilder: (ctx, index) {
+                                  final company = provider.companies[index];
+                                  return _buildCompanyCard(context, company);
+                                },
+                              ),
+
+                            const Gap(140),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -107,122 +127,10 @@ class CompaniesTabScreen extends StatelessWidget {
 
   // --- WIDGETS ---
 
-  /*Widget _buildHeader(BuildContext context) {
-    // Simulation
-    String? userPhotoUrl;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      height: 260,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black : Colors.white,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-        image: const DecorationImage(
-          image: AssetImage("assets/images/bus_header.jpg"),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.7), Colors.transparent], // Un peu plus sombre en haut
-            stops: const [0.0, 0.4],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // --- PROFIL ---
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                        );
-                      },
-                      child: CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.white,
-                        backgroundImage: userPhotoUrl != null
-                            ? NetworkImage(userPhotoUrl) as ImageProvider
-                            : const AssetImage("assets/images/ci.jpg"),
-                      ),
-                    ),
-
-                    const Gap(10),
-
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Ma localisation", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        Row(
-                          children: [
-                            Image.asset(
-                              "assets/icons/pin.png",
-                              width: 14,
-                              height: 14,
-                              color: AppColors.primary,
-                            ),
-                            const Gap(4),
-                            const Text("Abidjan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-
-                // --- NOTIFICATION ---
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Image.asset(
-                      "assets/icons/notification.png",
-                      width: 20,
-                      height: 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                )
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }*/
-
-
-
-
-
   Widget _buildHeader(BuildContext context) {
-    // 1. RÉCUPÉRATION DU USER VIA LE PROVIDER
-    // "watch" permet de reconstruire ce widget si la photo change ailleurs dans l'app
     final userProvider = context.watch<UserProvider>();
+    final user = userProvider.user; // ✅ On prend l'objet user entier
     final userPhotoUrl = userProvider.user?.photoUrl;
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -232,7 +140,7 @@ class CompaniesTabScreen extends StatelessWidget {
         color: isDark ? Colors.black : Colors.white,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         image: const DecorationImage(
-          image: AssetImage("assets/images/bus_header.jpg"),
+          image: AssetImage("assets/images/busheader5.jpg"),
           fit: BoxFit.cover,
         ),
       ),
@@ -243,80 +151,52 @@ class CompaniesTabScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-            stops: const [0.0, 0.5],
+            stops: const [0.0, 0.6],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Row(
                   children: [
-                    // --- PROFIL DYNAMIQUE ---
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                        );
-                      },
-                      child: CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.white,
-                        // 2. LOGIQUE D'AFFICHAGE CORRIGÉE
-                        backgroundImage: (userPhotoUrl != null && userPhotoUrl.isNotEmpty)
-                            ? NetworkImage(userPhotoUrl) as ImageProvider
-                            : const AssetImage("assets/images/ci.jpg"), // Image par défaut
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.grey[200],
+                          // ✅ C'EST ICI QUE TOUT SE JOUE :
+                          // On utilise user.fullPhotoUrl (ton getter magique)
+                          backgroundImage: user != null
+                              ? NetworkImage(user.fullPhotoUrl)
+                              : const AssetImage("assets/images/ci.jpg") as ImageProvider,
+
+                          // Petit bonus : gestion d'erreur silencieuse
+                          onBackgroundImageError: (_, __) {},
+                        ),
                       ),
                     ),
-
-                    const Gap(10),
-
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Ma localisation", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        Row(
-                          children: [
-                            Image.asset(
-                              "assets/icons/pin.png",
-                              width: 14,
-                              height: 14,
-                              color: AppColors.primary,
-                            ),
-                            const Gap(4),
-                            const Text("Abidjan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ],
-                    )
+                    const Gap(12),
+                    const LocationBadge(),
                   ],
                 ),
-
-                // --- NOTIFICATION ---
                 GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                    );
-                  },
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen())),
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    height: 45, width: 45,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
                     ),
-                    child: Image.asset(
-                      "assets/icons/notification.png",
-                      width: 20,
-                      height: 20,
-                      color: Colors.white,
-                    ),
+                    child: Image.asset("assets/icons/notification.png", color: Colors.white),
                   ),
                 )
               ],
@@ -328,29 +208,43 @@ class CompaniesTabScreen extends StatelessWidget {
   }
 
 
-
-  Widget _buildCompanyCard(BuildContext context, {
-    required String name,
-    required String slogan,
-    required String initials,
-    required Color color,
-    required String rating,
-    required String reviewCount,
-    required String stat1, required String label1,
-    required String stat2, required String label2,
-    required String stat3, required String label3,
-  }) {
-    // Variables de thème
+  Widget _buildCompanyCard(BuildContext context, CompanyModel company) {
+    // --- 1. VARIABLES DE THEME ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final subTextColor = isDark ? Colors.grey[400] : Colors.grey;
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey.shade200;
 
+    // Couleur par défaut (tu peux la rendre dynamique selon le tag si tu veux)
+    final companyColor = Colors.blueAccent;
+
+    // --- 2. LOGIQUE DE L'IMAGE (Intégrée ici) ---
+    // Ton URL de base (Backend)
+    const String baseUrl = "https://jingly-lindy-unminding.ngrok-free.dev/";
+
+    String? fullLogoUrl;
+
+    if (company.logoUrl.isNotEmpty) {
+      if (company.logoUrl.startsWith('http')) {
+        // Si c'est déjà une URL complète
+        fullLogoUrl = company.logoUrl;
+      } else {
+        // Sinon, on construit l'URL complète
+        // On enlève le '/' au début s'il y est pour éviter les doubles slashs
+        String cleanPath = company.logoUrl.startsWith('/')
+            ? company.logoUrl.substring(1)
+            : company.logoUrl;
+
+        fullLogoUrl = "$baseUrl$cleanPath";
+      }
+    }
+
+    // --- 3. RENDU VISUEL ---
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: cardColor, // <--- FOND CARTE
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -362,24 +256,45 @@ class CompaniesTabScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
+          // --- HEADER : LOGO + NOM ---
           Row(
             children: [
+              // LE CONTAINER LOGO ADAPTÉ
               Container(
                 height: 50, width: 50,
                 decoration: BoxDecoration(
-                  color: color,
+                  color: companyColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(15),
+                  image: fullLogoUrl != null
+                      ? DecorationImage(
+                    image: NetworkImage(fullLogoUrl!), // On utilise l'URL calculée
+                    fit: BoxFit.cover,
+                    onError: (exception, stackTrace) {
+                      debugPrint("Erreur image liste: $exception");
+                    },
+                  )
+                      : null,
                 ),
                 alignment: Alignment.center,
-                child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                // Si pas d'image valide, on affiche le sigle ou la première lettre
+                child: fullLogoUrl == null
+                    ? Text(
+                    company.sigle.isNotEmpty ? company.sigle : company.name[0],
+                    style: TextStyle(color: companyColor, fontWeight: FontWeight.bold, fontSize: 18)
+                )
+                    : null,
               ),
+
               const Gap(12),
+
+              // TEXTES (Nom + Slogan)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
-                    Text(slogan, style: TextStyle(color: subTextColor, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(company.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
+                    if (company.slogan.isNotEmpty)
+                      Text(company.slogan, style: TextStyle(color: subTextColor, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               )
@@ -387,19 +302,25 @@ class CompaniesTabScreen extends StatelessWidget {
           ),
           const Gap(10),
 
+          // --- ETOILES ET AVIS ---
           Row(
             children: [
               Row(
-                children: List.generate(4, (index) => const Icon(Icons.star, color: Colors.amber, size: 16))
-                  ..add(const Icon(Icons.star_border, color: Colors.amber, size: 16)),
+                children: List.generate(5, (index) {
+                  if (index < company.rating.round()) {
+                    return const Icon(Icons.star, color: Colors.amber, size: 16);
+                  } else {
+                    return const Icon(Icons.star_border, color: Colors.amber, size: 16);
+                  }
+                }),
               ),
               const Gap(8),
               RichText(
                 text: TextSpan(
                   style: TextStyle(color: textColor, fontSize: 12),
                   children: [
-                    TextSpan(text: rating, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: " ($reviewCount avis)", style: TextStyle(color: subTextColor)),
+                    TextSpan(text: "${company.rating}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: " (${company.reviewsCount} avis)", style: TextStyle(color: subTextColor)),
                   ],
                 ),
               )
@@ -407,30 +328,35 @@ class CompaniesTabScreen extends StatelessWidget {
           ),
           const Gap(15),
 
+          // --- STATISTIQUES ---
           Row(
             children: [
-              Expanded(child: _buildStatItem(context, stat1, label1)),
+              Expanded(child: _buildStatItem(context, "${company.stats.personnels}", "Personnels")),
               const Gap(10),
-              Expanded(child: _buildStatItem(context, stat2, label2)),
+              Expanded(child: _buildStatItem(context, "${company.stats.vehicules}", "Cars")),
               const Gap(10),
-              Expanded(child: _buildStatItem(context, stat3, label3)),
+              Expanded(child: _buildStatItem(context, "${company.stats.programmes}", "Trajets")),
             ],
           ),
           const Gap(15),
 
-          Row(
-            children: [
-              // Adaptation des tags pour qu'ils ne soient pas fluos en mode sombre
-              _buildTag(context, "Moderne", Colors.orange),
-              const Gap(8),
-              _buildTag(context, "Fiable", Colors.green),
-              const Gap(8),
-              _buildTag(context, "Certifiée", Colors.orange),
-            ],
-          ),
-          const Gap(15),
+          // --- TAGS (Optionnel) ---
+          if (company.tags.isNotEmpty)
+            SizedBox(
+              height: 25,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: company.tags.length,
+                separatorBuilder: (ctx, i) => const Gap(8),
+                itemBuilder: (ctx, i) {
+                  return _buildTag(context, company.tags[i].label, company.tags[i].color);
+                },
+              ),
+            ),
 
-          // 5. Bouton "Voir les trajets"
+          if (company.tags.isNotEmpty) const Gap(15),
+
+          // --- BOUTON ACTION ---
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -438,14 +364,16 @@ class CompaniesTabScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CompanyDetailScreen(companyName: name),
+                    builder: (context) => CompanyDetailScreen(
+                      companyId: company.id,
+                      companyName: company.name,
+                    ),
                   ),
                 );
               },
               style: ElevatedButton.styleFrom(
-                // Fond légèrement blanc en mode sombre, blanc pur en clair
                 backgroundColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                foregroundColor: isDark ? Colors.white : Colors.black, // Texte
+                foregroundColor: isDark ? Colors.white : Colors.black,
                 elevation: 0,
                 side: BorderSide(color: borderColor),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -459,59 +387,33 @@ class CompaniesTabScreen extends StatelessWidget {
     );
   }
 
-  // Ajout Context pour thème
   Widget _buildStatItem(BuildContext context, String value, String label) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        // Fond gris foncé ou gris très clair
         color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         children: [
-          Text(
-              label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isDark ? Colors.grey[400] : Colors.black54
-              )
-          ),
+          Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[400] : Colors.black54)),
           const Gap(2),
-          Text(
-              value,
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black
-              )
-          ),
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
         ],
       ),
     );
   }
 
-  // Modifié pour prendre la couleur de base et calculer l'opacité
-  Widget _buildTag(BuildContext context, String text, MaterialColor color) {
+  Widget _buildTag(BuildContext context, String text, Color color) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        // En mode sombre, opacité faible. En mode clair, shade50
-          color: isDark ? color.withOpacity(0.15) : color.shade50,
+          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(5)
       ),
-      child: Text(
-          text,
-          style: TextStyle(
-              color: color, // La couleur du texte reste vive
-              fontSize: 10,
-              fontWeight: FontWeight.bold
-          )
-      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 }

@@ -1,24 +1,117 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Imports Clean Arch
+import '../../../wallet/data/datasources/wallet_remote_data_source.dart';
+import '../../../wallet/data/models/wallet_model.dart';
+import '../../../wallet/domain/repositories/wallet_repository.dart';
+
 
 import 'TopUpScreen.dart';
 import 'WithdrawScreen.dart';
 
-// Assure-toi d'avoir importé tes couleurs si besoin, sinon on utilise le Theme
-// import '../../../../core/theme/app_colors.dart';
-
-class WalletScreen extends StatelessWidget {
+class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
   @override
+  State<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends State<WalletScreen> {
+  // --- ETAT ---
+  WalletModel? walletData;
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWalletData();
+  }
+
+
+
+
+  Future<void> _fetchWalletData() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      // 1. RÉCUPÉRATION DU TOKEN
+      final prefs = await SharedPreferences.getInstance();
+
+      // ✅ CORRECTION ICI : On utilise 'auth_token' comme dans ton AuthRemoteDataSource
+      final String? token = prefs.getString('auth_token');
+
+      // DEBUG
+      if (token != null) {
+        print("✅ WALLET: Token trouvé (auth_token): ${token.substring(0, 10)}...");
+      } else {
+        print("❌ WALLET: Aucun token trouvé pour la clé 'auth_token'");
+        setState(() {
+          isLoading = false;
+          errorMessage = "Non connecté.";
+        });
+        return;
+      }
+
+      // 2. CONFIGURATION DIO
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api', // Vérifie si c'est /api ou /api/
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // On injecte le bon token
+        },
+      ));
+
+      // 3. APPEL API
+      final dataSource = WalletRemoteDataSourceImpl(dio: dio);
+      final repo = WalletRepository(remoteDataSource: dataSource);
+
+      final data = await repo.getWalletData();
+
+      if (mounted) {
+        setState(() {
+          walletData = data;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("❌ ERREUR WALLET: $e");
+      if (mounted) {
+        setState(() {
+          errorMessage = "Impossible de charger le solde.";
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+
+
+
+
+
+  // Helper pour formater l'argent (ex: 45 000)
+  String _formatCurrency(int amount) {
+    return NumberFormat.currency(locale: 'fr_FR', symbol: '', decimalDigits: 0).format(amount).trim();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // --- 1. THEME VARIABLES ---
+    // --- THEME VARIABLES ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color; // Noir ou Blanc
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         title: Text(
             "Portefeuille",
@@ -28,18 +121,41 @@ class WalletScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor), // <--- Icone dynamique
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          // Petit bouton refresh pour tester
+          IconButton(
+            icon: Icon(Icons.refresh, color: textColor),
+            onPressed: () {
+              setState(() => isLoading = true);
+              _fetchWalletData();
+            },
+          )
+        ],
       ),
-      body: SingleChildScrollView(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+          ? Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 50, color: Colors.red),
+          Gap(10),
+          Text(errorMessage!, style: TextStyle(color: textColor)),
+          TextButton(onPressed: _fetchWalletData, child: Text("Réessayer"))
+        ],
+      ))
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- CARTE PRINCIPALE ORANGE ---
-            // Note : On garde le design orange intact même en mode sombre
-            // car c'est une "carte physique" (branding fort).
+            // ... (Le début du code reste identique)
+
+            // --- CARTE PRINCIPALE ORANGE ---
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(25),
@@ -55,7 +171,6 @@ class WalletScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    // En mode sombre, l'ombre est un peu plus subtile ou agit comme une lueur
                     color: const Color(0xFFE64A19).withOpacity(isDark ? 0.2 : 0.4),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
@@ -84,18 +199,18 @@ class WalletScreen extends StatelessWidget {
                           ),
                           const Gap(8),
                           RichText(
-                            text: const TextSpan(
+                            text: TextSpan(
                               children: [
                                 TextSpan(
-                                    text: "45 000 ",
-                                    style: TextStyle(
+                                    text: "${_formatCurrency(walletData?.solde ?? 0)} ",
+                                    style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 36,
                                         fontWeight: FontWeight.w800,
                                         fontFamily: 'Montserrat'
                                     )
                                 ),
-                                TextSpan(
+                                const TextSpan(
                                     text: "FCFA",
                                     style: TextStyle(
                                         color: Colors.white,
@@ -121,53 +236,31 @@ class WalletScreen extends StatelessWidget {
 
                   const Gap(30),
 
-                  // Partie Basse : Les boutons
-                  Row(
-                    children: [
-                      // ... dans WalletScreen ...
-
-// Bouton Recharger
-                      Expanded(
-                        child: SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // NAVIGATION VERS RECHARGER
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const TopUpScreen()));
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.25),
-                              // ... reste du style
-                            ),
-                            child: const Text("Recharger", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
+                  // Partie Basse : Le bouton Recharger (PREND TOUTE LA LARGEUR)
+                  SizedBox(
+                    width: double.infinity, // Prend toute la largeur
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const TopUpScreen()));
+                      },
+                      style: ElevatedButton.styleFrom(
+                        // J'ai mis le fond blanc pour qu'il ressorte bien sur l'orange
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFFE64A19), // Texte orange
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                       ),
+                      child: const Text("Recharger mon compte", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
 
-                      const Gap(15),
-
-                      // Bouton Retirer
-                      Expanded(
-                        child: SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // NAVIGATION VERS RETRAIT
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const WithdrawScreen()));
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              // ... reste du style
-                            ),
-                            child: const Text("Retirer", style: TextStyle(color: Color(0xFFE64A19), fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
+                  // J'ai supprimé le Gap(15) et le bouton "Retirer" ici
                 ],
               ),
             ),
+
+// ... (La suite avec la liste des transactions reste identique)
 
             const Gap(30),
 
@@ -175,12 +268,32 @@ class WalletScreen extends StatelessWidget {
             Text("Dernières transactions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
             const Gap(15),
 
-            // On passe le context pour récupérer le thème à l'intérieur
-            _buildTransactionTile(context, "Rechargement Orange Money", "+ 5 000 F", DateTime.now(), true),
-            _buildTransactionTile(context, "Ticket Abidjan - Bouaké", "- 6 000 F", DateTime.now().subtract(const Duration(days: 1)), false),
-            _buildTransactionTile(context, "Rechargement Wave", "+ 10 000 F", DateTime.now().subtract(const Duration(days: 2)), true),
+            if (walletData != null && walletData!.transactions.isNotEmpty)
+              ListView.builder(
+                  shrinkWrap: true, // Important dans un SingleChildScrollView
+                  physics: const NeverScrollableScrollPhysics(), // Désactive le scroll interne
+                  itemCount: walletData!.transactions.length,
+                  itemBuilder: (context, index) {
+                    final transac = walletData!.transactions[index];
+                    // Parsing simple de la date pour affichage
+                    DateTime? dateT = DateTime.tryParse(transac.date);
 
-            const Gap(20),
+                    return _buildTransactionTile(
+                        context,
+                        transac.titre,
+                        "${transac.isCredit ? '+' : '-'} ${transac.montant} F",
+                        dateT ?? DateTime.now(),
+                        transac.isCredit
+                    );
+                  }
+              )
+            else
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Text("Aucune transaction récente", style: TextStyle(color: Colors.grey)),
+                ),
+              )
           ],
         ),
       ),
@@ -188,7 +301,6 @@ class WalletScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionTile(BuildContext context, String title, String amount, DateTime date, bool isCredit) {
-    // Variables locales
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -198,7 +310,7 @@ class WalletScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-          color: cardColor, // <--- FOND DYNAMIQUE
+          color: cardColor,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
@@ -213,7 +325,6 @@ class WalletScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              // On garde les couleurs pastels mais en mode sombre on peut les rendre un peu plus transparentes si on veut
                 color: isCredit ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
                 shape: BoxShape.circle
             ),
@@ -231,7 +342,7 @@ class WalletScreen extends StatelessWidget {
                 Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
                 const Gap(4),
                 Text(
-                    "${date.day}/${date.month} • ${date.hour}:${date.minute.toString().padLeft(2, '0')}",
+                    DateFormat('dd/MM • HH:mm').format(date),
                     style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey, fontSize: 12)
                 ),
               ],
@@ -242,7 +353,6 @@ class WalletScreen extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  // Si c'est du débit (négatif), ça prend la couleur du texte (Noir/Blanc), sinon Vert
                   color: isCredit ? Colors.green : textColor
               )
           ),

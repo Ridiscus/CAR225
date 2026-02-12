@@ -1,80 +1,378 @@
+/*import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import 'main_wrapper_screen.dart';
+import '../../../booking/data/models/active_reservation_model.dart';
+import '../../../booking/domain/repositories/alert_repository.dart';
+import 'alert_success_screen.dart';
 
-class AlertDetailScreen extends StatelessWidget {
+class AlertDetailScreen extends StatefulWidget {
   final String alertType;
   final Color alertColor;
   final String iconPath;
+  final ActiveReservationModel reservation;
 
   const AlertDetailScreen({
     super.key,
     required this.alertType,
     required this.alertColor,
     required this.iconPath,
+    required this.reservation,
   });
 
   @override
+  State<AlertDetailScreen> createState() => _AlertDetailScreenState();
+}
+
+class _AlertDetailScreenState extends State<AlertDetailScreen> {
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+
+  File? _selectedImage;
+  Position? _currentPosition;
+  bool _isLocating = false;
+  bool _isSending = false;
+
+  final ImagePicker _picker = ImagePicker();
+
+  // ✅ TA NOUVELLE FONCTION OVERLAY (DESIGN MODERNE)
+  void _showTopNotification(String message, {bool isError = true}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 60.0,
+        left: 20.0,
+        right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isError ? const Color(0xFF222222) : Colors.green.shade700,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    // Suppression automatique après 3 secondes
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        overlayEntry.remove();
+      } else {
+        // Sécurité : si l'écran est fermé, on essaie quand même de nettoyer si l'overlay est actif
+        try {
+          overlayEntry.remove();
+        } catch (_) {}
+      }
+    });
+  }
+
+
+  // Convertit le texte affiché en valeur acceptée par l'API (minuscule)
+  String _getApiType(String displayType) {
+    // Si tu as d'autres cas, ajoute-les ici.
+    // Par défaut, on met tout en minuscule.
+    switch (displayType.toLowerCase()) {
+      case 'accident':
+        return 'accident';
+      case 'panne':
+        return 'panne';
+      case 'embouteillage':
+        return 'embouteillage';
+      case 'retard':
+        return 'retard';
+      default:
+        return displayType.toLowerCase();
+    }
+  }
+
+  // --- GESTION PHOTO ---
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 50);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      _showTopNotification("Impossible de charger la photo", isError: true);
+    }
+  }
+
+  void _showImageSourceModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text('Prendre une photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.purple),
+                title: const Text('Choisir dans la galerie'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- GESTION LOCALISATION ---
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLocating = true);
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Permission de localisation refusée');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Localisation définitivement refusée. Activez-la dans les paramètres.');
+      }
+
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+
+      setState(() {
+        _currentPosition = position;
+        if (placemarks.isNotEmpty) {
+          Placemark place = placemarks[0];
+          _locationController.text = "${place.street ?? ''}, ${place.locality ?? ''}".trim();
+          if (_locationController.text == ",") _locationController.text = "Position détectée";
+        } else {
+          _locationController.text = "${position.latitude}, ${position.longitude}";
+        }
+        _isLocating = false;
+      });
+
+    } catch (e) {
+      setState(() => _isLocating = false);
+      _showTopNotification("Erreur GPS : ${e.toString().replaceAll('Exception:', '')}", isError: true);
+    }
+  }
+
+  // --- ENVOI DU SIGNALEMENT ---
+  Future<void> _submitSignalement() async {
+    // 1. Validations
+    if (_descriptionController.text.trim().isEmpty) {
+      _showTopNotification("Veuillez décrire le problème.", isError: true);
+      return;
+    }
+    if (_selectedImage == null) {
+      _showTopNotification("Une photo de preuve est obligatoire.", isError: true);
+      return;
+    }
+    if (_currentPosition == null) {
+      _showTopNotification("Récupération de la position en cours...", isError: false);
+      await _getCurrentLocation();
+      if (_currentPosition == null) {
+        // Si échec de la localisation auto, on arrête
+        return;
+      }
+    }
+
+    setState(() => _isSending = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? prefs.getString('token');
+
+      // Setup Dio
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+
+      // 2. Appel
+      await repository.createSignalement(
+        programmeId: widget.reservation.programmeId,
+        vehiculeId: widget.reservation.vehiculeId,
+
+        // ✅ CORRECTION : On convertit en minuscule pour l'API
+        type: _getApiType(widget.alertType),
+
+        description: _descriptionController.text,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        photo: _selectedImage!,
+      );
+
+
+      if (mounted) {
+        _showTopNotification("Signalement envoyé !", isError: false);
+        // Petit délai pour voir la notif avant de changer d'écran
+        await Future.delayed(const Duration(milliseconds: 500));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AlertSuccessScreen()),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        // Nettoyage du message d'erreur pour l'utilisateur
+        String msg = e.toString().replaceAll("Exception:", "").trim();
+        _showTopNotification(msg, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // --- VARIABLES DE THEME ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final inputFillColor = isDark ? Colors.grey[900] : Colors.white; // Fond des inputs
+    final inputFillColor = isDark ? Colors.grey[900] : Colors.white;
     final borderColor = isDark ? Colors.grey[800] : Colors.transparent;
 
+    // Récupération de la zone safe en bas pour l'iPhone X+ / Android Gestures
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
+        title: Text("Détails du problème", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor), // Flèche dynamique
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Détails du problème", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        // ✅ CORRECTION ICI : On ajoute du padding en bas pour la barre système
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(alertType, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-            const Gap(10),
+            // --- INFO VOYAGE ---
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[900] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.directions_bus, color: textColor),
+                  const Gap(15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Voyage avec ${widget.reservation.compagnieName}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text("${widget.reservation.pointDepart} ➔ ${widget.reservation.pointArrive}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(5)),
+                    child: const Text("Actif", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  )
+                ],
+              ),
+            ),
+            const Gap(20),
 
-            // Tag du type d'alerte (Reste similaire car utilise l'opacité)
+            // --- TYPE ALERTE ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: alertColor.withOpacity(0.1),
+                color: widget.alertColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: alertColor.withOpacity(0.3)),
+                border: Border.all(color: widget.alertColor.withOpacity(0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(iconPath, width: 16, color: alertColor),
+                  Image.asset(widget.iconPath, width: 16, color: widget.alertColor),
                   const Gap(8),
-                  Text(alertType, style: TextStyle(color: alertColor, fontWeight: FontWeight.bold)),
+                  Text(widget.alertType, style: TextStyle(color: widget.alertColor, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
             const Gap(25),
 
-            // --- Champ Description ---
-            Text("Description du problème", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+            // --- FORMULAIRE DESCRIPTION ---
+            Text("Description du problème *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const Gap(10),
             TextField(
+              controller: _descriptionController,
               maxLines: 5,
-              style: TextStyle(color: textColor), // Texte saisi
+              style: TextStyle(color: textColor),
               decoration: InputDecoration(
                 hintText: "Décrivez en détails ce qui s'est passé...",
                 hintStyle: const TextStyle(color: Colors.grey),
                 filled: true,
-                fillColor: inputFillColor, // Couleur fond input adaptée
+                fillColor: inputFillColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                 enabledBorder: isDark
                     ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
@@ -82,24 +380,25 @@ class AlertDetailScreen extends StatelessWidget {
                 contentPadding: const EdgeInsets.all(15),
               ),
             ),
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: EdgeInsets.only(top: 5),
-                child: Text("0/500 caractères", style: TextStyle(color: Colors.grey, fontSize: 11)),
-              ),
-            ),
             const Gap(20),
 
-            // --- Champ Lieu ---
-            Text("Lieu du problème (optionnel)", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+            // --- LOCALISATION AUTOMATIQUE ---
+            Text("Lieu du problème *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const Gap(10),
             TextField(
+              controller: _locationController,
+              readOnly: true,
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
-                hintText: "Localisation actuelle...",
+                hintText: "Cliquez sur l'icône GPS...",
                 hintStyle: const TextStyle(color: Colors.grey),
                 prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                suffixIcon: IconButton(
+                  onPressed: _isLocating ? null : _getCurrentLocation,
+                  icon: _isLocating
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location, color: Colors.blue),
+                ),
                 filled: true,
                 fillColor: inputFillColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
@@ -110,52 +409,43 @@ class AlertDetailScreen extends StatelessWidget {
             ),
             const Gap(20),
 
-            // --- Champ Passagers ---
-            Text("Nombre de passagers affectés", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+            // --- PHOTO DE PREUVE ---
+            Text("Preuve photo *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const Gap(10),
-            TextField(
-              style: TextStyle(color: textColor),
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: "1",
-                hintStyle: const TextStyle(color: Colors.grey),
-                prefixIcon: const Icon(Icons.people_outline, color: Colors.grey),
-                filled: true,
-                fillColor: inputFillColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                enabledBorder: isDark
-                    ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
-                    : null,
-              ),
-            ),
-            const Gap(20),
-
-            // --- Boite info urgence ---
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                // Dark: Bleu très sombre transparent / Light: Bleu pâle
-                color: isDark ? Colors.blue.withOpacity(0.15) : Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: isDark ? Colors.blue.withOpacity(0.3) : Colors.blue.shade100),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.blue),
-                  const Gap(10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Urgence ?", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                        Text(
-                            "Si c'est une situation d'urgence vitale, contactez immédiatement les autorités locales.",
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.blueGrey[200] : Colors.blueGrey)
-                        ),
-                      ],
-                    ),
-                  )
-                ],
+            GestureDetector(
+              onTap: _showImageSourceModal,
+              child: Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                    color: inputFillColor,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: _selectedImage == null ? Colors.grey.shade400 : AppColors.primary, width: 1),
+                    image: _selectedImage != null
+                        ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
+                        : null
+                ),
+                child: _selectedImage == null
+                    ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.camera_enhance_rounded, size: 40, color: Colors.grey.shade400),
+                    const Gap(10),
+                    Text("Appuyez pour ajouter une photo", style: TextStyle(color: Colors.grey.shade500)),
+                  ],
+                )
+                    : Stack(
+                  children: [
+                    Positioned(
+                      right: 10, top: 10,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 15,
+                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                      ),
+                    )
+                  ],
+                ),
               ),
             ),
             const Gap(30),
@@ -165,136 +455,548 @@ class AlertDetailScreen extends StatelessWidget {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AlertSuccessScreen()),
-                  );
-                },
+                onPressed: _isSending ? null : _submitSignalement,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   elevation: 5,
                   shadowColor: AppColors.primary.withOpacity(0.4),
+                  disabledBackgroundColor: Colors.grey,
                 ),
-                child: const Text("Envoyer le signalement", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: _isSending
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                    : const Text("Envoyer le signalement", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
+
+            // Un petit espace supplémentaire au cas où
             const Gap(20),
           ],
         ),
       ),
     );
   }
+}*/
+
+
+
+
+
+
+
+
+
+
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../booking/data/models/active_reservation_model.dart';
+import '../../../booking/domain/repositories/alert_repository.dart';
+import 'alert_success_screen.dart';
+
+class AlertDetailScreen extends StatefulWidget {
+  final String alertType;
+  final Color alertColor;
+  final String iconPath;
+  final ActiveReservationModel reservation;
+
+  const AlertDetailScreen({
+    super.key,
+    required this.alertType,
+    required this.alertColor,
+    required this.iconPath,
+    required this.reservation,
+  });
+
+  @override
+  State<AlertDetailScreen> createState() => _AlertDetailScreenState();
 }
 
-// ---------------------------------------------------------
-// --- ALERT SUCCES SCREEN ---
-// ---------------------------------------------------------
+class _AlertDetailScreenState extends State<AlertDetailScreen> {
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
 
-class AlertSuccessScreen extends StatelessWidget {
-  const AlertSuccessScreen({super.key});
+  File? _selectedImage;
+  Position? _currentPosition;
+  bool _isLocating = false;
+  bool _isSending = false;
+
+  final ImagePicker _picker = ImagePicker();
+
+  // ✅ 1. LOGIQUE INTELLIGENTE
+  // Vérifie si les champs doivent être obligatoires (seulement si Accident)
+  bool get _isMandatory {
+    return _getApiType(widget.alertType) == 'accident';
+  }
+
+  // Convertit le texte affiché en valeur acceptée par l'API
+  String _getApiType(String displayType) {
+    switch (displayType.toLowerCase()) {
+      case 'accident':
+        return 'accident';
+      case 'panne':
+        return 'panne';
+      case 'embouteillage':
+        return 'embouteillage';
+      case 'retard':
+        return 'retard';
+      default:
+        return displayType.toLowerCase();
+    }
+  }
+
+  // --- NOTIFICATION TOP OVERLAY ---
+  void _showTopNotification(String message, {bool isError = true}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 60.0,
+        left: 20.0,
+        right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isError ? const Color(0xFF222222) : Colors.green.shade700,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        try { overlayEntry.remove(); } catch (_) {}
+      }
+    });
+  }
+
+  // --- GESTION PHOTO ---
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 50);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      _showTopNotification("Impossible de charger la photo", isError: true);
+    }
+  }
+
+  void _showImageSourceModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text('Prendre une photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.purple),
+                title: const Text('Choisir dans la galerie'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- GESTION LOCALISATION ---
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLocating = true);
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Permission de localisation refusée');
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Localisation définitivement refusée.');
+      }
+
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+      // Essai de géocodage (nom de rue), mais on continue même si ça échoue
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            if (placemarks.isNotEmpty) {
+              Placemark place = placemarks[0];
+              _locationController.text = "${place.street ?? ''}, ${place.locality ?? ''}".trim();
+              if (_locationController.text == ",") _locationController.text = "Position GPS détectée";
+            } else {
+              _locationController.text = "${position.latitude}, ${position.longitude}";
+            }
+            _isLocating = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _locationController.text = "${position.latitude}, ${position.longitude}";
+            _isLocating = false;
+          });
+        }
+      }
+
+    } catch (e) {
+      setState(() => _isLocating = false);
+      _showTopNotification("Erreur GPS : ${e.toString().replaceAll('Exception:', '')}", isError: true);
+    }
+  }
+
+  // --- ENVOI DU SIGNALEMENT ---
+  Future<void> _submitSignalement() async {
+    // ✅ 2. VALIDATION CONDITIONNELLE
+    // Si c'est un ACCIDENT, on oblige la description et la photo.
+    // Sinon, on laisse passer même si vide.
+
+    if (_isMandatory) {
+      if (_descriptionController.text.trim().isEmpty) {
+        _showTopNotification("Veuillez décrire l'accident.", isError: true);
+        return;
+      }
+      if (_selectedImage == null) {
+        _showTopNotification("Une photo est obligatoire pour un accident.", isError: true);
+        return;
+      }
+    }
+
+    // La localisation reste obligatoire pour tout le monde pour savoir où ça se passe
+    if (_currentPosition == null) {
+      _showTopNotification("Récupération de la position en cours...", isError: false);
+      await _getCurrentLocation();
+      if (_currentPosition == null) return;
+    }
+
+    setState(() => _isSending = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? prefs.getString('token');
+
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+      await repository.createSignalement(
+        programmeId: widget.reservation.programmeId,
+        vehiculeId: widget.reservation.vehiculeId,
+        type: _getApiType(widget.alertType),
+
+        description: _descriptionController.text, // Peut être vide si non accident
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+
+        // ✅ J'ai enlevé le "!" ici. Si c'est null (optionnel), on envoie null.
+        // Assure-toi que ton AlertRepository accepte "File? photo" et non "File photo"
+        photo: _selectedImage,
+      );
+
+      if (mounted) {
+        _showTopNotification("Signalement envoyé !", isError: false);
+        await Future.delayed(const Duration(milliseconds: 500));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AlertSuccessScreen()),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        String msg = e.toString().replaceAll("Exception:", "").trim();
+        _showTopNotification(msg, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Variables de thème
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final summaryBgColor = isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100;
+    final inputFillColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? Colors.grey[800] : Colors.transparent;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
-      body: Padding(
-        padding: const EdgeInsets.all(30.0),
+      backgroundColor: scaffoldColor,
+      appBar: AppBar(
+        title: Text("Détails du problème", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: textColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Spacer(),
-
-            // Cercle vert
+            // INFO VOYAGE
             Container(
-              height: 100, width: 100,
+              padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: isDark ? Colors.green.withOpacity(0.15) : Colors.green.shade50,
-                shape: BoxShape.circle,
+                color: isDark ? Colors.grey[900] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
               ),
-              child: const Icon(Icons.check, size: 50, color: Colors.green),
-            ),
-            const Gap(30),
-
-            Text("Rapport envoyé", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor)),
-            const Gap(10),
-            const Text(
-              "Merci de nous avoir signalé ce problème. Nos équipes examineront votre rapport dans les plus brefs délais.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const Gap(40),
-
-            // Résumé
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: summaryBgColor, // Fond adapté gris/transparent
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
+              child: Row(
                 children: [
-                  _buildSummaryRow(context, "Type de problème", "Accident"),
+                  Icon(Icons.directions_bus, color: textColor),
                   const Gap(15),
-                  _buildSummaryRow(context, "Passagers affectés", "5"),
-                  const Gap(15),
-                  _buildSummaryRow(context, "Numéro de rapport", "#1768855343878"),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Voyage avec ${widget.reservation.compagnieName}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text("${widget.reservation.pointDepart} ➔ ${widget.reservation.pointArrive}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
+            const Gap(20),
 
-            const Spacer(),
-
-            // Boutons d'action
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MainScreen(initialIndex: 0),
-                    ),
-                        (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8501E),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                ),
-                child: const Text("Retour à l'accueil", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            // TYPE ALERTE
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: widget.alertColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: widget.alertColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(widget.iconPath, width: 16, color: widget.alertColor),
+                  const Gap(8),
+                  Text(widget.alertType, style: TextStyle(color: widget.alertColor, fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
-            const Gap(15),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text("Signaler un autre problème", style: TextStyle(color: textColor)), // Texte dynamique
+            const Gap(25),
+
+            // ✅ 3. AFFICHAGE DYNAMIQUE (Description)
+            Row(
+              children: [
+                Text("Description du problème", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                const Gap(5),
+                Text(
+                  _isMandatory ? "*" : "(Optionnel)",
+                  style: TextStyle(
+                      color: _isMandatory ? Colors.red : Colors.grey,
+                      fontSize: 12,
+                      fontWeight: _isMandatory ? FontWeight.bold : FontWeight.normal
+                  ),
+                ),
+              ],
+            ),
+            const Gap(10),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 5,
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                hintText: _isMandatory
+                    ? "Décrivez en détails ce qui s'est passé..."
+                    : "Ajoutez une note si nécessaire...",
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: inputFillColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                enabledBorder: isDark
+                    ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
+                    : null,
+                contentPadding: const EdgeInsets.all(15),
+              ),
+            ),
+            const Gap(20),
+
+            // LOCALISATION (Toujours auto et visible)
+            Text("Lieu du problème", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+            const Gap(10),
+            TextField(
+              controller: _locationController,
+              readOnly: true,
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                hintText: "Cliquez sur l'icône GPS...",
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                suffixIcon: IconButton(
+                  onPressed: _isLocating ? null : _getCurrentLocation,
+                  icon: _isLocating
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location, color: Colors.blue),
+                ),
+                filled: true,
+                fillColor: inputFillColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                enabledBorder: isDark
+                    ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
+                    : null,
+              ),
+            ),
+            const Gap(20),
+
+            // ✅ 4. AFFICHAGE DYNAMIQUE (Photo)
+            Row(
+              children: [
+                Text("Preuve photo", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                const Gap(5),
+                Text(
+                  _isMandatory ? "*" : "(Optionnel)",
+                  style: TextStyle(
+                      color: _isMandatory ? Colors.red : Colors.grey,
+                      fontSize: 12,
+                      fontWeight: _isMandatory ? FontWeight.bold : FontWeight.normal
+                  ),
+                ),
+              ],
+            ),
+            const Gap(10),
+            GestureDetector(
+              onTap: _showImageSourceModal,
+              child: Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                    color: inputFillColor,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      // Bordure rouge si obligatoire et manquant (optionnel pour UX poussée)
+                        color: _selectedImage == null
+                            ? Colors.grey.shade400
+                            : AppColors.primary,
+                        width: 1
+                    ),
+                    image: _selectedImage != null
+                        ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
+                        : null
+                ),
+                child: _selectedImage == null
+                    ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.camera_enhance_rounded, size: 40, color: Colors.grey.shade400),
+                    const Gap(10),
+                    Text(
+                        _isMandatory ? "Appuyez pour ajouter une photo" : "Ajouter une photo (facultatif)",
+                        style: TextStyle(color: Colors.grey.shade500)
+                    ),
+                  ],
+                )
+                    : Stack(
+                  children: [
+                    Positioned(
+                      right: 10, top: 10,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 15,
+                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ),
+            const Gap(30),
+
+            // BOUTON
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _isSending ? null : _submitSignalement,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  elevation: 5,
+                  shadowColor: AppColors.primary.withOpacity(0.4),
+                  disabledBackgroundColor: Colors.grey,
+                ),
+                child: _isSending
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                    : const Text("Envoyer le signalement", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
             ),
             const Gap(20),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSummaryRow(BuildContext context, String label, String value) {
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-      ],
     );
   }
 }

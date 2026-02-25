@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/local_badge.dart';
 import '../../../../core/providers/company_provider.dart';
 import '../../../../core/providers/user_provider.dart';
@@ -18,16 +19,79 @@ class CompaniesTabScreen extends StatefulWidget {
   State<CompaniesTabScreen> createState() => _CompaniesTabScreenState();
 }
 
-class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
+class _CompaniesTabScreenState extends State<CompaniesTabScreen> with SingleTickerProviderStateMixin {
 
-  @override
+
+  // 🟢 2. DECLARATION DU CONTROLLER D'ANIMATION
+  late AnimationController _entranceController;
+
+  /*@override
   void initState() {
     super.initState();
     // On charge les compagnies au démarrage de l'écran
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CompanyProvider>().fetchCompanies();
     });
+
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 5000), // La durée que tu as choisie
+      vsync: this,
+    );
+
   }
+
+
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }*/
+
+
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    _entranceController = AnimationController(
+      // On réduit un peu la durée pour que ce soit fluide et dynamique
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<CompanyProvider>();
+
+      // On lance le chargement
+      provider.fetchCompanies();
+
+      // On écoute le provider pour savoir QUAND l'animation doit démarrer
+      provider.addListener(_onProviderChange);
+    });
+  }
+
+  // Fonction qui vérifie si on doit lancer l'animation
+  void _onProviderChange() {
+    final provider = context.read<CompanyProvider>();
+    // Si on a fini de charger et qu'il y a des données (et pas d'erreur)
+    if (!provider.isLoading && provider.error == null && provider.companies.isNotEmpty) {
+      // On lance l'animation si elle n'est pas déjà en cours ou terminée
+      if (!_entranceController.isAnimating && !_entranceController.isCompleted) {
+        _entranceController.forward(from: 0.0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Il faut retirer le listener pour éviter les fuites de mémoire
+    context.read<CompanyProvider>().removeListener(_onProviderChange);
+    _entranceController.dispose();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +104,12 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
     return Scaffold(
       backgroundColor: scaffoldColor,
       body: RefreshIndicator(
-        onRefresh: () => context.read<CompanyProvider>().fetchCompanies(),
+        onRefresh: () async {
+          // On remet l'animation à zéro
+          _entranceController.reset();
+          // On recharge les données (le listener relancera l'animation)
+          await context.read<CompanyProvider>().fetchCompanies();
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -95,7 +164,7 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
                             const Gap(20),
 
                             // --- 3. LISTE DES COMPAGNIES DYNAMIQUE ---
-                            if (provider.companies.isEmpty)
+                            /*if (provider.companies.isEmpty)
                               const Center(child: Text("Aucune compagnie disponible."))
                             else
                               ListView.separated(
@@ -108,7 +177,50 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
                                   final company = provider.companies[index];
                                   return _buildCompanyCard(context, company);
                                 },
+                              ),*/
+
+
+                            // --- 3. LISTE DES COMPAGNIES DYNAMIQUE ---
+                            if (provider.companies.isEmpty)
+                              const Center(child: Text("Aucune compagnie disponible."))
+                            else
+                              ListView.separated(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: provider.companies.length,
+                                separatorBuilder: (ctx, index) => const Gap(15),
+                                itemBuilder: (ctx, index) {
+                                  final company = provider.companies[index];
+
+                                  // 🟢 CALCUL DE L'ANIMATION EN CASCADE
+                                  final double startDelay = (index % 10) * 0.1;
+                                  final double endDelay = (startDelay + 0.5).clamp(0.0, 1.0);
+
+                                  final animation = CurvedAnimation(
+                                    parent: _entranceController,
+                                    curve: Interval(
+                                      startDelay,
+                                      endDelay,
+                                      curve: Curves.easeOutCubic,
+                                    ),
+                                  );
+
+                                  // 🟢 APPLICATION DE LA TRANSITION
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.3), // Glisse du bas vers le haut
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: FadeTransition(
+                                      opacity: animation, // Apparition en fondu
+                                      child: _buildCompanyCard(context, company),
+                                    ),
+                                  );
+                                },
                               ),
+
+
 
                             const Gap(140),
                           ],
@@ -127,11 +239,18 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
 
   // --- WIDGETS ---
 
+
+
+
+
+  // --- TON WIDGET HEADER CORRIGÉ ---
   Widget _buildHeader(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
-    final user = userProvider.user; // ✅ On prend l'objet user entier
-    final userPhotoUrl = userProvider.user?.photoUrl;
+    final user = userProvider.user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // ✅ CORRECTION 1 : On récupère la hauteur exacte de la barre d'état (encoche)
+    final double topPadding = MediaQuery.of(context).padding.top;
 
     return Container(
       height: 260,
@@ -140,67 +259,64 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
         color: isDark ? Colors.black : Colors.white,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         image: const DecorationImage(
-          image: AssetImage("assets/images/busheader5.jpg"),
-          fit: BoxFit.cover,
+            image: AssetImage("assets/images/busheader5.jpg"),
+            fit: BoxFit.cover
         ),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-            stops: const [0.0, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+              stops: const [0.0, 0.6]
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.grey[200],
-                          // ✅ C'EST ICI QUE TOUT SE JOUE :
-                          // On utilise user.fullPhotoUrl (ton getter magique)
-                          backgroundImage: user != null
-                              ? NetworkImage(user.fullPhotoUrl)
-                              : const AssetImage("assets/images/ci.jpg") as ImageProvider,
-
-                          // Petit bonus : gestion d'erreur silencieuse
-                          onBackgroundImageError: (_, __) {},
+        // ✅ CORRECTION 2 : On remplace le widget SafeArea par un Padding manuel
+        child: Padding(
+          padding: EdgeInsets.only(
+            // On pousse le contenu vers le bas : Hauteur barre d'état + 15px de marge
+              top: topPadding + 15,
+              left: 20,
+              right: 20,
+              bottom: 20
+          ),
+          child: Column(
+            // On utilise une Column pour être sûr que le contenu commence en haut
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center, // Important pour l'alignement vertical
+                children: [
+                  // GAUCHE : Avatar + Localisation
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: CircleAvatar(
+                              radius: 24, // Taille fixe garantie
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: user != null ? NetworkImage(user.fullPhotoUrl) : const AssetImage("assets/images/ci.jpg") as ImageProvider
+                          ),
                         ),
                       ),
-                    ),
-                    const Gap(12),
-                    const LocationBadge(),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen())),
-                  child: Container(
-                    height: 45, width: 45,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    ),
-                    child: Image.asset("assets/icons/notification.png", color: Colors.white),
+                      const Gap(12),
+                      // Si ton LocationBadge est coupé, c'est souvent qu'il manque de place en hauteur
+                      // On s'assure qu'il est bien centré dans la Row
+                      const LocationBadge(),
+                    ],
                   ),
-                )
-              ],
-            ),
+
+                  // DROITE : Notification
+                  const NotificationIconBtn(),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -221,22 +337,23 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> {
 
     // --- 2. LOGIQUE DE L'IMAGE (Intégrée ici) ---
     // Ton URL de base (Backend)
-    const String baseUrl = "https://jingly-lindy-unminding.ngrok-free.dev/";
+    const String baseUrl = 'https://car225.com/api/';
+    const String mediaBaseUrl = 'https://car225.com/';
 
     String? fullLogoUrl;
 
     if (company.logoUrl.isNotEmpty) {
       if (company.logoUrl.startsWith('http')) {
-        // Si c'est déjà une URL complète
+        // Si c'est déjà une URL complète (ex: Google profile pic)
         fullLogoUrl = company.logoUrl;
       } else {
-        // Sinon, on construit l'URL complète
-        // On enlève le '/' au début s'il y est pour éviter les doubles slashs
+        // Sinon, on construit l'URL complète avec le mediaBaseUrl
         String cleanPath = company.logoUrl.startsWith('/')
             ? company.logoUrl.substring(1)
             : company.logoUrl;
 
-        fullLogoUrl = "$baseUrl$cleanPath";
+        // Résultat attendu : https://car225.com/storage/compagnies/...
+        fullLogoUrl = "$mediaBaseUrl$cleanPath";
       }
     }
 

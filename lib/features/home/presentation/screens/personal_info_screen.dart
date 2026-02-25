@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,10 +29,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _emailController = TextEditingController();
   final _contactController = TextEditingController();
 
-  // Infos Urgence
-  final _nomUrgenceController = TextEditingController();
-  final _prenomUrgenceController = TextEditingController();
+// Infos Urgence
+  final _nomUrgenceController = TextEditingController(); // "Nom et Prénom"
   final _contactUrgenceController = TextEditingController();
+
+  // 🟢 NOUVEAU : Le Dropdown pour le lien de parenté
+  String? _selectedLienParente;
+  final List<String> _liensParente = [
+    'Père', 'Mère', 'Frère', 'Soeur', 'Conjoint(e)', 'Enfant', 'Ami(e)', 'Autre'
+  ];
+
 
   // État
   bool _isLoading = true;
@@ -52,33 +59,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     _loadUserData();
   }
 
+
   // 1. CHARGEMENT
   /*Future<void> _loadUserData() async {
-    try {
-      final user = await _repo.getUserProfile();
-
-      setState(() {
-        _nomController.text = user.name;
-        _prenomController.text = user.prenom;
-        _emailController.text = user.email;
-        _contactController.text = user.contact;
-
-        _nomUrgenceController.text = user.nomUrgence ?? "";
-        _prenomUrgenceController.text = user.prenomUrgence ?? "";
-        _contactUrgenceController.text = user.contactUrgence ?? "";
-
-        _currentPhotoUrl = user.photoUrl;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      // 🔔 Erreur de chargement
-      _showTopNotification("Impossible de charger les infos : $e", isError: true);
-    }
-  }*/
-
-  // 1. CHARGEMENT
-  Future<void> _loadUserData() async {
     try {
       final user = await _repo.getUserProfile();
 
@@ -104,6 +87,36 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       setState(() => _isLoading = false);
       _showTopNotification("Impossible de charger les infos : $e", isError: true);
     }
+  }*/
+
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = await _repo.getUserProfile();
+
+      setState(() {
+        _nomController.text = user.name;
+        _prenomController.text = user.prenom;
+        _emailController.text = user.email;
+        _contactController.text = user.contact;
+
+        _nomUrgenceController.text = user.nomUrgence ?? "";
+        _contactUrgenceController.text = user.contactUrgence ?? "";
+
+        // Pré-sélectionner le lien s'il existe dans notre liste
+        if (user.lienParenteUrgence != null && _liensParente.contains(user.lienParenteUrgence)) {
+          _selectedLienParente = user.lienParenteUrgence;
+        } else if (user.lienParenteUrgence != null && user.lienParenteUrgence!.isNotEmpty) {
+          _selectedLienParente = 'Autre';
+        }
+
+        _currentPhotoUrl = user.fullPhotoUrl;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showTopNotification("Impossible de charger les infos : $e", isError: true);
+    }
   }
 
   // 2. IMAGE
@@ -115,22 +128,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
+
+
   // 3. UPDATE (Avec Validation)
-  Future<void> _updateProfile() async {
+  /*Future<void> _updateProfile() async {
     // 🛡️ VALIDATION DES CHAMPS AVANT ENVOI
     if (_nomController.text.trim().isEmpty || _prenomController.text.trim().isEmpty) {
       _showTopNotification("Le nom et le prénom sont obligatoires", isError: true);
       return;
     }
-    if (_contactController.text.trim().isEmpty) {
-      _showTopNotification("Le numéro de contact est obligatoire", isError: true);
+
+    // 🟢 VALIDATION CONTACT PERSO : 10 Chiffres
+    if (_contactController.text.trim().length != 10) {
+      _showTopNotification("Le numéro de contact doit contenir exactement 10 chiffres", isError: true);
       return;
     }
-    // Validation Urgence (Si tu veux les rendre obligatoires)
-    // Validation Urgence
-    if (_contactUrgenceController.text.trim().isEmpty) {
-      _showTopNotification("Le numéro d'urgence est obligatoire", isError: true);
-      return; // <--- 🛑 IL MANQUAIT CECI ! Sans ça, le code continue.
+
+    // 🟢 VALIDATION URGENCE : 10 Chiffres
+    if (_contactUrgenceController.text.trim().length != 10) {
+      _showTopNotification("Le numéro d'urgence doit contenir exactement 10 chiffres", isError: true);
+      return;
     }
 
     setState(() => _isSaving = true);
@@ -164,6 +181,61 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (!mounted) return;
       // ❌ ERREUR API
       // On nettoie le message d'erreur pour qu'il soit lisible (retire "Exception:")
+      final message = e.toString().replaceAll("Exception: ", "");
+      _showTopNotification(message, isError: true);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }*/
+
+
+  Future<void> _updateProfile() async {
+    if (_nomController.text.trim().isEmpty || _prenomController.text.trim().isEmpty) {
+      _showTopNotification("Le nom et le prénom sont obligatoires", isError: true);
+      return;
+    }
+    if (_contactController.text.trim().length != 10) {
+      _showTopNotification("Le numéro de contact doit contenir exactement 10 chiffres", isError: true);
+      return;
+    }
+
+    // Validation du Lien de parenté
+    if (_selectedLienParente == null) {
+      _showTopNotification("Veuillez choisir un lien de parenté", isError: true);
+      return;
+    }
+
+    if (_contactUrgenceController.text.trim().length != 10) {
+      _showTopNotification("Le numéro d'urgence doit contenir exactement 10 chiffres", isError: true);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      await _repo.updateUserProfile(
+        name: _nomController.text.trim(),
+        prenom: _prenomController.text.trim(),
+        email: _emailController.text.trim(),
+        contact: _contactController.text.trim(),
+        nomUrgence: _nomUrgenceController.text.trim(),
+        lienParenteUrgence: _selectedLienParente!, // <-- On envoie la valeur du Dropdown
+        contactUrgence: _contactUrgenceController.text.trim(),
+        photoPath: _selectedImage?.path,
+      );
+
+      if (mounted) {
+        await context.read<UserProvider>().loadUser();
+      }
+
+      if (!mounted) return;
+
+      _showTopNotification("Profil mis à jour avec succès !", isError: false);
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) Navigator.pop(context);
+
+    } catch (e) {
+      if (!mounted) return;
       final message = e.toString().replaceAll("Exception: ", "");
       _showTopNotification(message, isError: true);
     } finally {
@@ -312,7 +384,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             const Gap(30),
 
             // --- SECTION 2 : CONTACT URGENCE ---
-            _buildSectionTitle("Contact d'Urgence (SOS)"),
+            /*_buildSectionTitle("Contact d'Urgence (SOS)"),
             const Gap(15),
 
             Row(
@@ -325,19 +397,63 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             const Gap(15),
             _buildModernInput(context, "Numéro d'Urgence", _contactUrgenceController, "assets/images/phone-call.png", isPhone: true),
 
+            const Gap(40),*/
+
+
+            // --- SECTION 2 : CONTACT URGENCE ---
+            _buildSectionTitle("Contact d'Urgence (SOS)"),
+            const Gap(15),
+
+            Row(
+              children: [
+                Expanded(
+                    flex: 3,
+                    child: _buildModernInput(context, "Nom & Prénom", _nomUrgenceController, "assets/images/health-insurance.png")
+                ),
+                const Gap(10),
+                // 🟢 LE NOUVEAU DROPDOWN
+                Expanded(
+                    flex: 2,
+                    child: _buildModernDropdown()
+                ),
+              ],
+            ),
+            const Gap(15),
+            _buildModernInput(context, "Numéro d'Urgence", _contactUrgenceController, "assets/images/phone-call.png", isPhone: true),
+
             const Gap(40),
 
             // --- BOUTON SAVE ---
-            SizedBox(
+            Container(
               width: double.infinity,
               height: 55,
+              // ✅ 1. Coupe l'image pour qu'elle respecte les coins arrondis
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                // ✅ 2. L'image de fond (la même que pour les autres boutons)
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                // On garde l'ombre que tu avais, mais appliquée au conteneur
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _updateProfile,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
+                  // ✅ 3. Fond transparent pour voir l'image
+                  backgroundColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.transparent, // Important si désactivé pendant le chargement
+                  shadowColor: Colors.transparent,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  elevation: 5,
-                  shadowColor: primaryColor.withOpacity(0.3),
                 ),
                 child: _isSaving
                     ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
@@ -372,6 +488,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
+
+
   // Widget Input Moderne (Style Inscription)
   Widget _buildModernInput(BuildContext context, String hint, TextEditingController controller, String imagePath, {bool isPhone = false, bool isEmail = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -385,8 +503,18 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       ),
       child: TextField(
         controller: controller,
+        // 💡 Force le clavier numérique si isPhone, email si isEmail, text sinon
         keyboardType: isPhone ? TextInputType.phone : (isEmail ? TextInputType.emailAddress : TextInputType.text),
         style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+
+        // 🛡️ BLOQUER LA SAISIE PHYSIQUEMENT (Chiffres uniquement et 10 max)
+        inputFormatters: isPhone
+            ? [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(10),
+        ]
+            : null,
+
         decoration: InputDecoration(
           prefixIcon: Padding(
             padding: const EdgeInsets.all(12.0),
@@ -400,5 +528,47 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       ),
     );
   }
-}
 
+
+  // 🟢 NOUVEAU WIDGET : Dropdown designé comme tes Inputs
+  Widget _buildModernDropdown() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
+    final iconColor = Colors.grey[500];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Image.asset("assets/images/user.png", width: 18, height: 18, color: iconColor), // Icône parenté
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+        ),
+        hint: Text("Lien", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+        value: _selectedLienParente,
+        dropdownColor: fillColor,
+        icon: Icon(Icons.keyboard_arrow_down, color: iconColor, size: 20),
+        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+        isExpanded: true,
+        items: _liensParente.map((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value, overflow: TextOverflow.ellipsis),
+          );
+        }).toList(),
+        onChanged: (newValue) {
+          setState(() {
+            _selectedLienParente = newValue;
+          });
+        },
+      ),
+    );
+  }
+
+}

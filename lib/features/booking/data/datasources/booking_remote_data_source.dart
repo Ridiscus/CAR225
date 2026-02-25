@@ -83,10 +83,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 2. RECHERCHE INTELLIGENTE (Utilise le Mapping)
-  // ---------------------------------------------------------------------------
-  /*@override
+
+
+  @override
   Future<List<ProgramModel>> searchProgrammes({
     required dynamic depart,
     required dynamic arrivee,
@@ -96,255 +95,400 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     try {
       Response response;
 
-      // Nettoyage des entrées utilisateur
-      String departCourt = depart.toString().trim();
-      String arriveeCourt = arrivee.toString().trim();
-      final bool isSearch = departCourt.isNotEmpty && arriveeCourt.isNotEmpty;
+      // 1. Nettoyage et Préparation des données
+      String rawDepart = depart.toString().trim();
+      String rawArrivee = arrivee.toString().trim();
 
-      if (isSearch) {
-        // --- TRADUCTION AVANT ENVOI ---
-        // On cherche le vrai nom dans la mémoire.
-        // Si on ne trouve pas, on ajoute ", Côte d'Ivoire" par défaut par sécurité.
-        String departAPI = _villeMapping[departCourt] ?? "$departCourt, Côte d'Ivoire";
-        String arriveeAPI = _villeMapping[arriveeCourt] ?? "$arriveeCourt, Côte d'Ivoire";
+      // On garde uniquement le nom de la ville pour reconstruire le format propre
+      // Ex: "Abidjan, Lagunes" -> "Abidjan"
+      String departVilleSeule = rawDepart.split(',')[0].trim();
+      String arriveeVilleSeule = rawArrivee.split(',')[0].trim();
 
-        print("🔄 TRADUCTION : '$departCourt' devient '$departAPI'");
-        print("🔄 TRADUCTION : '$arriveeCourt' devient '$arriveeAPI'");
+      // Format attendu par le backend : "Ville, Côte d'Ivoire"
+      String departAPI = "$departVilleSeule, Côte d'Ivoire";
+      String arriveeAPI = "$arriveeVilleSeule, Côte d'Ivoire";
 
-        print("====== 📡 API REQUEST: POST /user/itineraires/search ======");
+      // 2. Construction du Body
+      final requestBody = {
+        "point_depart": departAPI,
+        "point_arrive": arriveeAPI,
+        "date": date, // ✅ CORRECTION ICI (C'était "date_depart")
+        "type_trajet": isAllerRetour ? "aller-retour" : "aller-simple"
+      };
 
-        final requestBody = {
-          "point_depart": departAPI,   // <--- Vrai nom envoyé au backend
-          "point_arrive": arriveeAPI,  // <--- Vrai nom envoyé au backend
-          "date_depart": date,
-          "type_trajet": isAllerRetour ? "aller-retour" : "aller-simple"
-        };
-        print("📤 Body envoyé : $requestBody");
+      // 🖨️ DEBUG : Ce qu'on envoie
+      print("\n🔵 ================== ENVOI REQUÊTE API ==================");
+      print("📍 URL : /user/itineraires/search");
+      print("📤 BODY JSON : $requestBody");
+      print("========================================================\n");
 
-        response = await dio.post('/user/itineraires/search', data: requestBody);
-      } else {
-        print("====== 📡 API REQUEST: GET /user/programmes ======");
-        response = await dio.get('/user/programmes');
-      }
+      // 3. Appel API
+      response = await dio.post('/user/itineraires/search', data: requestBody);
 
-      // --- EXTRACTION ET PARSING (CODE STANDARD) ---
-      final rootData = response.data['data'];
+      // 🖨️ DEBUG : Ce qu'on reçoit
+      print("\n🟢 ================== RÉPONSE REÇUE ==================");
+      print("Status Code : ${response.statusCode}");
+      print("📥 DONNÉES BRUTES : ${response.data}"); // Tu verras tout le JSON ici
+      print("======================================================\n");
+
+      // 4. Traitement de la réponse
+      final rootData = response.data;
+
       if (rootData == null) {
-        print("⚠️ API a renvoyé NULL dans 'data'.");
+        print("⚠️ ERREUR : L'API a renvoyé null.");
         return [];
       }
 
+      // Extraction de la liste (gestion flexible : map ou list)
       List listJSON = [];
-      if (rootData is Map && rootData.containsKey('data')) {
-        listJSON = rootData['data'] ?? [];
+      if (rootData is Map) {
+        if (rootData.containsKey('data')) {
+          var innerData = rootData['data'];
+          if (innerData is List) {
+            listJSON = innerData;
+          } else if (innerData is Map && innerData.containsKey('data')) {
+            // Cas pagination Laravel standard
+            listJSON = innerData['data'] ?? [];
+          } else {
+            // Cas où data n'est ni liste ni map paginée (rare mais possible)
+            print("⚠️ Structure 'data' inconnue : $innerData");
+          }
+        } else {
+          // Si le JSON est directement un objet sans clé "data" mais qu'on attend une liste
+          print("⚠️ Le JSON racine est une Map mais sans clé 'data'. Vérifier la structure.");
+        }
       } else if (rootData is List) {
         listJSON = rootData;
       }
 
-      print("🔢 Résultats bruts reçus : ${listJSON.length}");
+      print("🔢 Nombre d'éléments trouvés dans le JSON : ${listJSON.length}");
+
+      // 5. Parsing vers ProgramModel
       final List<ProgramModel> extractedPrograms = [];
 
       for (var jsonItem in listJSON) {
-        List horaires = jsonItem['horaires_disponibles'] ?? [];
+        try {
+          // Gestion si l'API renvoie des horaires groupés
+          List horaires = jsonItem['horaires_disponibles'] ?? [];
 
-        if (horaires.isNotEmpty) {
-          for (var horaire in horaires) {
-            Map<String, dynamic> mergedJson = Map.from(jsonItem);
-            mergedJson['id'] = horaire['programme_id'];
-            mergedJson['heure_depart'] = horaire['heure_depart'];
-            mergedJson['heure_arrive'] = horaire['heure_arrive'];
+          if (horaires.isNotEmpty) {
+            for (var horaire in horaires) {
+              // On fusionne les infos parentes avec les infos spécifiques de l'horaire
+              Map<String, dynamic> mergedJson = Map.from(jsonItem);
 
-            double prixDouble = double.tryParse(horaire['prix'].toString()) ?? 0.0;
-            mergedJson['montant_billet'] = prixDouble.toInt();
+              mergedJson['id'] = horaire['programme_id'] ?? jsonItem['id'];
+              mergedJson['heure_depart'] = horaire['heure_depart'];
+              mergedJson['heure_arrive'] = horaire['heure_arrive'];
 
-            if (horaire['vehicule'] != null) mergedJson['vehicule'] = horaire['vehicule'];
-            if (horaire['chauffeur'] != null) mergedJson['chauffeur'] = horaire['chauffeur'];
-            mergedJson['is_aller_retour'] = isAllerRetour ? 1 : 0;
+              // Sécurisation du prix (parfois String, parfois Int, parfois Double)
+              var rawPrix = horaire['montant_billet'] ?? horaire['prix'] ?? jsonItem['montant_billet'];
+              mergedJson['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
 
-            extractedPrograms.add(ProgramModel.fromJson(mergedJson));
+              if (horaire['vehicule'] != null) mergedJson['vehicule'] = horaire['vehicule'];
+              if (horaire['chauffeur'] != null) mergedJson['chauffeur'] = horaire['chauffeur'];
+
+              mergedJson['is_aller_retour'] = isAllerRetour ? 1 : 0;
+
+              extractedPrograms.add(ProgramModel.fromJson(mergedJson));
+            }
+          } else {
+            // Format standard simple
+            var rawPrix = jsonItem['montant_billet'] ?? jsonItem['prix'];
+            jsonItem['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
+
+            jsonItem['is_aller_retour'] = isAllerRetour ? 1 : 0;
+            extractedPrograms.add(ProgramModel.fromJson(jsonItem));
           }
-        } else {
-          // Fallback sans horaires détaillés
-          if (jsonItem['montant_billet'] != null) {
-            double prixRaacine = double.tryParse(jsonItem['montant_billet'].toString()) ?? 0.0;
-            jsonItem['montant_billet'] = prixRaacine.toInt();
-          }
-          jsonItem['is_aller_retour'] = isAllerRetour ? 1 : 0;
-          extractedPrograms.add(ProgramModel.fromJson(jsonItem));
+        } catch (e) {
+          print("⚠️ Erreur de parsing sur un élément : $e");
+          print("Élément fautif : $jsonItem");
         }
       }
 
-      // --- FILTRAGE FINAL DE SÉCURITÉ ---
-      if (isSearch) {
-        final targetDepart = departCourt.toLowerCase();
-        final targetArrivee = arriveeCourt.toLowerCase();
-
-        final filteredResults = extractedPrograms.where((prog) {
-          // On nettoie aussi les données reçues pour comparer "pomme" avec "pomme"
-          String pDepart = prog.villeDepart.split(',')[0].trim().toLowerCase();
-          String pArrivee = prog.villeArrivee.split(',')[0].trim().toLowerCase();
-
-          bool matchDepart = pDepart.contains(targetDepart) || targetDepart.contains(pDepart);
-          bool matchArrivee = pArrivee.contains(targetArrivee) || targetArrivee.contains(pArrivee);
-
-          return matchDepart && matchArrivee;
-        }).toList();
-
-        print("✅ ${filteredResults.length} trajets valides après filtrage.");
-        return filteredResults;
-      }
-
+      print("✅ SUCCÈS : ${extractedPrograms.length} programmes valides retournés.");
       return extractedPrograms;
 
     } on DioException catch (e) {
-      print("❌ ERREUR API: ${e.response?.data}");
+      print("\n❌ ================== ERREUR DIO ==================");
+      print("Status: ${e.response?.statusCode}");
+      print("Message: ${e.message}");
+      print("Data erreur: ${e.response?.data}");
+      print("==================================================\n");
       return [];
-    } catch (e) {
-      print("❌ ERREUR INCONNUE: $e");
+    } catch (e, stacktrace) {
+      print("\n❌ ================== ERREUR CRITIQUE ==================");
+      print("Erreur : $e");
+      print("Stack : $stacktrace");
+      print("======================================================\n");
+      return [];
+    }
+  }
+
+
+
+
+
+  // ---------------------------------------------------------------------------
+  // 2. RÉCUPÉRATION DE TOUS LES PROGRAMMES (Via API dédiée /user/programmes)
+  // ---------------------------------------------------------------------------
+  /*@override
+  Future<List<ProgramModel>> getAllProgrammes() async {
+    print("------------------------------------------------------------------");
+    print("🚀 [DEBUG] getAllProgrammes : Démarrage appel /user/programmes");
+
+    try {
+      // 1. Appel de l'API dédiée
+      final response = await dio.get('/user/programmes');
+
+      print("📥 [DEBUG] Status Code : ${response.statusCode}");
+
+      // 2. Vérification basique
+      if (response.statusCode != 200 || response.data == null) {
+        print("⚠️ [DEBUG] Erreur ou réponse vide.");
+        return [];
+      }
+
+      final rootData = response.data;
+      List<dynamic> rawList = [];
+
+      // 3. Navigation dans le JSON (Structure Laravel Pagination)
+      // Structure reçue : { "success": true, "data": { "data": [ ... ], "current_page": 1 ... } }
+      if (rootData is Map && rootData.containsKey('data')) {
+        final paginationData = rootData['data'];
+
+        if (paginationData is Map && paginationData.containsKey('data')) {
+          // C'est ici que se trouve la vraie liste
+          rawList = paginationData['data'] ?? [];
+        } else if (paginationData is List) {
+          // Cas rare où il n'y a pas de pagination
+          rawList = paginationData;
+        }
+      }
+
+      print("🔢 [DEBUG] ${rawList.length} programmes trouvés dans la réponse.");
+
+      // 4. Conversion en ProgramModel
+      final List<ProgramModel> extractedPrograms = [];
+
+      for (var jsonItem in rawList) {
+        try {
+          // Copie mutable pour nettoyage
+          Map<String, dynamic> cleanJson = Map.from(jsonItem);
+
+          // --- NETTOYAGE DES DONNÉES ---
+
+          // A. Le prix arrive souvent en String "100" -> On le force en int
+          var rawPrix = cleanJson['montant_billet'] ?? cleanJson['prix'] ?? 0;
+          cleanJson['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
+
+          // B. Gestion des objets imbriqués (Vehicule / Compagnie)
+          // Normalement ProgramModel.fromJson gère ça, mais on s'assure qu'ils ne sont pas null
+          if (cleanJson['vehicule'] == null) {
+            // Tu peux mettre des valeurs par défaut si nécessaire
+            print("⚠️ Véhicule null pour le programme ${cleanJson['id']}");
+          }
+
+          // C. Dates
+          // "2026-01-30T00:00:00.000000Z" est géré par DateTime.parse,
+          // mais assure-toi que ton Model le gère bien.
+
+          // D. Ajout à la liste
+          extractedPrograms.add(ProgramModel.fromJson(cleanJson));
+
+        } catch (e) {
+          print("⚠️ [DEBUG] Erreur de parsing sur l'item ID ${jsonItem['id']}: $e");
+        }
+      }
+
+      print("✅ [DEBUG] ${extractedPrograms.length} programmes parsés avec succès.");
+      return extractedPrograms;
+
+    } on DioException catch (e) {
+      print("❌ [DEBUG] DioError (getAllProgrammes): ${e.message}");
+      print("👉 Data: ${e.response?.data}");
+      return [];
+    } catch (e, stack) {
+      print("❌ [DEBUG] Erreur Critique (getAllProgrammes): $e");
+      print(stack);
       return [];
     }
   }*/
 
 
-  // ---------------------------------------------------------------------------
-  // 2. RECHERCHE INTELLIGENTE (CORRIGÉE)
-  // ---------------------------------------------------------------------------
   @override
-  Future<List<ProgramModel>> searchProgrammes({
-    required dynamic depart,
-    required dynamic arrivee,
-    required String date,
-    required bool isAllerRetour,
-  }) async {
+  Future<List<ProgramModel>> getAllProgrammes() async {
+    print("------------------------------------------------------------------");
+    print("🚀 [DEBUG] getAllProgrammes : Démarrage appel /user/programmes");
+
     try {
-      Response response;
+      final response = await dio.get('/user/programmes');
 
-      // Nettoyage initial
-      String rawDepart = depart.toString().trim();
-      String rawArrivee = arrivee.toString().trim();
+      // Validation simple
+      if (response.statusCode != 200 || response.data == null) return [];
 
-      // On vérifie si on a bien des valeurs pour lancer une recherche
-      final bool isSearch = rawDepart.isNotEmpty && rawArrivee.isNotEmpty;
-
-      if (isSearch) {
-        // --- 🔧 FIX : NETTOYAGE RADICAL ---
-        // 1. On prend tout ce qui est avant la première virgule (ex: "Bouaké, CI" -> "Bouaké")
-        String departVilleSeule = rawDepart.split(',')[0].trim();
-        String arriveeVilleSeule = rawArrivee.split(',')[0].trim();
-
-        // 2. On reconstruit PROPREMENT le format API (ex: "Bouaké, Côte d'Ivoire")
-        // Tu peux adapter le pays si besoin, mais ça évite les doublons.
-        String departAPI = "$departVilleSeule, Côte d'Ivoire";
-        String arriveeAPI = "$arriveeVilleSeule, Côte d'Ivoire";
-
-        print("🟦 --- DEBUG APPEL API ---");
-        print("Entrée brute : '$rawDepart' -> Ville seule : '$departVilleSeule'");
-        print("Sortie API   : '$departAPI'");
-        print("---------------------------");
-
-        final requestBody = {
-          "point_depart": departAPI,
-          "point_arrive": arriveeAPI,
-          "date_depart": date,
-          "type_trajet": isAllerRetour ? "aller-retour" : "aller-simple"
-        };
-
-        print("====== 📡 API REQUEST: POST /user/itineraires/search ======");
-        print("📤 Body envoyé : $requestBody");
-
-        response = await dio.post('/user/itineraires/search', data: requestBody);
-      } else {
-        // Pas de recherche, on récupère tout (GET classique)
-        print("====== 📡 API REQUEST: GET /user/programmes ======");
-        response = await dio.get('/user/programmes');
-      }
-
-      // --- EXTRACTION ET PARSING (CODE STANDARD) ---
       final rootData = response.data;
-      if (rootData == null) {
-        print("⚠️ API a renvoyé NULL.");
-        return [];
-      }
+      List<dynamic> rawList = [];
 
-      // Gestion flexible data (Map ou List)
-      List listJSON = [];
+      // Récupération de la liste (gestion pagination Laravel)
       if (rootData is Map && rootData.containsKey('data')) {
-        // Parfois l'API met les résultats dans data['data'] (pagination) ou juste data (liste)
-        if (rootData['data'] is Map && rootData['data'].containsKey('data')) {
-          listJSON = rootData['data']['data'] ?? [];
-        } else {
-          listJSON = rootData['data'] ?? [];
+        final paginationData = rootData['data'];
+        if (paginationData is Map && paginationData.containsKey('data')) {
+          rawList = paginationData['data'] ?? [];
+        } else if (paginationData is List) {
+          rawList = paginationData;
         }
-      } else if (rootData is List) {
-        listJSON = rootData;
       }
 
-      print("🔢 Résultats bruts reçus : ${listJSON.length}");
+      print("🔢 [DEBUG] ${rawList.length} éléments parents trouvés.");
+
       final List<ProgramModel> extractedPrograms = [];
 
-      for (var jsonItem in listJSON) {
-        // Gestion des horaires multiples (si structure complexe)
-        List horaires = jsonItem['horaires_disponibles'] ?? [];
+      for (var jsonItem in rawList) {
+        try {
+          // 1. Récupération des infos de capacité du PARENT
+          int parentCapacity = int.tryParse(jsonItem['capacity'].toString()) ?? 0;
 
-        if (horaires.isNotEmpty) {
-          for (var horaire in horaires) {
-            Map<String, dynamic> mergedJson = Map.from(jsonItem);
-            // On écrase les infos globales par les infos spécifiques de l'horaire
-            mergedJson['id'] = horaire['programme_id'];
-            mergedJson['heure_depart'] = horaire['heure_depart'];
-            mergedJson['heure_arrive'] = horaire['heure_arrive'];
-
-            // Prix
-            double prix = double.tryParse(horaire['prix'].toString()) ?? 0.0;
-            mergedJson['montant_billet'] = prix.toInt();
-
-            if (horaire['vehicule'] != null) mergedJson['vehicule'] = horaire['vehicule'];
-            if (horaire['chauffeur'] != null) mergedJson['chauffeur'] = horaire['chauffeur'];
-
-            mergedJson['is_aller_retour'] = isAllerRetour ? 1 : 0;
-
-            extractedPrograms.add(ProgramModel.fromJson(mergedJson));
+          // Fallback : si capacity est vide, on tente de voir si le véhicule a une info
+          if (parentCapacity == 0 && jsonItem['vehicule'] != null) {
+            parentCapacity = int.tryParse(jsonItem['vehicule']['nombre_place'].toString()) ?? 0;
           }
-        } else {
-          // Fallback structure simple
-          if (jsonItem['montant_billet'] != null) {
-            double prix = double.tryParse(jsonItem['montant_billet'].toString()) ?? 0.0;
-            jsonItem['montant_billet'] = prix.toInt();
+          // Ultime fallback pour éviter la division par zéro ou l'affichage vide
+          if (parentCapacity == 0) parentCapacity = 48;
+
+          // 2. Gestion des Horaires Multiples
+          List horaires = jsonItem['horaires_disponibles'] ?? [];
+
+          if (horaires.isNotEmpty) {
+            // CAS A : Le programme a plusieurs horaires
+            for (var horaire in horaires) {
+
+              // ---------------------------------------------------------
+              // 🔍 DEBUG LOGS (Regarde ta console après avoir rechargé)
+              // ---------------------------------------------------------
+              print("🔍 DEBUG ID:${jsonItem['id']} - ${horaire['heure_depart']}");
+              print("   👉 Capacity Parent : $parentCapacity");
+              print("   👉 Occupé (json)   : ${horaire['nbre_siege_occupe']}");
+              print("   👉 Dispo (expl)    : ${horaire['nbre_place_dispo'] ?? horaire['places_disponibles']}");
+              print("------------------------------------------------");
+              // ---------------------------------------------------------
+
+              // On prépare le JSON fusionné
+              Map<String, dynamic> mergedJson = Map.from(jsonItem);
+
+              // On écrase avec les infos spécifiques de l'horaire
+              mergedJson['id'] = horaire['programme_id'] ?? jsonItem['id'];
+              mergedJson['heure_depart'] = horaire['heure_depart'];
+              mergedJson['heure_arrive'] = horaire['heure_arrive'];
+
+              // On force la capacité qu'on a trouvée plus haut
+              mergedJson['capacity'] = parentCapacity;
+
+              // --- LOGIQUE INTELLIGENTE DES PLACES ---
+              int occupation = int.tryParse(horaire['nbre_siege_occupe'].toString()) ?? 0;
+              int placesDispo = 0;
+
+              // Si l'API donne explicitement les places dispo, on prend ça
+              if (horaire['nbre_place_dispo'] != null) {
+                placesDispo = int.tryParse(horaire['nbre_place_dispo'].toString()) ?? (parentCapacity - occupation);
+              } else {
+                // Sinon on calcule
+                placesDispo = parentCapacity - occupation;
+              }
+
+              // On injecte le résultat dans le json pour le Model
+              mergedJson['places_disponibles'] = placesDispo > 0 ? placesDispo : 0;
+              mergedJson['nbre_siege_occupe'] = occupation; // On s'assure que le modèle le reçoit
+
+              // Nettoyage Prix
+              var rawPrix = horaire['prix'] ?? horaire['montant_billet'] ?? jsonItem['montant_billet'];
+              mergedJson['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
+
+              extractedPrograms.add(ProgramModel.fromJson(mergedJson));
+            }
+          } else {
+            // CAS B : Programme simple sans sous-horaires
+            Map<String, dynamic> cleanJson = Map.from(jsonItem);
+
+            // ---------------------------------------------------------
+            // 🔍 DEBUG LOGS (Cas Simple)
+            // ---------------------------------------------------------
+            print("🔍 DEBUG ID:${jsonItem['id']} (Simple)");
+            print("   👉 Capacity : $parentCapacity");
+            print("   👉 Occupé   : ${jsonItem['nbre_siege_occupe']}");
+            print("------------------------------------------------");
+
+            int occupation = int.tryParse(jsonItem['nbre_siege_occupe'].toString()) ?? 0;
+
+            cleanJson['capacity'] = parentCapacity;
+            cleanJson['places_disponibles'] = (parentCapacity - occupation) > 0 ? (parentCapacity - occupation) : 0;
+            cleanJson['nbre_siege_occupe'] = occupation;
+
+            // Nettoyage Prix
+            var rawPrix = cleanJson['montant_billet'] ?? cleanJson['prix'] ?? 0;
+            cleanJson['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
+
+            extractedPrograms.add(ProgramModel.fromJson(cleanJson));
           }
-          jsonItem['is_aller_retour'] = isAllerRetour ? 1 : 0;
-          extractedPrograms.add(ProgramModel.fromJson(jsonItem));
+
+        } catch (e) {
+          print("⚠️ [DEBUG] Erreur parsing item ${jsonItem['id']}: $e");
         }
       }
 
-      print("✅ ${extractedPrograms.length} trajets parsés avec succès.");
+      print("✅ [DEBUG] ${extractedPrograms.length} programmes finaux générés.");
       return extractedPrograms;
 
-    } on DioException catch (e) {
-      print("❌ ERREUR API (${e.response?.statusCode}): ${e.response?.data}");
-      return [];
     } catch (e) {
-      print("❌ ERREUR INCONNUE: $e");
+      print("❌ [DEBUG] Erreur critique: $e");
       return [];
     }
   }
 
 
+  /*final List<ProgramModel> extractedPrograms = [];
 
+  for (var jsonItem in rawList) {
+  // 1. On récupère la capacité du PARENT (Source de vérité)
+  int parentCapacity = int.tryParse(jsonItem['capacity'].toString()) ?? 0;
 
-
-
-
-
-
-  // ---------------------------------------------------------------------------
-  // 2. RÉCUPÉRATION DE TOUS LES PROGRAMMES (Sans filtre)
-  // ---------------------------------------------------------------------------
-  @override
-  Future<List<ProgramModel>> getAllProgrammes() async {
-    // On appelle la méthode search avec des paramètres vides pour tout récupérer
-    // et profiter de la logique de parsing (éclatement des horaires) commune.
-    return searchProgrammes(depart: "", arrivee: "", date: "", isAllerRetour: false);
+  // Fallback : si capacity n'est pas là, on regarde le véhicule du parent
+  if (parentCapacity == 0 && jsonItem['vehicule'] != null) {
+  parentCapacity = int.tryParse(jsonItem['vehicule']['nombre_place'].toString()) ?? 0;
   }
+
+  List horaires = jsonItem['horaires_disponibles'] ?? [];
+
+  if (horaires.isNotEmpty) {
+  // --- CAS MULTI-HORAIRES ---
+  for (var horaire in horaires) {
+  // On prépare les données pour l'enfant
+  Map<String, dynamic> childJson = Map.from(jsonItem); // On base sur le parent
+
+  // On met à jour les infos spécifiques
+  childJson['id'] = horaire['programme_id'] ?? jsonItem['id'];
+  childJson['heure_depart'] = horaire['heure_depart'];
+  childJson['heure_arrive'] = horaire['heure_arrive'];
+
+  // 🔥 LE POINT CLÉ : On injecte la capacité du parent
+  // Le modèle va maintenant la trouver grâce à la modif de l'étape 1
+  childJson['capacity'] = parentCapacity;
+
+  // Le prix spécifique
+  var rawPrix = horaire['prix'] ?? horaire['montant_billet'];
+  if (rawPrix != null) childJson['montant_billet'] = rawPrix;
+
+  extractedPrograms.add(ProgramModel.fromJson(childJson));
+  }
+  } else {
+  // --- CAS SIMPLE ---
+  // On s'assure juste que capacity est bien lu
+  jsonItem['capacity'] = parentCapacity;
+  extractedPrograms.add(ProgramModel.fromJson(jsonItem));
+  }
+  }*/
+
+
+
 
   @override
   Future<List<ProgramModel>> getAllTrips() async {

@@ -8,7 +8,6 @@ class CompanyRepository {
   final Dio dio;
 
   CompanyRepository({required this.dio});
-
   Future<List<CompanyModel>> getAllCompanies() async {
     try {
       final response = await dio.get('/user/compagnies');
@@ -17,10 +16,47 @@ class CompanyRepository {
         final List<dynamic> data = response.data['data']['compagnies'];
         return data.map((json) => CompanyModel.fromJson(json)).toList();
       } else {
-        throw Exception("Erreur API: ${response.data['message']}");
+        // Si l'API répond mais dit success: false
+        throw Exception(response.data['message'] ?? "Erreur inconnue du serveur.");
       }
+
+    } on DioException catch (e) {
+      // 🔥 C'est ici qu'on filtre les erreurs sales pour faire propre
+      String message;
+
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          message = "Le serveur met trop de temps à répondre.";
+          break;
+        case DioExceptionType.connectionError:
+          message = "Impossible de se connecter. Vérifiez votre internet ou si le serveur est allumé.";
+          break;
+        case DioExceptionType.badResponse:
+        // Erreur 404, 500, etc.
+          final statusCode = e.response?.statusCode;
+          if (statusCode == 500) {
+            message = "Problème technique sur le serveur (Erreur 500).";
+          } else if (statusCode == 404) {
+            message = "Les compagnies sont introuvables.";
+          } else {
+            message = "Erreur serveur ($statusCode).";
+          }
+          break;
+        case DioExceptionType.cancel:
+          message = "La requête a été annulée.";
+          break;
+        default:
+          message = "Une erreur de connexion est survenue.";
+      }
+
+      // On lance une exception propre, sans le blabla technique
+      throw Exception(message);
+
     } catch (e) {
-      throw Exception("Erreur lors de la récupération des compagnies: $e");
+      // Pour les erreurs qui ne viennent pas de Dio (ex: erreur de parsing JSON)
+      throw Exception("Une erreur inattendue est survenue.");
     }
   }
 
@@ -40,22 +76,6 @@ class CompanyRepository {
     }
   }
 
-  // 2. Récupérer les programmes (trajets) d'une compagnie
-  /*Future<List<ProgrammeModel>> getCompanyProgrammes(int id) async {
-    try {
-      final response = await dio.get('/user/compagnies/$id/programmes');
-
-      // Note: L'API renvoie parfois une liste vide dans "programmes": []
-      if (response.data['success'] == true) {
-        final List<dynamic> list = response.data['data']['programmes'];
-        return list.map((json) => ProgrammeModel.fromJson(json)).toList();
-      } else {
-        throw Exception(response.data['message']);
-      }
-    } catch (e) {
-      throw Exception("Erreur programmes: $e");
-    }
-  }*/
 
 
 // --- MISE À JOUR AVEC DÉBOGAGE ---

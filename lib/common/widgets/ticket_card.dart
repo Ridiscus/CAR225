@@ -6,14 +6,18 @@ import '../../features/booking/data/models/ticket_model.dart';
 class TicketCard extends StatelessWidget {
   final TicketModel ticket;
   final VoidCallback onDetailPressed;
-  final VoidCallback onDownloadPressed;
   final bool isDownloading;
+
+  // 🔴 AJOUTE LE '?' ICI :
+  final VoidCallback? onDownloadPressed; // Le '?' autorise le null
 
   const TicketCard({
     super.key,
     required this.ticket,
     required this.onDetailPressed,
-    required this.onDownloadPressed,
+    // Note : enlève "required" si tu l'avais mis,
+    // ou utilise "this.onDownloadPressed" simplement.
+    this.onDownloadPressed,
     this.isDownloading = false,
   });
 

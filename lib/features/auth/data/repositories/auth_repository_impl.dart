@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../booking/data/models/user_stats_model.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
 import '../models/login_request_model.dart';
@@ -27,6 +28,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> verifyOtp(String email, String otpCode) async {
     await remoteDataSource.verifyOtp(email, otpCode);
   }
+
 
   @override
   Future<void> resetPassword({
@@ -74,6 +76,17 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (e) {
       rethrow;
     }
+  }
+
+  // 🟢 AJOUTE LE @override POUR ÊTRE PROPRE
+  @override
+  Future<UserStatsModel> getUserStats() async {
+    return await remoteDataSource.getUserStats();
+  }
+
+  @override
+  Future<TripDetailsModel> getTripDetails() async {
+    return await remoteDataSource.getTripDetails();
   }
 
 
@@ -223,7 +236,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String contact,
     required String nomUrgence,
-    required String prenomUrgence,
+    required String lienParenteUrgence, // <-- Remplacé
     required String contactUrgence,
     String? photoPath,
   }) async {
@@ -233,7 +246,7 @@ class AuthRepositoryImpl implements AuthRepository {
       email: email,
       contact: contact,
       nomUrgence: nomUrgence,
-      prenomUrgence: prenomUrgence,
+      lienParenteUrgence: lienParenteUrgence,
       contactUrgence: contactUrgence,
       photoPath: photoPath,
     );

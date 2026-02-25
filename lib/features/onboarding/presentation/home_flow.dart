@@ -371,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     // Initialisation "Manuelle" du repo (Idéalement via GetIt/Provider)
-    final dio = Dio(BaseOptions(baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/'));
+    final dio = Dio(BaseOptions(baseUrl: 'https://car225.com/api/'));
     _bookingRepository = BookingRepositoryImpl(remoteDataSource: BookingRemoteDataSourceImpl(dio: dio));
 
     // Charger les villes
@@ -829,7 +829,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // mais sans la redéfinir partout dans le code métier.
 
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/', // L'URL centrale
+      baseUrl: 'https://car225.com/api/', // L'URL centrale
       headers: {'Content-Type': 'application/json'},
     ));
 

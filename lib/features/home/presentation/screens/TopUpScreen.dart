@@ -162,7 +162,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
       // 3. Config Dio
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api',
+        baseUrl: 'https://car225.com/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

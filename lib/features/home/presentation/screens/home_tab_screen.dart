@@ -6,12 +6,15 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Imports Clean Architecture & Models
+import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/cube_magic.dart';
+import '../../../../core/providers/notification_provider.dart';
 import '../../../../core/providers/user_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 
 // Booking Imports
 import '../../../booking/data/datasources/booking_remote_data_source.dart';
+import '../../../booking/data/models/live_trip_location.dart';
 import '../../../booking/data/models/program_model.dart';
 import '../../../booking/domain/repositories/booking_repository.dart';
 import '../../../booking/presentation/screens/all_itineraire_screen.dart';
@@ -32,7 +35,21 @@ import 'notification_screen.dart';
 import 'profil_screen.dart';
 
 class HomeTabScreen extends StatefulWidget {
-  const HomeTabScreen({super.key});
+  final bool isModificationMode;
+  final String? initialDepart;
+  final String? initialArrivee;
+  final DateTime? initialDate;
+  final bool ticketWasAllerRetour;
+
+
+  const HomeTabScreen({
+    super.key,
+    this.isModificationMode = false, // Par défaut à false (mode normal)
+    this.initialDepart,
+    this.initialArrivee,
+    this.initialDate, // 🟢 2. AJOUT AU CONSTRUCTEUR
+    this.ticketWasAllerRetour = false, // Par défaut false
+  });
 
   @override
   State<HomeTabScreen> createState() => _HomeTabScreenState();
@@ -43,6 +60,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   String? departureCity;
   String? arrivalCity;
   DateTime? departureDate;
+
+  Dio dio = Dio();
 
   // --- ETAT DONNÉES ---
   List<String> cities = [];
@@ -62,6 +81,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   // --- ETAT INTERACTION (OVERLAY) ---
   OverlayEntry? _overlayEntry;
 
+
+  LiveTripLocation? liveTrip; // null au départ
+
+
   // --- ANIMATIONS ---
   late AnimationController _busController;
   late Animation<double> _busAnimation;
@@ -74,11 +97,28 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+    fetchLiveTrip();
+
+    // 🟢 AJOUTE CE BLOC ICI
+    if (widget.isModificationMode) {
+      departureCity = widget.initialDepart;
+      arrivalCity = widget.initialArrivee;
+      // Optionnel : Si tu veux pré-remplir la date avec aujourd'hui ou demain par défaut
+      if (widget.initialDate != null) {
+        departureDate = widget.initialDate;
+      }
+
+      // 🔒 VERROUILLAGE DU TYPE DE VOYAGE
+      // Si on modifie, on force la valeur du ticket original
+      //isAllerRetour = widget.ticketWasAllerRetour;
+
+    }
+
     _initData();
 
 
     _entranceController = AnimationController(
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 1000), // <--- CHANGE ICI (3000 -> 800)
       vsync: this,
     );
 
@@ -105,7 +145,15 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
         userProvider.loadUser();
       }
     });
+
+    // ✅ On charge les notifs
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationProvider>(context, listen: false).fetchUnreadCount();
+    });
+
   }
+
+
 
   @override
   void dispose() {
@@ -116,9 +164,28 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     super.dispose();
   }
 
+
+
+
+
+  Future<void> fetchLiveTrip() async {
+    try {
+      final response = await dio.get('/user/tracking/location'); // ton dio
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        setState(() {
+          liveTrip = LiveTripLocation.fromJson(response.data);
+        });
+      }
+    } catch (e) {
+      debugPrint("Erreur fetchLiveTrip: $e");
+    }
+  }
+
+
+
   void _initData() async {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      baseUrl: 'https://car225.com/api/',
       headers: {'Content-Type': 'application/json'},
     ));
 
@@ -130,12 +197,74 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     _fetchActiveReservations();
   }
 
+
+
   Future<void> _loadBookingData() async {
+    // 1. CHARGEMENT DES VILLES
     try {
       final loadedCities = await _bookingRepository.getCities();
-      if (mounted) setState(() { cities = loadedCities; isLoadingCities = false; });
-    } catch (e) { if(mounted) setState(() => isLoadingCities = false); }
 
+      debugPrint("📋 API Villes chargées : $loadedCities");
+
+      String? matchDepart;
+      String? matchArrivee;
+
+      // SI MODE MODIFICATION : On cherche la correspondance
+      if (widget.isModificationMode) {
+
+        // --- CORRECTION : NETTOYAGE DES NOMS ---
+        // On prend "Abidjan, Côte d'Ivoire", on coupe à la virgule, on garde "Abidjan"
+        final cleanTicketDepart = widget.initialDepart?.split(',').first.trim().toLowerCase() ?? "";
+        final cleanTicketArrivee = widget.initialArrivee?.split(',').first.trim().toLowerCase() ?? "";
+
+        debugPrint("🔧 MODE MODIFICATION - Recherche:");
+        debugPrint("   -> Ticket Nettoyé (Départ) : '$cleanTicketDepart'");
+        debugPrint("   -> Ticket Nettoyé (Arrivée) : '$cleanTicketArrivee'");
+
+        // RECHERCHE DANS LA LISTE API
+        if (cleanTicketDepart.isNotEmpty) {
+          try {
+            // On cherche une ville API qui ressemble à "abidjan"
+            matchDepart = loadedCities.firstWhere(
+                  (apiCity) => apiCity.trim().toLowerCase() == cleanTicketDepart,
+              orElse: () => "",
+            );
+          } catch (e) { matchDepart = null; }
+        }
+
+        if (cleanTicketArrivee.isNotEmpty) {
+          try {
+            matchArrivee = loadedCities.firstWhere(
+                  (apiCity) => apiCity.trim().toLowerCase() == cleanTicketArrivee,
+              orElse: () => "",
+            );
+          } catch (e) { matchArrivee = null; }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          cities = loadedCities;
+          isLoadingCities = false;
+
+          // 🎯 APPLICATION DES VALEURS TROUVÉES
+          if (matchDepart != null && matchDepart!.isNotEmpty) {
+            departureCity = matchDepart; // On met la valeur EXACTE de la liste API
+            debugPrint("✅ Succès : Départ pré-rempli avec '$departureCity'");
+          }
+
+          if (matchArrivee != null && matchArrivee!.isNotEmpty) {
+            arrivalCity = matchArrivee; // On met la valeur EXACTE de la liste API
+            debugPrint("✅ Succès : Arrivée pré-remplie avec '$arrivalCity'");
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("🚨 Erreur villes : $e");
+      if(mounted) setState(() => isLoadingCities = false);
+    }
+
+    // 2. CHARGEMENT DES ITINÉRAIRES
     try {
       final trips = await _bookingRepository.getAllTrips();
       if (mounted) setState(() { weeklyItineraries = trips.take(2).toList(); isLoadingTrips = false; });
@@ -147,7 +276,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       final prefs = await SharedPreferences.getInstance();
       final String? token = prefs.getString('auth_token');
       if (token != null) {
-        final dioWallet = Dio(BaseOptions(baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api', headers: {'Authorization': 'Bearer $token'}));
+        final dioWallet = Dio(BaseOptions(baseUrl: 'https://car225.com/api/', headers: {'Authorization': 'Bearer $token'}));
         final walletRepo = WalletRepository(remoteDataSource: WalletRemoteDataSourceImpl(dio: dioWallet));
         final walletData = await walletRepo.getWalletData();
         if (mounted) setState(() { walletBalance = walletData.solde; isLoadingWallet = false; });
@@ -162,7 +291,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
       if (token != null) {
         final dioAlert = Dio(BaseOptions(
-          baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+          baseUrl: 'https://car225.com/api/',
           headers: {'Authorization': 'Bearer $token'},
         ));
         final alertRepo = AlertRepository(dio: dioAlert);
@@ -261,17 +390,45 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
 
 
-
-  void _onSearchPressed() {
-    // ⚠️ ICI : On utilise la Top Notification au lieu du SnackBar
+  void _onSearchPressed() async { // ⚠️ Ajoute 'async' ici
+    // Validation
     if (departureCity == null || arrivalCity == null || departureDate == null) {
       _showTopNotification("Veuillez remplir tous les champs", isError: true);
       return;
     }
 
     String dateDepartApi = DateFormat('yyyy-MM-dd').format(departureDate!);
-    final searchParams = {"depart": departureCity, "arrivee": arrivalCity, "date": dateDepartApi};
-    Navigator.push(context, MaterialPageRoute(builder: (context) => SearchResultsScreen(isGuestMode: false, searchParams: searchParams)));
+    final searchParams = {
+      "depart": departureCity,
+      "arrivee": arrivalCity,
+      "date": dateDepartApi
+    };
+
+    // 🟢 NAVIGATION AVEC ATTENTE DE RÉSULTAT (AWAIT)
+    final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => SearchResultsScreen(
+              // On passe le mode modification à l'écran suivant
+              isGuestMode: false,
+              searchParams: searchParams,
+              isModificationMode: widget.isModificationMode,
+
+              // 🚨 C'EST ICI LA SOURCE DU PROBLÈME SI TU L'OUBLIES
+              ticketWasAllerRetour: widget.ticketWasAllerRetour,
+
+            )
+        )
+    );
+
+    // 🟢 GESTION DU RETOUR (Le Relais)
+    // Si on est en mode modif et qu'on a reçu des données de SearchResults -> SeatSelection
+    if (widget.isModificationMode && result != null) {
+      // On ferme HomeTabScreen et on renvoie le résultat à TicketDetailScreen
+      if (mounted) {
+        Navigator.pop(context, result);
+      }
+    }
   }
 
   // ===========================================================================
@@ -366,143 +523,74 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
 
 
-
-
-
-
-
-  // Modifie ton _buildAnimatedBlock pour qu'il ne bloque pas les clics
-  /*Widget _buildAnimatedBlock({
-    required Widget child,
-    required double delay,
-  }) {
-    final animation = CurvedAnimation(
-      parent: _entranceController,
-      curve: Interval(delay, delay + 0.4, curve: Curves.easeOutQuart),
-    );
-
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: animation.value,
-          child: Transform.translate(
-            // On garde l'animation de montée, mais on s'assure qu'elle finit à 0
-            offset: Offset(0, 30 * (1 - animation.value)),
-            child: child,
-          ),
-        );
-      },
-      child: child,
-    );
-  }*/
-
-// DANS TON BUILD :
-  /*@override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 1. HEADER
-            _buildAnimatedBlock(
-              delay: 0.0,
-              child: _buildHeader(context),
-            ),
-
-            // 2. CARTE RECHERCHE
-            // On applique le décalage de -80 ICI, en dehors de l'animation
-            Transform.translate(
-              offset: const Offset(0, -80),
-              child: _buildAnimatedBlock(
-                delay: 0.2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildSearchCard(context),
-                ),
-              ),
-            ),
-
-            // 3. BANNIÈRE
-            Transform.translate(
-              offset: const Offset(0, -60),
-              child: _buildAnimatedBlock(
-                delay: 0.4,
-                child: Container( /* ... ton code de bannière ... */ ),
-              ),
-            ),
-
-            // 4. ITINÉRAIRES
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: _buildAnimatedBlock(
-                delay: 0.6,
-                child: _buildItinerairesSection(textColor),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }*/
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final userProvider = context.watch<UserProvider>();
-    final currentUser = userProvider.user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // ✅ 1. LE SINGLE CHILD SCROLL VIEW RESTE ICI
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        physics: const BouncingScrollPhysics(),
+        // ✅ 2. AJOUT DU STACK ICI
+        child: Stack(
           children: [
-            // 1. HEADER (Arrive à 0ms)
-            _buildAnimatedBlock(
-              delay: 0.0,
-              child: _buildHeader(context),
+            // --- CONTENU DE TA PAGE ---
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildAnimatedBlock(delay: 0.0, child: _buildHeader(context)),
+                _buildAnimatedBlock(
+                  delay: 0.2,
+                  child: Transform.translate(
+                    offset: const Offset(0, -60),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildSearchCard(context),
+                    ),
+                  ),
+                ),
+                _buildAnimatedBlock(
+                  delay: 0.4,
+                  child: Transform.translate(
+                    offset: const Offset(0, -40),
+                    child: _buildPromoBanner(isDark),
+                  ),
+                ),
+                const Gap(15),
+                _buildAnimatedBlock(
+                  delay: 0.6,
+                  child: Transform.translate(
+                    offset: const Offset(0, -40),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: _buildItinerairesSection(textColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 120),
+              ],
             ),
 
-            // 2. CARTE RECHERCHE (Arrive à 200ms)
-            // Le Transform est à l'extérieur pour ne pas casser le "HitTest"
-            Transform.translate(
-              offset: const Offset(0, -80),
-              child: _buildAnimatedBlock(
-                delay: 0.2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildSearchCard(context),
+            // --- 🔴 3. LE BADGE FLOTTANT PAR-DESSUS TOUT ---
+            if (liveTrip != null)
+              Positioned(
+                // Calcul : Header (340) - Remontée carte (60) - Moitié du badge (18) = 262
+                top: 262,
+                left: 0,
+                right: 0,
+                child: _buildAnimatedBlock(
+                  delay: 0.3, // Il apparaitra juste après la carte
+                  child: _buildLiveTripPulseBadgeFromLocation(liveTrip!),
                 ),
               ),
-            ),
-
-            // 3. BANNIÈRE PUB (Arrive à 400ms)
-            Transform.translate(
-              offset: const Offset(0, -60),
-              child: _buildAnimatedBlock(
-                delay: 0.4,
-                child: _buildPromoBanner(isDark), // Je te suggère d'extraire aussi ça si possible
-              ),
-            ),
-
-            // 4. ITINÉRAIRES (Arrive à 600ms)
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: _buildAnimatedBlock(
-                delay: 0.6,
-                child: _buildItinerairesSection(textColor),
-              ),
-            ),
-
-            const Gap(65),
           ],
         ),
       ),
     );
   }
+
 
 
   Widget _buildPromoBanner(bool isDark) {
@@ -518,15 +606,34 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
           const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
           const Text("Trouvez votre voyage parfait.", style: TextStyle(color: AppColors.grey)),
           const Gap(15),
-          SizedBox(
+
+          // --- LE BOUTON MODIFIÉ ICI ---
+          Container(
               width: double.infinity,
               height: 50,
+              // ✅ 1. On coupe l'image pour qu'elle respecte les bords arrondis
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                // ✅ 2. On met l'image ici
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/row.jpg"),
+                  fit: BoxFit.cover,
+                ),
+              ),
               child: ElevatedButton(
                   onPressed: _onSearchPressed,
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  style: ElevatedButton.styleFrom(
+                    // ✅ 3. On rend le fond du bouton TRANSPARENT pour voir l'image derrière
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
                   child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))
               )
           ),
+          // -----------------------------
         ],
       ),
     );
@@ -535,312 +642,26 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
 
 
-  // ===========================================================================
-
- /* @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final userProvider = context.watch<UserProvider>();
-    final currentUser = userProvider.user;
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. HEADER
-            //_buildHeader(context),
-
-            // 1. HEADER (Arrive en premier)
-            _buildAnimatedBlock(
-              delay: 0.0,
-              child: _buildHeader(context),
-            ),
-
-            // 2. CARTE RECHERCHE
-            /*Transform.translate(
-              offset: const Offset(0, -80),
-              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildSearchCard(context)),
-            ),*/
-
-            // 2. CARTE RECHERCHE (Arrive juste après)
-            Transform.translate(
-              offset: const Offset(0, -80),
-              child: _buildAnimatedBlock(
-                delay: 0.2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildSearchCard(context),
-                ),
-              ),
-            ),
-
-            // 3. BANNIÈRE PUB
-            /*Transform.translate(
-              offset: const Offset(0, -60),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: isDark ? const Color(0xFF263238) : const Color(0xFF37474F), borderRadius: BorderRadius.circular(15)),
-                child: Column(
-                  children: [
-                    const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    const Text("Trouvez votre voyage parfait.", style: TextStyle(color: AppColors.grey)),
-                    const Gap(15),
-                    SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _onSearchPressed, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
-                  ],
-                ),
-              ),
-            ),*/
-
-
-            // 3. BANNIÈRE PUB
-            _buildAnimatedBlock(
-              delay: 0.4,
-              child: Transform.translate(
-                offset: const Offset(0, -60),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(color: isDark ? const Color(0xFF263238) : const Color(0xFF37474F), borderRadius: BorderRadius.circular(15)),
-                  child: Column(
-                    children: [
-                      const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                      const Text("Trouvez votre voyage parfait.", style: TextStyle(color: AppColors.grey)),
-                      const Gap(15),
-                      SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _onSearchPressed, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            Transform.translate(
-              offset: const Offset(0, -60),
-              child: _buildAnimatedBlock(
-                delay: 0.4,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(color: isDark ? const Color(0xFF263238) : const Color(0xFF37474F), borderRadius: BorderRadius.circular(15)),
-                  child: Column(
-                    children: [
-                      const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                      const Text("Trouvez votre voyage parfait.", style: TextStyle(color: AppColors.grey)),
-                      const Gap(15),
-                      SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _onSearchPressed, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-
-            // 4. ITINÉRAIRES AVEC LE NOUVEAU DESIGN
-            /*Transform.translate(
-              offset: const Offset(0, -40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Itinéraire de la semaine", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-
-                          // --- NOUVEAU BOUTON "VOIR TOUT" STYLÉ ---
-                          InkWell(
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AllItinerariesScreen())),
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                              ),
-                              child: Row(
-                                children: const [
-                                  Text("Voir tout", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                                  Gap(4),
-                                  Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.primary),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ]
-                    ),
-                  ),
-                  const Gap(10),
-                  SizedBox(
-                    height: 240,
-                    child: isLoadingTrips
-                        ? const Center(child: CircularProgressIndicator())
-                        : weeklyItineraries.isEmpty
-                        ? const Center(child: Text("Aucun itinéraire disponible"))
-                        : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: weeklyItineraries.length,
-                      separatorBuilder: (context, index) => const Gap(15),
-                      // --- MODIFICATION ICI POUR L'OVERLAY ---
-                      itemBuilder: (context, index) {
-                        final program = weeklyItineraries[index];
-                        return Builder(
-                            builder: (itemContext) {
-                              return GestureDetector(
-                                onTap: () => _showSelectionOverlay(itemContext, program),
-                                child: SizedBox(
-                                    width: 200,
-                                    child: _buildCompanyCard(context, program: program)
-                                ),
-                              );
-                            }
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),*/
-
-
-
-            // 4. ITINÉRAIRES (Arrive en dernier)
-            /*_buildAnimatedBlock(
-              delay: 0.6,
-              child: Transform.translate(
-                offset: const Offset(0, -40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text("Itinéraire de la semaine", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-
-                            // --- NOUVEAU BOUTON "VOIR TOUT" STYLÉ ---
-                            InkWell(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AllItinerariesScreen())),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                                ),
-                                child: Row(
-                                  children: const [
-                                    Text("Voir tout", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                                    Gap(4),
-                                    Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.primary),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ]
-                      ),
-                    ),
-                    const Gap(10),
-                    SizedBox(
-                      height: 240,
-                      child: isLoadingTrips
-                          ? const Center(child: CircularProgressIndicator())
-                          : weeklyItineraries.isEmpty
-                          ? const Center(child: Text("Aucun itinéraire disponible"))
-                          : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: weeklyItineraries.length,
-                        separatorBuilder: (context, index) => const Gap(15),
-                        // --- MODIFICATION ICI POUR L'OVERLAY ---
-                        itemBuilder: (context, index) {
-                          final program = weeklyItineraries[index];
-                          return Builder(
-                              builder: (itemContext) {
-                                return GestureDetector(
-                                  onTap: () => _showSelectionOverlay(itemContext, program),
-                                  child: SizedBox(
-                                      width: 200,
-                                      child: _buildCompanyCard(context, program: program)
-                                  ),
-                                );
-                              }
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),*/
-
-
-            // 4. ITINÉRAIRES (Arrive à 600ms)
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: _buildAnimatedBlock(
-                delay: 0.6,
-                child: _buildItinerairesSection(textColor),
-              ),
-            ),
-
-
-            const Gap(65),
-          ],
-        ),
-      ),
-    );
-  }*/
-
-
-
 
   Widget _buildItinerairesSection(Color? textColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // TITRE (Sans le bouton "Voir tout" qui buggait)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Itinéraire de la semaine",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-              InkWell(
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AllItinerariesScreen())
-                ),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    children: const [
-                      Text("Voir tout",
-                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Gap(4),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.primary),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          child: Text(
+            "Itinéraire de la semaine",
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textColor),
           ),
         ),
-        const Gap(10),
+
+        const Gap(15),
+
+        // LISTE HORIZONTALE
         SizedBox(
           height: 240,
           child: isLoadingTrips
@@ -850,17 +671,24 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
               : ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
-            itemCount: weeklyItineraries.length,
+            // IMPORTANT : On ajoute +1 pour la carte "Voir tout"
+            itemCount: weeklyItineraries.length + 1,
             separatorBuilder: (context, index) => const Gap(15),
             itemBuilder: (context, index) {
+
+              // Si c'est le dernier élément, on affiche la carte "Voir tout"
+              if (index == weeklyItineraries.length) {
+                return _buildSeeAllCard();
+              }
+
+              // Sinon, on affiche la carte normale
               final program = weeklyItineraries[index];
               return Builder(builder: (itemContext) {
                 return GestureDetector(
                   onTap: () => _showSelectionOverlay(itemContext, program),
                   child: SizedBox(
                       width: 200,
-                      child: _buildCompanyCard(context, program: program)
-                  ),
+                      child: _buildCompanyCard(context, program: program)),
                 );
               });
             },
@@ -871,7 +699,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   }
 
 
-// 1. On retire "String? photoUrl" des arguments car le Provider s'en occupe
   Widget _buildHeader(BuildContext context) {
     final List<String> headerImages = [
       "assets/images/busheader3.jpg",
@@ -879,12 +706,17 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       "assets/images/busheader5.jpg"
     ];
 
+    final hasActiveTrip = activeReservations.isNotEmpty;
+    final headerHeight = 340.0;
+    final searchCardOffset = 60.0;
+
     return SizedBox(
       height: 340,
-      width: double.infinity,
+      width: MediaQuery.of(context).size.width,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // --- ARRIÈRE-PLAN ---
+          // --- 1. ARRIÈRE-PLAN ---
           SimpleHeaderBackground(height: 340, images: headerImages),
           Container(
             decoration: BoxDecoration(
@@ -901,157 +733,759 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
             ),
           ),
 
-          // --- CONTENU SAFE AREA ---
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          // =====================================================
-                          // ✅ MODIFICATION ICI : CONSUMER POUR L'IMAGE
-                          // =====================================================
-                          Consumer<UserProvider>(
-                            builder: (context, provider, child) {
-                              final user = provider.user;
-
-                              // Logique de sécurité pour l'image
-                              ImageProvider imageProvider;
-                              if (user != null) {
-                                // Utilise ton getter intelligent (fullPhotoUrl)
-                                imageProvider = NetworkImage(user.fullPhotoUrl);
-                              } else {
-                                // Image par défaut si pas connecté
-                                imageProvider = const AssetImage("assets/images/ci.jpg");
-                              }
-
-                              return GestureDetector(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                                ),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2), // Petit bord blanc joli
-                                  ),
-                                  child: CircleAvatar(
-                                    radius: 24,
-                                    backgroundColor: Colors.grey[200],
-                                    backgroundImage: imageProvider,
-                                    // Évite le crash si l'URL est cassée
-                                    onBackgroundImageError: (_, __) {
-                                      print("Erreur chargement image header");
-                                    },
-                                  ),
-                                ),
-                              );
-                            },
+          // --- 2. CONTENU (AppBar Custom) ---
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              // 🟢 CORRECTION 1 : J'ai réduit le padding à droite (right: 10 au lieu de 20)
+              // Ça rapproche naturellement tout le bloc de droite vers le bord
+              child: Padding(
+                padding: const EdgeInsets.only(left: 20.0, right: 2, top: 15.0, bottom: 15.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // 1. AVATAR
+                    Consumer<UserProvider>(
+                      builder: (context, provider, child) {
+                        final user = provider.user;
+                        return GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ProfileScreen()),
                           ),
-                          // =====================================================
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.white24,
+                              backgroundImage: user != null
+                                  ? NetworkImage(user.fullPhotoUrl)
+                                  : const AssetImage("assets/images/ci.jpg") as ImageProvider,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
 
-                          const Gap(12),
+                    const SizedBox(width: 12),
 
-                          // --- BOUTON WALLET ---
-                          GestureDetector(
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const WalletScreen()),
-                              );
-                              _fetchWalletBalance();
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.secondary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 12),
+                    // 2. WALLET
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.5,
+                        ),
+                        child: GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const WalletScreen()),
+                            );
+                            _fetchWalletBalance();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), // Padding légèrement augmenté
+                            decoration: BoxDecoration(
+                              // 🟢 CHANGEMENT 1 : Fond noir semi-transparent au lieu de blanc pour maximiser le contraste
+                              color: Colors.black.withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withOpacity(0.15)),
+                              // 🟢 CHANGEMENT 2 : Ajout d'une ombre douce pour détacher le bloc de l'image
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(5), // Icône très légèrement plus grande
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.secondary,
+                                    shape: BoxShape.circle,
                                   ),
-                                  const Gap(8),
-                                  Column(
+                                  child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 12),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Text("CarPay", style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                                      const Text(
+                                        "CarPay",
+                                        style: TextStyle(
+                                          // 🟢 CHANGEMENT 3 : Blanc pur, plus grand, plus gras
+                                          color: Colors.white,
+                                          fontSize: 11, // Passé de 9 à 11
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                      ),
+                                      const SizedBox(height: 1), // Petit espace de respiration
                                       isLoadingWallet
                                           ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
                                           : Text(
                                         walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
-                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          // 🟢 CHANGEMENT 4 : Solde plus lisible
+                                          color: Colors.white,
+                                          fontSize: 13, // Passé de 11 à 13
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                        softWrap: false,
                                       ),
                                     ],
-                                  )
-                                ],
-                              ),
+                                  ),
+                                )
+                              ],
                             ),
-                          )
-                        ],
-                      ),
-
-                      // --- BOUTON NOTIFICATION ---
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                        ),
-                        child: Container(
-                          height: 45,
-                          width: 45,
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.1)),
                           ),
-                          child: Image.asset("assets/icons/notification.png", color: Colors.white),
                         ),
-                      )
-                    ],
-                  )
-                ],
+                      ),
+                    ),
+
+                    // 3. SPACER
+                    const Spacer(),
+
+                    // 4. NOTIFICATION
+                    // 🟢 CORRECTION 2 : Transform.translate force le bouton à se décaler.
+                    // J'ai mis 8 pixels vers la droite. Si tu veux le coller encore plus, augmente ce chiffre (ex: 12).
+                    Transform.translate(
+                      offset: const Offset(8, 0),
+                      child: const NotificationIconBtn(),
+                    ),
+                  ],
+                ),
               ),
             ),
-          )
+          ),
+
+          // --- 3. BADGE LIVE TRIP au centre bas du header ---
+          if (liveTrip != null)
+            _buildLiveTripPulseBadgeFromLocation(liveTrip!)
         ],
       ),
     );
   }
 
+
+
+
+  Widget _buildLiveTripPulseBadgeFromLocation(LiveTripLocation trip) {
+    // ✅ On retire le Positioned, on retourne directement le Center
+    return Center(
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          final scale = isLiveExpanded ? 1.0 : _pulseAnimation.value;
+          return Transform.scale(
+            scale: scale,
+            child: child,
+          );
+        },
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              setState(() {
+                isLiveExpanded = !isLiveExpanded;
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              width: isLiveExpanded ? 240 : 85,
+              height: isLiveExpanded ? 90 : 36,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.6),
+                    blurRadius: isLiveExpanded ? 5 : 10,
+                    spreadRadius: isLiveExpanded ? 0 : 2,
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                              const SizedBox(width: 6),
+                              const Text("LIVE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                            ],
+                          ),
+                          Icon(isLiveExpanded ? Icons.close : Icons.arrow_drop_down, color: Colors.white, size: isLiveExpanded ? 14 : 16),
+                        ],
+                      ),
+                      if (isLiveExpanded) ...[
+                        const SizedBox(height: 8),
+                        Container(height: 1, color: Colors.white24),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: Text(trip.depart, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                            const Padding(padding: EdgeInsets.symmetric(horizontal: 5), child: Icon(Icons.directions_bus, color: Colors.white, size: 14)),
+                            Expanded(child: Text(trip.arrivee, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(trip.tempsRestant, style: const TextStyle(color: Colors.white70, fontSize: 10, fontStyle: FontStyle.italic))
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+
+
+  Widget _buildWalletButton() {
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const WalletScreen()),
+        );
+        _fetchWalletBalance();
+      },
+      child: Container(
+        // ✅ STOP OVERFLOW : On limite physiquement la largeur max
+        constraints: const BoxConstraints(maxWidth: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // Le bouton prend le minimum de place
+          children: [
+            // Icône
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: AppColors.secondary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 10),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Texte + Montant
+            // 2. WALLET (CORRIGÉ)
+            Flexible(
+              // FlexFit.loose permet au bouton de garder sa taille naturelle (petite)
+              // mais de rétrécir si l'espace manque.
+              fit: FlexFit.loose,
+              child: GestureDetector(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalletScreen()),
+                  );
+                  _fetchWalletBalance();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Important : le Row colle au contenu
+                    children: [
+                      // Icône Wallet
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 10),
+                      ),
+
+                      const SizedBox(width: 8), // Préférable à Gap ici pour éviter des soucis de layout
+
+                      // TEXTE + MONTANT
+                      // C'est ce Flexible interne qui résout l'overflow du texte
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "CarPay",
+                              style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false, // Force une seule ligne
+                            ),
+                            isLoadingWallet
+                                ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
+                                : Text(
+                              walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildSeeAllCard() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const AllItinerariesScreen()));
+      },
+      child: Container(
+        width: 160, // Un peu plus petit que les cartes normales
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.arrow_forward, color: AppColors.primary, size: 24),
+            ),
+            const Gap(10),
+            const Text(
+              "Voir tous\nles trajets",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+
   Widget _buildSearchCard(BuildContext context) {
     final cardColor = Theme.of(context).cardColor;
     final hasActiveTrip = activeReservations.isNotEmpty;
-    return Stack(clipBehavior: Clip.none, children: [
-      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: EdgeInsets.only(right: hasActiveTrip ? 60.0 : 0), child: const Text("Où souhaitez-vous voyager ?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))), const Text("Trouvez votre bus en quelques clics", style: TextStyle(color: Colors.grey, fontSize: 12)), const Gap(20), isLoadingCities ? const Center(child: LinearProgressIndicator()) : Row(children: [Expanded(child: _buildRealDropdown(context, "Départ", departureCity, cities, "assets/images/map.png", (val) => setState(() => departureCity = val))), const Gap(10), Expanded(child: _buildRealDropdown(context, "Destination", arrivalCity, cities, "assets/images/map.png", (val) => setState(() => arrivalCity = val), isGreen: true))]), const Gap(15), GestureDetector(onTap: _selectDepartureDate, child: SizedBox(width: double.infinity, child: _buildDateField(context, "Date du voyage", departureDate))), const Gap(20), SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: _onSearchPressed, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 0), child: const Text("Rechercher des trajets", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))))])),
-      if (hasActiveTrip) Positioned(top: 15, right: 15, child: _buildLiveTripPulseBadge(activeReservations.first)),
-    ]);
+
+    // 🔒 LOGIQUE DE VERROUILLAGE
+    // Est verrouillé SI : On est en mode modif ET que le ticket original était un Aller-Retour
+    bool isRouteLocked = widget.isModificationMode && widget.ticketWasAllerRetour;
+
+    return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5)
+                    )
+                  ]
+              ),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- 1. TITRE ---
+                    Padding(
+                        padding: EdgeInsets.only(right: hasActiveTrip ? 60.0 : 0),
+                        child: Text(
+                            widget.isModificationMode
+                                ? "Modifier votre voyage"
+                                : "Où souhaitez-vous voyager ?",
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                        )
+                    ),
+
+                    // --- 2. SOUS-TITRE (Alerte si bloqué) ---
+                    if (isRouteLocked)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.lock, size: 12, color: Colors.orange),
+                            SizedBox(width: 5),
+                            Text("Trajet non modifiable pour un Aller-Retour", style: TextStyle(color: Colors.orange, fontSize: 12, fontStyle: FontStyle.italic)),
+                          ],
+                        ),
+                      )
+                    else
+                      const Text("Trouvez votre bus en quelques clics", style: TextStyle(color: Colors.grey, fontSize: 12)),
+
+                    const Gap(20),
+
+                    // --- 3. LES DROPDOWNS (VILLES) ---
+                    isLoadingCities
+                        ? const Center(child: LinearProgressIndicator())
+                        : Row(
+                        children: [
+                          // VILLE DÉPART
+                          Expanded(
+                              child: _buildRealDropdown(
+                                  context,
+                                  "Départ",
+                                  departureCity,
+                                  cities,
+                                  "assets/images/map.png",
+                                  // 🔒 SI BLOQUÉ : on passe null (ce qui désactive le clic)
+                                  // SINON : on passe la fonction normale
+                                  isRouteLocked ? null : (val) => setState(() => departureCity = val)
+                              )
+                          ),
+                          const Gap(10),
+                          // VILLE ARRIVÉE
+                          Expanded(
+                              child: _buildRealDropdown(
+                                  context,
+                                  "Destination",
+                                  arrivalCity,
+                                  cities,
+                                  "assets/images/map.png",
+                                  // 🔒 IDEM ICI
+                                  isRouteLocked ? null : (val) => setState(() => arrivalCity = val),
+                                  isGreen: true
+                              )
+                          )
+                        ]
+                    ),
+
+                    const Gap(15),
+
+                    // --- 4. DATE (Toujours modifiable) ---
+                    GestureDetector(
+                        onTap: _selectDepartureDate,
+                        child: SizedBox(
+                            width: double.infinity,
+                            child: _buildDateField(context, "Date du voyage", departureDate)
+                        )
+                    ),
+
+                    const Gap(20),
+
+                    // --- 5. BOUTON RECHERCHER ---
+                    Container(
+                      width: double.infinity,
+                      height: 50,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        image: const DecorationImage(
+                          image: AssetImage("assets/images/tabaa.jpg"),
+                          fit: BoxFit.cover,
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _onSearchPressed,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                            "Rechercher des trajets",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 2)]
+                            )
+                        ),
+                      ),
+                    ),
+                  ]
+              )
+          ),
+
+          // Badge pulse si voyage en cours (Masqué en mode modif pour épurer)
+          /*if (hasActiveTrip && !widget.isModificationMode)
+            Positioned(
+                top: 15,
+                right: 15,
+                child: _buildLiveTripPulseBadge(activeReservations.first)
+            ),*/
+        ]
+    );
   }
+
+  /*Widget _buildLiveTripPulseBadge(ActiveReservationModel trip) {
+    return GestureDetector(onTap: () { setState(() { isLiveExpanded = !isLiveExpanded; }); }, child: AnimatedBuilder(animation: _pulseAnimation, builder: (context, child) { return Transform.scale(scale: isLiveExpanded ? 1.0 : _pulseAnimation.value, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutBack, width: isLiveExpanded ? 220 : 85, height: isLiveExpanded ? 90 : 36, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.6), blurRadius: isLiveExpanded ? 5 : 10 * _pulseAnimation.value, spreadRadius: isLiveExpanded ? 0 : 2)]), child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Column(mainAxisSize: MainAxisSize.min, children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)), const Gap(6), const Text("LIVE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10))]), if (!isLiveExpanded) const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16), if (isLiveExpanded) const Icon(Icons.close, color: Colors.white, size: 14)]), if (isLiveExpanded) ...[const Gap(8), Container(height: 1, color: Colors.white24), const Gap(8), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(trip.pointDepart, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis)), AnimatedBuilder(animation: _busAnimation, builder: (context, child) => Transform.translate(offset: Offset(_busAnimation.value, 0), child: const Icon(Icons.directions_bus, color: Colors.white, size: 14))), Expanded(child: Text(trip.pointArrive, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis))])]]))), ); }, ));
+  }*/
 
   Widget _buildLiveTripPulseBadge(ActiveReservationModel trip) {
-    return GestureDetector(onTap: () { setState(() { isLiveExpanded = !isLiveExpanded; }); }, child: AnimatedBuilder(animation: _pulseAnimation, builder: (context, child) { return Transform.scale(scale: isLiveExpanded ? 1.0 : _pulseAnimation.value, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutBack, width: isLiveExpanded ? 220 : 85, height: isLiveExpanded ? 90 : 36, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.6), blurRadius: isLiveExpanded ? 5 : 10 * _pulseAnimation.value, spreadRadius: isLiveExpanded ? 0 : 2)]), child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Column(mainAxisSize: MainAxisSize.min, children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)), const Gap(6), const Text("LIVE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10))]), if (!isLiveExpanded) const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16), if (isLiveExpanded) const Icon(Icons.close, color: Colors.white, size: 14)]), if (isLiveExpanded) ...[const Gap(8), Container(height: 1, color: Colors.white24), const Gap(8), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(trip.pointDepart, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis)), AnimatedBuilder(animation: _busAnimation, builder: (context, child) => Transform.translate(offset: Offset(_busAnimation.value, 0), child: const Icon(Icons.directions_bus, color: Colors.white, size: 14))), Expanded(child: Text(trip.pointArrive, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis))])]]))), ); }, ));
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          setState(() {
+            isLiveExpanded = !isLiveExpanded;
+          });
+        },
+        child: AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: isLiveExpanded ? 1.0 : _pulseAnimation.value,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutBack,
+                width: isLiveExpanded ? 220 : 85,
+                height: isLiveExpanded ? 90 : 36,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.6),
+                      blurRadius: isLiveExpanded ? 5 : 10 * _pulseAnimation.value,
+                      spreadRadius: isLiveExpanded ? 0 : 2,
+                    )
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              "LIVE",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 10),
+                            ),
+                          ],
+                        ),
+                        Icon(
+                          isLiveExpanded ? Icons.close : Icons.arrow_drop_down,
+                          color: Colors.white,
+                          size: isLiveExpanded ? 14 : 16,
+                        ),
+                      ],
+                    ),
+                    if (isLiveExpanded) ...[
+                      const SizedBox(height: 8),
+                      Container(height: 1, color: Colors.white24),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              trip.pointDepart,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _busAnimation,
+                            builder: (context, child) {
+                              return Transform.translate(
+                                offset: Offset(_busAnimation.value, 0),
+                                child: const Icon(
+                                  Icons.directions_bus,
+                                  color: Colors.white,
+                                  size: 14,
+
+                                ),
+                              );
+                            },
+                          ),
+                          Expanded(
+                            child: Text(
+                              trip.pointArrive,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12),
+                              textAlign: TextAlign.right,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
-  Widget _buildRealDropdown(BuildContext context, String label, String? value, List<String> items, String imagePath, Function(String?) onChanged, {bool isGreen = false}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final borderColor = isDark ? Colors.white24 : Colors.grey.shade300;
-    final imageColor = isGreen ? AppColors.secondary : AppColors.primary;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)), const Gap(5), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0), decoration: BoxDecoration(border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(10), color: isDark ? Colors.white.withOpacity(0.05) : Colors.transparent), child: Row(children: [Image.asset(imagePath, width: 20, height: 20, color: imageColor, fit: BoxFit.contain), const Gap(10), Expanded(child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: items.contains(value) ? value : null, hint: Text("Sélectionner", style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 13)), isExpanded: true, icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 18), dropdownColor: Theme.of(context).cardColor, style: TextStyle(color: textColor, fontWeight: FontWeight.w500), items: items.map((String item) => DropdownMenuItem<String>(value: item, child: Text(item))).toList(), onChanged: onChanged)))]))]);
+
+
+  Widget _buildRealDropdown(
+      BuildContext context,
+      String label,
+      String? currentValue,
+      List<String> items,
+      String iconPath,
+      Function(String?)? onChanged, // Peut être null
+          {bool isGreen = false}
+      ) {
+    // ✅ DÉTECTION : Si onChanged est null, le champ est désactivé
+    final bool isDisabled = onChanged == null;
+    final cardColor = Theme.of(context).cardColor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 5),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            // 🎨 COULEUR : Gris clair si désactivé, couleur carte si actif
+            color: isDisabled ? Colors.grey.shade200 : cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              // Icône grisée si désactivé
+              Image.asset(
+                  iconPath,
+                  width: 20,
+                  color: isDisabled ? Colors.grey : (isGreen ? Colors.green : Colors.blue)
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: currentValue,
+                    // Texte grisé si désactivé
+                    hint: Text("Choisir", style: TextStyle(color: Colors.grey.shade400)),
+                    isExpanded: true,
+                    // On cache la flèche si désactivé
+                    icon: Icon(Icons.keyboard_arrow_down, color: isDisabled ? Colors.transparent : Colors.grey),
+
+                    // ⚡ C'est ici que Flutter bloque l'interaction si c'est null
+                    onChanged: onChanged,
+
+                    items: items.map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(
+                            value,
+                            style: TextStyle(
+                                fontSize: 14,
+                                // Texte grisé dans la liste aussi si jamais
+                                color: isDisabled ? Colors.grey : Colors.black
+                            )
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              // 🔒 PETIT CADENAS VISUEL À DROITE
+              if (isDisabled)
+                const Icon(Icons.lock, size: 16, color: Colors.grey),
+            ],
+          ),
+        ),
+      ],
+    );
   }
+
+
+
 
   Widget _buildDateField(BuildContext context, String label, DateTime? date, {bool isOptional = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1251,7 +1685,7 @@ class _BranchAndButtonWidget extends StatelessWidget {
 
   const _BranchAndButtonWidget({required this.onBookPressed, required this.cardWidth});
 
-  @override
+/*  @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
@@ -1290,7 +1724,70 @@ class _BranchAndButtonWidget extends StatelessWidget {
         )
       ],
     );
+  }*/
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        CustomPaint(
+          size: Size(cardWidth, 80),
+          painter: _BranchPainter(color: AppColors.primary),
+        ),
+        Positioned(
+          top: 50,
+          left: (cardWidth / 2) - 70, // Centré
+          child: ScaleTransition(
+            scale: const AlwaysStoppedAnimation(1.0),
+            child: Container(
+              width: 140,
+              height: 45,
+              // ✅ Coupe l'image selon l'arrondi
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                // ✅ L'image de fond
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                // On recrée l'ombre ici car le bouton sera transparent
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: onBookPressed,
+                style: ElevatedButton.styleFrom(
+                  // ✅ Fond transparent
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  elevation: 0,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text("Réserver", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Gap(8),
+                    Icon(Icons.arrow_forward, size: 18)
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+      ],
+    );
   }
+
+
 }
 
 class _BranchPainter extends CustomPainter {

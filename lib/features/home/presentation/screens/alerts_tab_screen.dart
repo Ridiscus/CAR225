@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Adapte ces imports selon l'emplacement réel de tes fichiers
+import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/local_badge.dart';
 import '../../../../core/providers/user_provider.dart';
 // import '../../../../core/theme/app_colors.dart';
@@ -23,22 +24,81 @@ class AlertsTabScreen extends StatefulWidget {
   State<AlertsTabScreen> createState() => _AlertsTabScreenState();
 }
 
-class _AlertsTabScreenState extends State<AlertsTabScreen> {
+
+
+  class _AlertsTabScreenState extends State<AlertsTabScreen> with SingleTickerProviderStateMixin { // 👈 1. AJOUT DU MIXIN
   bool _isLoading = true;
   List<ActiveReservationModel> _reservations = [];
   String? _errorMessage;
 
-  // Déclaration du Repository
   late AlertRepository _alertRepository;
+
+  // 🟢 2. DÉCLARATION DU CONTROLLER
+  late AnimationController _entranceController;
+
+
 
   @override
   void initState() {
     super.initState();
+
+    // 🟢 3. INITIALISATION DU CONTROLLER (Sans le lancer !)
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
     // On lance la récupération dès l'ouverture
     _fetchReservations();
   }
 
-  Future<void> _fetchReservations() async {
+  // 🟢 4. AJOUT DU DISPOSE
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+
+  Map<String, dynamic> _getStatusStyle(String status) {
+    final s = status.toLowerCase();
+
+    if (s.contains("cours") || s.contains("active")) {
+      return {
+        "label": "En cours",
+        "bg": Colors.green.withOpacity(0.1),
+        "color": Colors.green,
+      };
+    } else if (s.contains("confirm")) {
+      return {
+        "label": "Confirmé",
+        "bg": Colors.blue.withOpacity(0.1),
+        "color": Colors.blue,
+      };
+    } else if (s.contains("annul")) {
+      return {
+        "label": "Annulé",
+        "bg": Colors.red.withOpacity(0.1),
+        "color": Colors.red,
+      };
+    } else if (s.contains("termin") || s.contains("arriv")) {
+      return {
+        "label": "Terminé",
+        "bg": Colors.grey.withOpacity(0.2),
+        "color": Colors.grey,
+      };
+    } else {
+      return {
+        "label": status.isNotEmpty ? status : "Inconnu",
+        "bg": Colors.orange.withOpacity(0.1),
+        "color": Colors.orange,
+      };
+    }
+  }
+
+
+
+  /*Future<void> _fetchReservations() async {
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -49,42 +109,53 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // ✅ CORRECTION ICI : On cherche le token sous tous les noms possibles
-      // Le Login le sauvegarde sous 'auth_token', donc on doit le chercher là.
       final String? token = prefs.getString('auth_token') ??
           prefs.getString('access_token') ??
           prefs.getString('token');
-
-      // Debug pour vérifier
-      print("🔍 Token récupéré dans AlertsTabScreen : $token");
 
       if (token == null || token.isEmpty) {
         throw Exception("Non connecté (Token manquant)");
       }
 
-      // 3. Configuration de Dio
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: 'https://car225.com/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': 'Bearer $token', // ✅ Token injecté
+          'Authorization': 'Bearer $token',
         },
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
       ));
 
-      // 4. Appel via le Repository
       final repository = AlertRepository(dio: dio);
-      final reservations = await repository.getActiveReservations();
+
+      // 1. On récupère TOUTES les réservations renvoyées par le backend
+      final allReservations = await repository.getActiveReservations();
+
+      // 2. 🔴 FILTRAGE MAGIQUE ICI 🔴
+      // On ne garde que les voyages qui NE SONT PAS terminés, annulés ou arrivés.
+      final activeOnly = allReservations.where((res) {
+        // ⚠️ ASSURE-TOI QUE "displayStatut" EST BIEN LE NOM DE TA VARIABLE DANS LE MODEL
+        // Si tu l'as appelé autrement (ex: res.statut), change-le ici.
+        final status = (res.displayStatut ?? "").toLowerCase();
+
+        return !status.contains("termin") &&
+            !status.contains("annul") &&
+            !status.contains("arriv");
+      }).toList();
 
       if (mounted) {
         setState(() {
-          _reservations = reservations;
+          // On passe la liste filtrée à l'UI
+          _reservations = activeOnly;
           _isLoading = false;
         });
       }
-    } catch (e) {
+      // 🟢 5. ON LANCE L'ANIMATION ICI !
+      _entranceController.forward(from: 0.0);
+    }
+    catch (e) {
       debugPrint("Erreur fetch: $e");
 
       if (mounted) {
@@ -100,7 +171,105 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
         });
       }
     }
+  }*/
+
+
+  Future<void> _fetchReservations() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    debugPrint("🚀 [FETCH] Début récupération des réservations");
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final String? token = prefs.getString('auth_token') ??
+          prefs.getString('access_token') ??
+          prefs.getString('token');
+
+      debugPrint("🔐 [FETCH] Token présent : ${token != null && token.isNotEmpty}");
+
+      if (token == null || token.isEmpty) {
+        throw Exception("Non connecté (Token manquant)");
+      }
+
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://car225.com/api/',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+      debugPrint("📡 [FETCH] Appel API /user/signalements/active-reservations");
+
+      // 1️⃣ Récupération brute
+      final allReservations = await repository.getActiveReservations();
+
+      debugPrint("📦 [FETCH] Réservations reçues : ${allReservations.length}");
+
+      // 🔍 DEBUG CONTENU
+      for (final res in allReservations) {
+        debugPrint(
+          "➡️ ID:${res.id} | Prog:${res.programmeId} | Veh:${res.vehiculeId} | Statut:${res.displayStatut}",
+        );
+      }
+
+      // 2️⃣ FILTRAGE
+      final activeOnly = allReservations.where((res) {
+        final status = res.displayStatut.toLowerCase();
+
+        final isActive = !status.contains("termin") &&
+            !status.contains("annul") &&
+            !status.contains("arriv");
+
+        debugPrint(
+          "🔎 [FILTER] ID:${res.id} | statut='$status' | gardé=$isActive",
+        );
+
+        return isActive;
+      }).toList();
+
+      debugPrint("✅ [FETCH] Réservations actives après filtre : ${activeOnly.length}");
+
+      if (mounted) {
+        setState(() {
+          _reservations = activeOnly;
+          _isLoading = false;
+        });
+      }
+
+      debugPrint("🎬 [FETCH] Lancement animation UI");
+      _entranceController.forward(from: 0.0);
+
+    } catch (e) {
+      debugPrint("❌ [FETCH] Erreur attrapée : $e");
+
+      if (mounted) {
+        setState(() {
+          if (e.toString().contains("Non connecté")) {
+            _errorMessage = "Vous n'êtes pas connecté.";
+          } else if (e is DioException && e.response?.statusCode == 401) {
+            _errorMessage = "Session expirée. Veuillez vous reconnecter.";
+          } else {
+            _errorMessage = "Impossible de charger les voyages.";
+          }
+          _isLoading = false;
+        });
+      }
+    }
   }
+
+
 
 
   @override
@@ -150,9 +319,33 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _reservations.length,
                         separatorBuilder: (context, index) => const Gap(15),
-                        itemBuilder: (context, index) {
+                        /*itemBuilder: (context, index) {
                           return _buildReservationCard(context, _reservations[index]);
+                        },*/
+
+                        itemBuilder: (context, index) {
+                          // 🟢 6. CALCUL DU DÉLAI EN CASCADE
+                          final double startDelay = (index % 10) * 0.1;
+                          final double endDelay = (startDelay + 0.5).clamp(0.0, 1.0);
+
+                          final animation = CurvedAnimation(
+                            parent: _entranceController,
+                            curve: Interval(startDelay, endDelay, curve: Curves.easeOutCubic),
+                          );
+
+                          // 🟢 7. APPLICATION DES TRANSITIONS
+                          return SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.3), // Glisse vers le haut
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: _buildReservationCard(context, _reservations[index]),
+                            ),
+                          );
                         },
+
                       ),
 
                   const Gap(100),
@@ -194,35 +387,69 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
         ),
         child: Column(
           children: [
-            // Ligne Haut: Compagnie & Date
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.directions_bus, color: Colors.orange, size: 20),
-                    ),
-                    const Gap(10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(reservation.compagnieName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text("Ref: ${reservation.reference.length > 8 ? reservation.reference.substring(0, 8) : reservation.reference}...", style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                      ],
-                    )
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.directions_bus,
+                          color: Colors.orange,
+                          size: 20,
+                        ),
+                      ),
+                      const Gap(10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              reservation.compagnieName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              "Ref: ${reservation.reference.length > 8 ? reservation.reference.substring(0, 8) : reservation.reference}...",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Container(
+                const SizedBox(width: 8),
+                /*Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text("En cours", style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
-                )
+                  child: const Text(
+                    "En cours",
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),*/
+                _buildStatusChip(reservation.displayStatut),
               ],
             ),
             const Divider(height: 30),
@@ -256,6 +483,28 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
               ),
             )
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    final style = _getStatusStyle(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: style["bg"],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        style["label"],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: style["color"],
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -403,11 +652,17 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
     );
   }
 
+
+
+
+  // --- TON WIDGET HEADER CORRIGÉ ---
   Widget _buildHeader(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
-    final user = userProvider.user; // ✅ On prend l'objet user entier
-    final userPhotoUrl = userProvider.user?.photoUrl;
+    final user = userProvider.user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // ✅ CORRECTION 1 : On récupère la hauteur exacte de la barre d'état (encoche)
+    final double topPadding = MediaQuery.of(context).padding.top;
 
     return Container(
       height: 260,
@@ -416,71 +671,71 @@ class _AlertsTabScreenState extends State<AlertsTabScreen> {
         color: isDark ? Colors.black : Colors.white,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         image: const DecorationImage(
-          image: AssetImage("assets/images/busheader1.jpg"),
-          fit: BoxFit.cover,
+            image: AssetImage("assets/images/busheader4.jpg"),
+            fit: BoxFit.cover
         ),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-            stops: const [0.0, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+              stops: const [0.0, 0.6]
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.grey[200],
-                          // ✅ C'EST ICI QUE TOUT SE JOUE :
-                          // On utilise user.fullPhotoUrl (ton getter magique)
-                          backgroundImage: user != null
-                              ? NetworkImage(user.fullPhotoUrl)
-                              : const AssetImage("assets/images/ci.jpg") as ImageProvider,
-
-                          // Petit bonus : gestion d'erreur silencieuse
-                          onBackgroundImageError: (_, __) {},
+        // ✅ CORRECTION 2 : On remplace le widget SafeArea par un Padding manuel
+        child: Padding(
+          padding: EdgeInsets.only(
+            // On pousse le contenu vers le bas : Hauteur barre d'état + 15px de marge
+              top: topPadding + 15,
+              left: 20,
+              right: 20,
+              bottom: 20
+          ),
+          child: Column(
+            // On utilise une Column pour être sûr que le contenu commence en haut
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center, // Important pour l'alignement vertical
+                children: [
+                  // GAUCHE : Avatar + Localisation
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: CircleAvatar(
+                              radius: 24, // Taille fixe garantie
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: user != null ? NetworkImage(user.fullPhotoUrl) : const AssetImage("assets/images/ci.jpg") as ImageProvider
+                          ),
                         ),
                       ),
-                    ),
-                    const Gap(12),
-                    const LocationBadge(),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen())),
-                  child: Container(
-                    height: 45, width: 45,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    ),
-                    child: Image.asset("assets/icons/notification.png", color: Colors.white),
+                      const Gap(12),
+                      // Si ton LocationBadge est coupé, c'est souvent qu'il manque de place en hauteur
+                      // On s'assure qu'il est bien centré dans la Row
+                      const LocationBadge(),
+                    ],
                   ),
-                )
-              ],
-            ),
+
+                  // DROITE : Notification
+                  const NotificationIconBtn(),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+
+
 }
 

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 // --- IMPORTS EXISTANTS (Providers & UI) ---
 import 'core/providers/company_provider.dart';
+import 'core/providers/notification_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'core/services/notifications/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
@@ -14,6 +15,7 @@ import 'core/services/theme_provider.dart';
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart' hide AuthRepositoryImpl;
+import 'features/booking/data/repositories/notification_repository.dart';
 import 'features/booking/domain/repositories/company_repository.dart';
 import 'features/onboarding/presentation/screens/splash_screen.dart';
 
@@ -44,7 +46,7 @@ void main() async {
   // 4. ✅ CONFIGURATION DIO (Pour les requêtes HTTP)
   // Remplace 'http://10.0.2.2:8000/api' par ta vraie URL d'API (10.0.2.2 pour Émulateur Android)
   final dio = Dio(BaseOptions(
-    baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+    baseUrl: 'https://car225.com/api/',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     headers: {
@@ -54,12 +56,13 @@ void main() async {
   ));
 
   // 5. Lancement de l'App avec les Providers
-  runApp(
+  /*runApp(
     MultiProvider(
       providers: [
         // --- A. Providers de base ---
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
 
         // --- B. Repositories (Logique métier sans UI) ---
         Provider<AuthRepository>(
@@ -79,7 +82,47 @@ void main() async {
       ],
       child: const Car225App(), // Ton point d'entrée principal
     ),
+  );*/
+
+
+
+  runApp(
+    MultiProvider(
+      providers: [
+        // --- A. Providers de base (ceux qui n'ont pas de dépendances) ---
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+
+        // --- B. Repositories (Logique métier sans UI) ---
+        Provider<AuthRepository>(
+          create: (_) => AuthRepositoryImpl(
+            remoteDataSource: AuthRemoteDataSourceImpl(),
+            fcmService: FcmService(),
+            deviceService: DeviceService(),
+          ),
+        ),
+
+        // --- C. Providers avec Dépendances (Repositories) ---
+
+        // ✅ CORRECTION ICI : On injecte le repository
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(
+            repository: NotificationRepository(dio: dio),
+          ),
+        ),
+
+        // ✅ PROVIDER COMPANY
+        ChangeNotifierProvider(
+          create: (_) => CompanyProvider(
+            repository: CompanyRepository(dio: dio),
+          ),
+        ),
+      ],
+      child: const Car225App(),
+    ),
   );
+
+
 }
 
 

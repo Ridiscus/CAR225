@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../booking/data/models/user_stats_model.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/models/login_request_model.dart';
 import '../../data/models/register_request_model.dart';
@@ -50,7 +51,7 @@ abstract class AuthRepository {
     required String email,
     required String contact,
     required String nomUrgence,     // Nouveau
-    required String prenomUrgence,  // Nouveau
+    required String lienParenteUrgence, // <-- Remplacé
     required String contactUrgence, // Nouveau
     String? photoPath,
   });
@@ -74,6 +75,11 @@ abstract class AuthRepository {
     required String password,
     required String passwordConfirmation,
   });
+
+  // 🟢 AJOUTE CES DEUX LIGNES ICI :
+  Future<UserStatsModel> getUserStats();
+  Future<TripDetailsModel> getTripDetails();
+
 }
 
 // ===========================================================================
@@ -176,15 +182,25 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
 
+
   @override
   Future<void> sendOtp(String email) async {
     await remoteDataSource.sendOtp(email);
   }
 
-  // 👇 IL FALLAIT AJOUTER L'IMPLÉMENTATION ICI 👇
   @override
   Future<void> verifyOtp(String email, String otpCode) async {
     await remoteDataSource.verifyOtp(email, otpCode);
+  }
+
+  @override
+  Future<UserStatsModel> getUserStats() async {
+    return await remoteDataSource.getUserStats();
+  }
+
+  @override
+  Future<TripDetailsModel> getTripDetails() async {
+    return await remoteDataSource.getTripDetails();
   }
 
 
@@ -299,7 +315,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String contact,
     required String nomUrgence,
-    required String prenomUrgence,
+    required String lienParenteUrgence, // <-- Remplacé
     required String contactUrgence,
     String? photoPath,
   }) async {
@@ -310,7 +326,7 @@ class AuthRepositoryImpl implements AuthRepository {
       email: email,
       contact: contact,
       nomUrgence: nomUrgence,
-      prenomUrgence: prenomUrgence,
+      lienParenteUrgence: lienParenteUrgence,
       contactUrgence: contactUrgence,
       photoPath: photoPath,
     );

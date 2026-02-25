@@ -12,6 +12,7 @@ import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/services/device/device_service.dart';
 
 // Ecrans
+import '../../../booking/data/models/user_stats_model.dart';
 import 'personal_info_screen.dart';
 import 'security_screen.dart';
 import 'wallet_screen.dart';
@@ -25,7 +26,50 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  late AuthRepositoryImpl _repo;
+  UserStatsModel? _userStats;
+  bool _isLoadingStats = true;
+
   @override
+  void initState() {
+    super.initState();
+    _repo = AuthRepositoryImpl(
+      remoteDataSource: AuthRemoteDataSourceImpl(),
+      fcmService: FcmService(),
+      deviceService: DeviceService(),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<UserProvider>().loadUser();
+      _fetchStats(); // 🟢 On charge les stats au lancement
+    });
+  }
+
+
+  // --- 🟢 CHARGEMENT DES STATS GLOBALES ---
+  Future<void> _fetchStats() async {
+    try {
+      final stats = await _repo.getUserStats();
+      if (mounted) {
+        setState(() {
+          _userStats = stats;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingStats = false);
+      }
+      print("Erreur Stats: $e");
+    }
+  }
+
+
+
+
+
+
+  /*@override
   void initState() {
     super.initState();
     // ✅ On demande au Provider de rafraîchir les données quand on arrive sur cette page
@@ -33,7 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserProvider>().loadUser();
     });
-  }
+  }*/
 
   // Navigation vers l'édition
   void _navigateToEdit() {
@@ -44,6 +88,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // ✅ Quand on revient, on recharge le profil via le Provider
       if(mounted) context.read<UserProvider>().loadUser();
     });
+  }
+
+
+
+  // --- 🟢 AFFICHER LES DÉTAILS (BOTTOM SHEET) ---
+  void _showTripDetails() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(10)))),
+              const Gap(20),
+              Text("Détails de vos trajets", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+              const Gap(20),
+
+              // 🟢 UTILISATION D'UN FUTURE BUILDER POUR CHARGER À LA VOLÉE
+              Expanded(
+                child: FutureBuilder<TripDetailsModel>(
+                  future: _repo.getTripDetails(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text("Erreur de chargement", style: TextStyle(color: Colors.red.shade300)));
+                    } else if (!snapshot.hasData) {
+                      return const Center(child: Text("Aucune donnée disponible"));
+                    }
+
+                    final data = snapshot.data!;
+                    return ListView(
+                      children: [
+                        _buildSectionTitle("Départs fréquents", Icons.flight_takeoff),
+                        ...data.departsFrequents.map((e) => _buildTripTile(e.city, e.count, isDark)),
+                        const Gap(20),
+                        _buildSectionTitle("Arrivées fréquentes", Icons.flight_land),
+                        ...data.arriveesFrequentes.map((e) => _buildTripTile(e.city, e.count, isDark)),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+
+
+  // Widgets utilitaires pour le BottomSheet
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const Gap(10),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripTile(String city, int count, bool isDark) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(city, style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade300 : Colors.black87)),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+        child: Text("$count fois", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+      ),
+    );
   }
 
   @override
@@ -136,9 +263,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // --- 3. STATISTIQUES ---
             Row(
               children: [
-                Expanded(child: _buildStatCard(context, "12", "VOYAGES")),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _showTripDetails, // 🟢 Rendu cliquable ici !
+                    child: _buildStatCard(
+                      context,
+                      _isLoadingStats ? "..." : "${_userStats?.totalReservations ?? 0}", // 🟢 Affiche 25 ou 0
+                      "VOYAGES",
+                    ),
+                  ),
+                ),
                 const Gap(15),
-                Expanded(child: _buildStatCard(context, "2.25K", "POINTS", isPoints: true)),
+                Expanded(
+                    child: _buildStatCard(context, "2.25K", "POINTS", isPoints: true)
+                ),
               ],
             ),
             const Gap(25),

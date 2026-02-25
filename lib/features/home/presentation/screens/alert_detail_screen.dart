@@ -1,492 +1,3 @@
-/*import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../../../core/theme/app_colors.dart';
-import '../../../booking/data/models/active_reservation_model.dart';
-import '../../../booking/domain/repositories/alert_repository.dart';
-import 'alert_success_screen.dart';
-
-class AlertDetailScreen extends StatefulWidget {
-  final String alertType;
-  final Color alertColor;
-  final String iconPath;
-  final ActiveReservationModel reservation;
-
-  const AlertDetailScreen({
-    super.key,
-    required this.alertType,
-    required this.alertColor,
-    required this.iconPath,
-    required this.reservation,
-  });
-
-  @override
-  State<AlertDetailScreen> createState() => _AlertDetailScreenState();
-}
-
-class _AlertDetailScreenState extends State<AlertDetailScreen> {
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
-
-  File? _selectedImage;
-  Position? _currentPosition;
-  bool _isLocating = false;
-  bool _isSending = false;
-
-  final ImagePicker _picker = ImagePicker();
-
-  // ✅ TA NOUVELLE FONCTION OVERLAY (DESIGN MODERNE)
-  void _showTopNotification(String message, {bool isError = true}) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 60.0,
-        left: 20.0,
-        right: 20.0,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-            decoration: BoxDecoration(
-              color: isError ? const Color(0xFF222222) : Colors.green.shade700,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    // Suppression automatique après 3 secondes
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        overlayEntry.remove();
-      } else {
-        // Sécurité : si l'écran est fermé, on essaie quand même de nettoyer si l'overlay est actif
-        try {
-          overlayEntry.remove();
-        } catch (_) {}
-      }
-    });
-  }
-
-
-  // Convertit le texte affiché en valeur acceptée par l'API (minuscule)
-  String _getApiType(String displayType) {
-    // Si tu as d'autres cas, ajoute-les ici.
-    // Par défaut, on met tout en minuscule.
-    switch (displayType.toLowerCase()) {
-      case 'accident':
-        return 'accident';
-      case 'panne':
-        return 'panne';
-      case 'embouteillage':
-        return 'embouteillage';
-      case 'retard':
-        return 'retard';
-      default:
-        return displayType.toLowerCase();
-    }
-  }
-
-  // --- GESTION PHOTO ---
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(source: source, imageQuality: 50);
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      _showTopNotification("Impossible de charger la photo", isError: true);
-    }
-  }
-
-  void _showImageSourceModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.blue),
-                title: const Text('Prendre une photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.purple),
-                title: const Text('Choisir dans la galerie'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- GESTION LOCALISATION ---
-  Future<void> _getCurrentLocation() async {
-    setState(() => _isLocating = true);
-
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Permission de localisation refusée');
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception('Localisation définitivement refusée. Activez-la dans les paramètres.');
-      }
-
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
-
-      setState(() {
-        _currentPosition = position;
-        if (placemarks.isNotEmpty) {
-          Placemark place = placemarks[0];
-          _locationController.text = "${place.street ?? ''}, ${place.locality ?? ''}".trim();
-          if (_locationController.text == ",") _locationController.text = "Position détectée";
-        } else {
-          _locationController.text = "${position.latitude}, ${position.longitude}";
-        }
-        _isLocating = false;
-      });
-
-    } catch (e) {
-      setState(() => _isLocating = false);
-      _showTopNotification("Erreur GPS : ${e.toString().replaceAll('Exception:', '')}", isError: true);
-    }
-  }
-
-  // --- ENVOI DU SIGNALEMENT ---
-  Future<void> _submitSignalement() async {
-    // 1. Validations
-    if (_descriptionController.text.trim().isEmpty) {
-      _showTopNotification("Veuillez décrire le problème.", isError: true);
-      return;
-    }
-    if (_selectedImage == null) {
-      _showTopNotification("Une photo de preuve est obligatoire.", isError: true);
-      return;
-    }
-    if (_currentPosition == null) {
-      _showTopNotification("Récupération de la position en cours...", isError: false);
-      await _getCurrentLocation();
-      if (_currentPosition == null) {
-        // Si échec de la localisation auto, on arrête
-        return;
-      }
-    }
-
-    setState(() => _isSending = true);
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? prefs.getString('token');
-
-      // Setup Dio
-      final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      ));
-
-      final repository = AlertRepository(dio: dio);
-
-
-      // 2. Appel
-      await repository.createSignalement(
-        programmeId: widget.reservation.programmeId,
-        vehiculeId: widget.reservation.vehiculeId,
-
-        // ✅ CORRECTION : On convertit en minuscule pour l'API
-        type: _getApiType(widget.alertType),
-
-        description: _descriptionController.text,
-        latitude: _currentPosition!.latitude,
-        longitude: _currentPosition!.longitude,
-        photo: _selectedImage!,
-      );
-
-
-      if (mounted) {
-        _showTopNotification("Signalement envoyé !", isError: false);
-        // Petit délai pour voir la notif avant de changer d'écran
-        await Future.delayed(const Duration(milliseconds: 500));
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AlertSuccessScreen()),
-        );
-      }
-
-    } catch (e) {
-      if (mounted) {
-        // Nettoyage du message d'erreur pour l'utilisateur
-        String msg = e.toString().replaceAll("Exception:", "").trim();
-        _showTopNotification(msg, isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final inputFillColor = isDark ? Colors.grey[900] : Colors.white;
-    final borderColor = isDark ? Colors.grey[800] : Colors.transparent;
-
-    // Récupération de la zone safe en bas pour l'iPhone X+ / Android Gestures
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Scaffold(
-      backgroundColor: scaffoldColor,
-      appBar: AppBar(
-        title: Text("Détails du problème", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        // ✅ CORRECTION ICI : On ajoute du padding en bas pour la barre système
-        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- INFO VOYAGE ---
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.directions_bus, color: textColor),
-                  const Gap(15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Voyage avec ${widget.reservation.compagnieName}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text("${widget.reservation.pointDepart} ➔ ${widget.reservation.pointArrive}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(5)),
-                    child: const Text("Actif", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  )
-                ],
-              ),
-            ),
-            const Gap(20),
-
-            // --- TYPE ALERTE ---
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: widget.alertColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: widget.alertColor.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(widget.iconPath, width: 16, color: widget.alertColor),
-                  const Gap(8),
-                  Text(widget.alertType, style: TextStyle(color: widget.alertColor, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            const Gap(25),
-
-            // --- FORMULAIRE DESCRIPTION ---
-            Text("Description du problème *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-            const Gap(10),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 5,
-              style: TextStyle(color: textColor),
-              decoration: InputDecoration(
-                hintText: "Décrivez en détails ce qui s'est passé...",
-                hintStyle: const TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: inputFillColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                enabledBorder: isDark
-                    ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
-                    : null,
-                contentPadding: const EdgeInsets.all(15),
-              ),
-            ),
-            const Gap(20),
-
-            // --- LOCALISATION AUTOMATIQUE ---
-            Text("Lieu du problème *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-            const Gap(10),
-            TextField(
-              controller: _locationController,
-              readOnly: true,
-              style: TextStyle(color: textColor),
-              decoration: InputDecoration(
-                hintText: "Cliquez sur l'icône GPS...",
-                hintStyle: const TextStyle(color: Colors.grey),
-                prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
-                suffixIcon: IconButton(
-                  onPressed: _isLocating ? null : _getCurrentLocation,
-                  icon: _isLocating
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.my_location, color: Colors.blue),
-                ),
-                filled: true,
-                fillColor: inputFillColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                enabledBorder: isDark
-                    ? OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: borderColor!))
-                    : null,
-              ),
-            ),
-            const Gap(20),
-
-            // --- PHOTO DE PREUVE ---
-            Text("Preuve photo *", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-            const Gap(10),
-            GestureDetector(
-              onTap: _showImageSourceModal,
-              child: Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                    color: inputFillColor,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: _selectedImage == null ? Colors.grey.shade400 : AppColors.primary, width: 1),
-                    image: _selectedImage != null
-                        ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
-                        : null
-                ),
-                child: _selectedImage == null
-                    ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.camera_enhance_rounded, size: 40, color: Colors.grey.shade400),
-                    const Gap(10),
-                    Text("Appuyez pour ajouter une photo", style: TextStyle(color: Colors.grey.shade500)),
-                  ],
-                )
-                    : Stack(
-                  children: [
-                    Positioned(
-                      right: 10, top: 10,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        radius: 15,
-                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ),
-            const Gap(30),
-
-            // --- BOUTON ENVOYER ---
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _isSending ? null : _submitSignalement,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  elevation: 5,
-                  shadowColor: AppColors.primary.withOpacity(0.4),
-                  disabledBackgroundColor: Colors.grey,
-                ),
-                child: _isSending
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                    : const Text("Envoyer le signalement", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ),
-
-            // Un petit espace supplémentaire au cas où
-            const Gap(20),
-          ],
-        ),
-      ),
-    );
-  }
-}*/
-
-
-
-
-
-
-
-
-
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -703,7 +214,7 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
   }
 
   // --- ENVOI DU SIGNALEMENT ---
-  Future<void> _submitSignalement() async {
+  /*Future<void> _submitSignalement() async {
     // ✅ 2. VALIDATION CONDITIONNELLE
     // Si c'est un ACCIDENT, on oblige la description et la photo.
     // Sinon, on laisse passer même si vide.
@@ -726,6 +237,15 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       if (_currentPosition == null) return;
     }
 
+    // 🚫 VÉRIFICATION VÉHICULE (OBLIGATOIRE)
+    if (widget.reservation.vehiculeId == null || widget.reservation.vehiculeId <= 0) {
+      _showTopNotification(
+        "Aucun véhicule valide associé à cette réservation",
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _isSending = true);
 
     try {
@@ -733,7 +253,7 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       final token = prefs.getString('auth_token') ?? prefs.getString('token');
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: 'https://car225.com/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -771,6 +291,87 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
     } catch (e) {
       if (mounted) {
         String msg = e.toString().replaceAll("Exception:", "").trim();
+        _showTopNotification(msg, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }*/
+
+
+  // --- ENVOI DU SIGNALEMENT ---
+  Future<void> _submitSignalement() async {
+
+    // ✅ VALIDATION ACCIDENT
+    if (_isMandatory) {
+      if (_descriptionController.text.trim().isEmpty) {
+        _showTopNotification("Veuillez décrire l'accident.", isError: true);
+        return;
+      }
+      if (_selectedImage == null) {
+        _showTopNotification("Une photo est obligatoire pour un accident.", isError: true);
+        return;
+      }
+    }
+
+    // 📍 Localisation obligatoire
+    if (_currentPosition == null) {
+      _showTopNotification("Récupération de la position en cours...", isError: false);
+      await _getCurrentLocation();
+      if (_currentPosition == null) return;
+    }
+
+    final int? vehiculeId = widget.reservation.vehiculeId;
+
+
+    if (vehiculeId == null || vehiculeId <= 0) {
+      _showTopNotification(
+        "Aucun véhicule valide associé à cette réservation",
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isSending = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? prefs.getString('token');
+
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://car225.com/api/',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+      await repository.createSignalement(
+        programmeId: widget.reservation.programmeId,
+        vehiculeId: widget.reservation.vehiculeId!, // sécurisé ici
+        type: _getApiType(widget.alertType),
+        description: _descriptionController.text,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        photo: _selectedImage,
+      );
+
+      if (mounted) {
+        _showTopNotification("Signalement envoyé avec succès", isError: false);
+        await Future.delayed(const Duration(milliseconds: 500));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AlertSuccessScreen()),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        final msg = e.toString().replaceAll("Exception:", "").trim();
         _showTopNotification(msg, isError: true);
       }
     } finally {

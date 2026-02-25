@@ -14,11 +14,16 @@ import '../../domain/repositories/booking_repository.dart';
 import 'seat_selection_screen.dart';
 
 class SearchResultsScreen extends StatefulWidget {
+  final bool isModificationMode; // 1️⃣ AJOUTER CECI
   final bool isGuestMode;
   final Map<String, dynamic>? searchParams;
+  // 🟢 On récupère l'info depuis l'écran précédent
+  final bool ticketWasAllerRetour;
 
   const SearchResultsScreen({
     super.key,
+    this.isModificationMode = false, // 2️⃣ Initialiser à false par défaut
+    this.ticketWasAllerRetour = false, // Par défaut false
     this.isGuestMode = false,
     this.searchParams,
   });
@@ -27,7 +32,8 @@ class SearchResultsScreen extends StatefulWidget {
   State<SearchResultsScreen> createState() => _SearchResultsScreenState();
 }
 
-class _SearchResultsScreenState extends State<SearchResultsScreen> {
+
+  class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTickerProviderStateMixin { // 👈 1. AJOUT DU MIXIN
   int passengerCount = 1;
   bool isLoading = true;
   String? errorMessage;
@@ -35,15 +41,35 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   late BookingRepositoryImpl _repository;
 
+  // 🟢 2. DÉCLARATION DU CONTROLLER
+  late AnimationController _entranceController;
+
+
   @override
   void initState() {
     super.initState();
+
+    // 🟢 3. INITIALISATION DU CONTROLLER (Sans faire le .forward() ici !)
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
     _setupDependenciesAndFetch();
   }
 
+  // 🟢 4. AJOUT DU DISPOSE POUR ÉVITER LES FUITES DE MÉMOIRE
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+
+
   void _setupDependenciesAndFetch() {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api',
+      baseUrl: 'https://car225.com/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'Content-Type': 'application/json'},
@@ -74,6 +100,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       if (mounted) {
         setState(() { programs = results; isLoading = false; });
       }
+
+      // 🟢 5. ON LANCE L'ANIMATION UNE FOIS LES DONNÉES PRÊTES
+      _entranceController.forward(from: 0.0);
+
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -87,8 +117,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void _incrementPassengers() { if (passengerCount < 5) setState(() => passengerCount++); }
   void _decrementPassengers() { if (passengerCount > 1) setState(() => passengerCount--); }
 
-  void _showBookingOptionsModal(BuildContext context, ProgramModel program) {
-    showModalBottomSheet(
+
+
+  // 🟢 CORRECTION DE L'APPEL A LA MODALE
+  Future<void> _showBookingOptionsModal(BuildContext context, ProgramModel program) async {
+    final Map<String, dynamic>? configResult = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -102,12 +135,50 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               program: program,
               passengerCount: passengerCount,
               isGuestMode: widget.isGuestMode,
+              isModificationMode: widget.isModificationMode,
               repository: _repository,
+
+              // ✅ ICI : On passe la variable CRUCIALE à la modale
+              ticketWasAllerRetour: widget.ticketWasAllerRetour,
             );
           },
         );
       },
     );
+
+    // Si on revient avec des résultats, on va vers la sélection des sièges
+    if (configResult != null && mounted) {
+      _navigateToSeatSelection(
+        program: configResult['program'],
+        returnProgram: configResult['returnProgram'], // Sera null si isRoundTrip était false
+        dateRetourChoisie: configResult['dateRetourChoisie'],
+      );
+    }
+  }
+
+  void _navigateToSeatSelection({
+    required ProgramModel program,
+    ProgramModel? returnProgram,
+    String? dateRetourChoisie,
+  }) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SeatSelectionScreen(
+          program: program,
+          returnProgram: returnProgram, // ✅ On transmet le programme retour
+          passengerCount: passengerCount,
+          isGuestMode: widget.isGuestMode,
+          isModificationMode: widget.isModificationMode,
+          dateRetourChoisie: dateRetourChoisie,
+        ),
+      ),
+    );
+
+    // Si on a terminé la modif, on remonte le résultat
+    if (widget.isModificationMode && result != null && mounted) {
+      Navigator.pop(context, result);
+    }
   }
 
   @override
@@ -176,13 +247,43 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 ? Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("Oups ! $errorMessage", textAlign: TextAlign.center, style: TextStyle(color: textColor))))
                 : programs.isEmpty
                 ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.directions_bus_outlined, size: 60, color: Colors.grey.shade400), const Gap(10), Text("Aucun trajet disponible", style: TextStyle(color: Colors.grey.shade600))]))
-                : ListView.builder(
+                /*: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: programs.length,
               itemBuilder: (context, index) {
                 return _buildTicketCard(context, programs[index]);
               },
+            ),*/
+
+                : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: programs.length,
+              itemBuilder: (context, index) {
+                final program = programs[index];
+
+                // 🟢 6. CALCUL DU DÉLAI EN CASCADE (STAGGERED ANIMATION)
+                final double startDelay = (index % 10) * 0.1;
+                final double endDelay = (startDelay + 0.5).clamp(0.0, 1.0);
+
+                final animation = CurvedAnimation(
+                  parent: _entranceController,
+                  curve: Interval(startDelay, endDelay, curve: Curves.easeOutCubic),
+                );
+
+                // 🟢 7. APPLICATION DES TRANSITIONS (SLIDE + FADE)
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.3), // Vient un peu du bas
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: _buildTicketCard(context, program),
+                  ),
+                );
+              },
             ),
+
           ),
         ],
       ),
@@ -206,32 +307,92 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Padding(padding: const EdgeInsets.all(8.0), child: Image.asset("assets/images/bus.png", color: AppColors.primary, fit: BoxFit.contain)),
-                  ),
-                  const Gap(10),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(program.compagnieName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time_filled, size: 12, color: AppColors.primary),
-                        const Gap(4),
-                        Text("Départ : ${program.heureDepart}", style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Image.asset(
+                          "assets/images/bus.png",
+                          color: AppColors.primary,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
-                  ]),
+                    const Gap(10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            program.compagnieName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: textColor,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_filled,
+                                size: 12,
+                                color: AppColors.primary,
+                              ),
+                              const Gap(4),
+                              Expanded(
+                                child: Text(
+                                  "Départ : ${program.heureDepart}",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    "${program.prix} F",
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  Text(
+                    "${program.placesDisponibles} places dispo",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: program.placesDisponibles < 5
+                          ? Colors.red
+                          : AppColors.secondary,
+                    ),
+                  ),
                 ],
               ),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text("${program.prix} F", style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
-                Text("${program.placesDisponibles} places dispo", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: program.placesDisponibles < 5 ? Colors.red : AppColors.secondary)),
-              ]),
             ],
           ),
 
@@ -272,8 +433,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ],
           ),
           const Gap(20),
-          SizedBox(
+          // MODIFICATION ICI
+          Container(
             width: double.infinity,
+            height: 45, // On fixe une hauteur pour que l'image se voie bien
+            clipBehavior: Clip.hardEdge, // Coupe l'image aux bords
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10), // Rayon original
+              image: const DecorationImage(
+                image: AssetImage("assets/images/tabaa.jpg"),
+                fit: BoxFit.cover,
+              ),
+            ),
             child: ElevatedButton(
               onPressed: () {
                 String searchDate = widget.searchParams?['date'] ?? program.dateDepart.split(' ')[0];
@@ -283,12 +454,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 _showBookingOptionsModal(context, programCorrige);
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: Colors.transparent, // Transparent !
+                  shadowColor: Colors.transparent,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 12)),
+                  padding: const EdgeInsets.symmetric(vertical: 0) // Le Container gère la hauteur
+              ),
               child: const Text("Réserver", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           )
+
+
         ],
       ),
     );
@@ -301,14 +477,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 class _BookingConfigModalContent extends StatefulWidget {
   final ProgramModel program;
   final int passengerCount;
+  final bool isModificationMode;
   final bool isGuestMode;
+  final bool ticketWasAllerRetour;
   final BookingRepositoryImpl repository;
 
   const _BookingConfigModalContent({
     super.key,
     required this.program,
     required this.passengerCount,
+    required this.isModificationMode,
     required this.isGuestMode,
+    // Ajouté au constructeur
+    this.ticketWasAllerRetour = false,
     required this.repository,
   });
 
@@ -328,6 +509,16 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
   void initState() {
     super.initState();
     selectedDepartureTime = widget.program.heureDepart;
+
+    // 🔒 LOGIQUE DE VERROUILLAGE CORRIGÉE
+    if (widget.isModificationMode) {
+      // Si c'était un aller-retour, on FORCE le mode aller-retour dès l'ouverture
+      isRoundTrip = widget.ticketWasAllerRetour;
+    } else {
+      // Mode normal : on respecte la logique par défaut (ou celle du programme si déjà défini)
+      isRoundTrip = widget.program.isAllerRetour;
+    }
+
   }
 
   void _showTopNotification(String message, {bool isError = true}) {
@@ -409,8 +600,17 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
         return;
       }
     }
-    Navigator.pop(context);
-    Navigator.push(context, MaterialPageRoute(builder: (context) => SeatSelectionScreen(isGuestMode: widget.isGuestMode, passengerCount: widget.passengerCount, program: widget.program.copyWith(isAllerRetour: isRoundTrip), returnProgram: isRoundTrip ? selectedReturnProgram : null, dateRetourChoisie: isRoundTrip && selectedReturnDate != null ? DateFormat('yyyy-MM-dd').format(selectedReturnDate!) : null)));
+
+    // 1. On prépare les données à renvoyer au parent (SearchResultsScreen)
+    // On ne navigue PAS ici, on ferme juste le modal avec le résultat.
+    Navigator.pop(context, {
+      'program': widget.program.copyWith(isAllerRetour: isRoundTrip),
+      'returnProgram': isRoundTrip ? selectedReturnProgram : null,
+      'dateRetourChoisie': isRoundTrip && selectedReturnDate != null
+          ? DateFormat('yyyy-MM-dd').format(selectedReturnDate!)
+          : null
+    });
+
   }
 
   @override
@@ -436,17 +636,40 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
             Text("Configuration du voyage", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
             const Gap(20),
 
-            // TYPE DE TRAJET
+
+            // 🔒 LE BLOC DE CHOIX DU TYPE DE VOYAGE
             Container(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10)
+              ),
               child: Row(
                 children: [
-                  _buildTypeOption("Aller Simple", !isRoundTrip, () { setState(() { isRoundTrip = false; selectedReturnProgram = null; selectedReturnDate = null; }); }),
-                  _buildTypeOption("Aller - Retour", isRoundTrip, () => setState(() => isRoundTrip = true)),
+                  // BOUTON ALLER SIMPLE
+                  _buildTypeOption(
+                      "Aller Simple",
+                      !isRoundTrip, // Actif si isRoundTrip est false
+                      // Si Modif : On bloque le clic (null). Sinon : on change l'état.
+                      widget.isModificationMode
+                          ? null
+                          : () { setState(() { isRoundTrip = false; selectedReturnProgram = null; selectedReturnDate = null; }); }
+                  ),
+
+                  // BOUTON ALLER RETOUR
+                  _buildTypeOption(
+                      "Aller - Retour",
+                      isRoundTrip, // Actif si isRoundTrip est true
+                      // Si Modif : On bloque le clic (null). Sinon : on change l'état.
+                      widget.isModificationMode
+                          ? null
+                          : () => setState(() => isRoundTrip = true)
+                  ),
                 ],
               ),
             ),
+
+
             const Gap(20),
 
             // RÉCAP ALLER
@@ -550,17 +773,32 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
                 ],
               ),
             ),
-            // -----------------------------------------------------------
-
-            SizedBox(
+            Container(
               width: double.infinity,
               height: 50,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                boxShadow: [
+                  BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: _onValidate,
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent, // Fond transparent
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                ),
                 child: const Text("Choisir les sièges", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
+
             const Gap(10),
           ],
         ),
@@ -568,21 +806,53 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
     );
   }
 
-  Widget _buildTypeOption(String label, bool isSelected, VoidCallback onTap) {
+
+
+  Widget _buildTypeOption(String label, bool isSelected, VoidCallback? onTap) {
+    // Si onTap est null, c'est que le bouton est désactivé
+    bool isDisabled = onTap == null;
+
+    // Si c'est désactivé mais que ce n'est PAS l'option sélectionnée, on la grise fort
+    // Exemple : Je modifie un Aller Simple. "Aller Retour" est désactivé et non sélectionné.
+    double opacity = isDisabled && !isSelected ? 0.3 : 1.0;
+
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: onTap, // Peut être null, donc pas de clic
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
+            // Si sélectionné : Blanc. Si pas sélectionné : Transparent.
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : [],
           ),
-          child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.grey, fontSize: 13)),
+          child: Opacity(
+            opacity: opacity,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Petit cadenas si c'est l'option sélectionnée mais verrouillée
+                if (isDisabled && isSelected) ...[
+                  Icon(Icons.lock, size: 12, color: Colors.grey),
+                  SizedBox(width: 5),
+                ],
+                Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.black : Colors.grey,
+                        fontSize: 13
+                    )
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
 }

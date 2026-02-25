@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // --- IMPORTS ---
+import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/local_badge.dart';
 import '../../../../core/providers/company_provider.dart';
 import '../../../../core/providers/user_provider.dart';
@@ -116,12 +117,13 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
           // ⚠️ IMPORTANT : Remplace ceci par l'URL racine de ton API Laravel
           // Exemple local émulateur: "http://10.0.2.2:8000/"
           // Exemple réel: "https://mon-site-transport.com/"
-          const String baseUrl = "https://jingly-lindy-unminding.ngrok-free.dev/";
+          // 🟢 CORRECTION : On retire le 'api/' pour pointer vers la racine du site
+          const String mediaBaseUrl = 'https://car225.com/';
 
           String? fullLogoUrl;
 
           if (company?.logoUrl != null && company!.logoUrl.isNotEmpty) {
-            // Si l'API renvoie déjà http... (peu probable ici mais bonne pratique)
+            // Si l'API renvoie déjà http...
             if (company!.logoUrl.startsWith('http')) {
               fullLogoUrl = company!.logoUrl;
             } else {
@@ -131,11 +133,13 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                 cleanPath = cleanPath.substring(1);
               }
 
-              // On colle : Base + Chemin
-              // Résultat : https://jingly...dev/storage/compagnies/...
-              fullLogoUrl = "$baseUrl$cleanPath";
+              // On colle : Base média + Chemin
+              // Résultat : https://car225.com/storage/compagnies/...
+              fullLogoUrl = "$mediaBaseUrl$cleanPath";
             }
           }
+
+
 
           return SingleChildScrollView(
             child: Column(
@@ -459,15 +463,9 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
                     const LocationBadge(),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen())),
-                  child: Container(
-                    height: 45, width: 45,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.1))),
-                    child: Image.asset("assets/icons/notification.png", color: Colors.white),
-                  ),
-                )
+                // --- 2. DROITE : BOUTON NOTIFICATION (Smart Widget) ---
+                // On a remplacé l'ancien GestureDetector manuel par ton widget provider
+                const NotificationIconBtn(),
               ],
             ),
           ),

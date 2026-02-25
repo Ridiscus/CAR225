@@ -1,8 +1,9 @@
 import 'dart:convert';
+import 'package:car225/features/home/presentation/screens/home_tab_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../booking/data/models/ticket_model.dart';
 import '../../../booking/domain/repositories/ticket_repository.dart';
+import '../../../booking/presentation/screens/search_results_screen.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final TicketModel initialTicket;
@@ -21,7 +22,9 @@ class TicketDetailScreen extends StatefulWidget {
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   late TicketModel ticket;
   bool isLoading = true;
-  String? errorMessage;
+
+  // 🟢 AJOUT : Cette variable retient si on a touché au ticket
+  bool hasChanged = false;
 
   @override
   void initState() {
@@ -30,481 +33,923 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     _loadFullDetails();
   }
 
+  // 🔄 CHARGEMENT INTELLIGENT (Fix des villes qui disparaissent)
   Future<void> _loadFullDetails() async {
     try {
-      final fullTicket = await widget.repository.getTicketDetails(widget.initialTicket.id);
+      final fullTicket = await widget.repository.getTicketDetails(widget.initialTicket.id.toString());
+
       if (mounted) {
         setState(() {
-          ticket = fullTicket;
+          // On garde les villes d'avant si le nouveau ticket a perdu l'info (bug API courant)
+          String finalDepart = fullTicket.departureCity;
+          String finalArrive = fullTicket.arrivalCity;
+
+          if (finalDepart == "Départ" && widget.initialTicket.departureCity != "Départ") {
+            finalDepart = widget.initialTicket.departureCity;
+          }
+          if (finalArrive == "Arrivée" && widget.initialTicket.arrivalCity != "Arrivée") {
+            finalArrive = widget.initialTicket.arrivalCity;
+          }
+
+          // On met à jour le ticket avec les meilleures infos des deux mondes
+          ticket = fullTicket.copyWith(
+              departureCity: finalDepart,
+              arrivalCity: finalArrive,
+              // On force le statut si nécessaire pour qu'il soit propre
+              status: fullTicket.status.isEmpty ? widget.initialTicket.status : fullTicket.status
+          );
+
           isLoading = false;
         });
       }
     } catch (e) {
+      print("Erreur reload details: $e");
       if (mounted) {
         setState(() {
           isLoading = false;
-          errorMessage = "Mise à jour impossible (Hors ligne).";
+          // En cas d'erreur, on reste sur les données initiales qui fonctionnent
         });
       }
     }
   }
 
   // ------------------------------------------------------------------------
-  // 🧮 LOGIQUE DE CALCUL (DATES & REMBOURSEMENT)
+  // 🧮 LOGIQUE DATES & STATUTS (CORRIGÉE & SOUPLE)
   // ------------------------------------------------------------------------
 
-  // Récupère la date précise du départ
+  // 1. Calcul précis de la date et l'heure de départ
   DateTime? get _departureDateTime {
     try {
-      final datePart = ticket.date; // Supposons DateTime(2024, 02, 12)
-      final timeParts = ticket.departureTimeRaw.split(':');
-      final hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      return DateTime(datePart.year, datePart.month, datePart.day, hour, minute);
+      final datePart = ticket.date;
+      // On nettoie l'heure (parfois "14:30:00", on veut juste "14" et "30")
+      final cleanTime = ticket.departureTimeRaw.trim();
+      final timeParts = cleanTime.split(':');
+
+      if (timeParts.length < 2) return datePart.add(const Duration(hours: 23, minutes: 59));
+
+      return DateTime(
+        datePart.year,
+        datePart.month,
+        datePart.day,
+        int.parse(timeParts[0]), // Heures
+        int.parse(timeParts[1]), // Minutes
+      );
     } catch (e) {
-      print("Erreur parsing date: $e");
-      return null;
+      return ticket.date.add(const Duration(hours: 23, minutes: 59));
     }
   }
 
-  // Vérifie si on est à plus de 15 min du départ
+  // 2. CORRECTION DU PROBLÈME "Confirmée" vs "Confirmé"
+  bool get _isStatusValid {
+    final s = ticket.status.toLowerCase().trim();
+    // On utilise contains pour accepter "confirmé", "confirmée", "confirmed", etc.
+    return s.contains("confirm") || s.contains("valid") || s.contains("pay") || s.contains("success");
+  }
+
+  // 3. LA LOGIQUE FINALE pour afficher les boutons
   bool get _isActionPossible {
-    if (ticket.status == "Terminé" || ticket.status == "Annulé" || ticket.status == "Expiré") {
-      return false;
-    }
+    // Si statut invalide (Annulé, Terminé...) -> NON
+    if (!_isStatusValid) return false;
+
     final departure = _departureDateTime;
     if (departure == null) return false;
 
     final now = DateTime.now();
+
+    // Si bus déjà parti -> NON
+    if (now.isAfter(departure)) return false;
+
+    // Si départ dans moins de 15 min -> NON
     return departure.difference(now).inMinutes > 15;
   }
 
-  // 👇 C'EST ICI QUE TA LOGIQUE EST APPLIQUÉE
+
+
+  // ------------------------------------------------------------------------
+// 💰 CALCUL REMBOURSEMENT (CORRIGÉ POUR GÉRER LES DÉCIMALES)
+// ------------------------------------------------------------------------
   Map<String, dynamic> _calculateRefundInfo() {
-    final departure = _departureDateTime;
-    if (departure == null) return {'percent': 0.0, 'amount': 0, 'penalty': 0};
-
+    final departure = _departureDateTime; // Assure-toi que cette variable est bien définie dans ta classe
     final now = DateTime.now();
-    final difference = departure.difference(now);
-    final int daysBefore = difference.inDays;
-    final int minutesBefore = difference.inMinutes;
 
-    double refundPercent = 0.0;
-
-    // Tes règles :
-    if (daysBefore >= 7) {
-      refundPercent = 1.0; // 100% (Plus d'1 semaine)
-    } else if (daysBefore >= 4) {
-      refundPercent = 0.7; // 70% (Entre 4 jours et 1 semaine)
-    } else if (daysBefore >= 2) {
-      refundPercent = 0.4; // 40% (Entre 2 et 4 jours)
-    } else if (minutesBefore > 15) {
-      refundPercent = 0.2; // 20% (Moins de 2 jours, jusqu'à 15 min)
-    } else {
-      refundPercent = 0.0; // 0% (Moins de 15 min)
-    }
-
-    // Nettoyage du prix (ex: "5 000" -> 5000.0)
+    // 1. Récupération et Nettoyage Intelligent du Prix
     double price = 0.0;
     try {
-      String cleanPrice = ticket.price.replaceAll(RegExp(r'[^0-9]'), '');
-      price = double.parse(cleanPrice);
+      String rawPrice = ticket.price.toString().trim();
+
+      // DEBUG : Regarde ça dans ta console pour comprendre
+      debugPrint("💰 PRIX BRUT AVANT NETTOYAGE : '$rawPrice'");
+
+      // ÉTAPE CLÉ : Si le prix contient des décimales nulles (.00 ou ,00), on les retire d'abord
+      // Sinon "100.00" devient "10000" après le nettoyage des symboles
+      if (rawPrice.endsWith('.00')) {
+        rawPrice = rawPrice.substring(0, rawPrice.length - 3);
+      } else if (rawPrice.endsWith(',00')) {
+        rawPrice = rawPrice.substring(0, rawPrice.length - 3);
+      }
+
+      // Maintenant on garde uniquement les chiffres
+      String cleanPrice = rawPrice.replaceAll(RegExp(r'[^0-9]'), '');
+
+      if (cleanPrice.isEmpty) {
+        price = 0.0;
+      } else {
+        price = double.parse(cleanPrice);
+      }
+
+      debugPrint("✅ PRIX NETTOYÉ UTILISÉ : $price");
+
     } catch (e) {
+      debugPrint("🔴 Erreur parsing prix: $e");
       price = 0.0;
     }
 
-    double refundAmount = price * refundPercent;
-    double penaltyAmount = price - refundAmount;
+    // 2. Si le bus est déjà parti ou date invalide
+    if (departure == null || now.isAfter(departure)) {
+      return {
+        'refund': 0,
+        'penalty': price.toInt(),
+        'label': 'Départ passé (Non remboursable)',
+        'total_price': price.toInt()
+      };
+    }
+
+    // 3. Calcul de la pénalité selon le temps restant
+    final difference = departure.difference(now);
+    final int minutesBefore = difference.inMinutes;
+
+    int penalty = 0;
+    String label = "";
+
+    // --- RÈGLES DE REMBOURSEMENT ---
+    if (minutesBefore >= 180) { // Plus de 3h avant
+      penalty = 0;
+      label = "Annulation gratuite (> 3h avant)";
+    } else if (minutesBefore >= 120) { // Entre 2h et 3h
+      int fraisFixes = 250;
+      // Sécurité : Si le billet coûte 100F, on ne peut pas retenir 250F
+      penalty = (price < fraisFixes) ? price.toInt() : fraisFixes;
+      label = "Frais d'annulation : $penalty F (< 3h)";
+    } else { // Moins de 2h
+      int fraisFixes = 500;
+      penalty = (price < fraisFixes) ? price.toInt() : fraisFixes;
+      label = "Frais d'annulation : $penalty F (< 2h)";
+    }
+
+    // Calcul final
+    double refund = (price - penalty);
+    if (refund < 0) refund = 0;
 
     return {
-      'percent': (refundPercent * 100).toInt(),
-      'amount': refundAmount.toInt(),
-      'penalty': penaltyAmount.toInt(),
-      'daysBefore': daysBefore,
+      'refund': refund.toInt(),
+      'penalty': penalty,
+      'label': label,
+      'total_price': price.toInt()
     };
   }
 
   // ------------------------------------------------------------------------
-  // 🛠 ACTIONS BOUTONS
+  // 🔔 NOTIFICATION TOP (Custom)
   // ------------------------------------------------------------------------
+  void _showTopNotification(String message, {bool isError = true}) {
+    if (!mounted) return;
 
-  void _onCancelPressed() {
-    final refundInfo = _calculateRefundInfo();
-    final int percent = refundInfo['percent'];
-    final int amount = refundInfo['amount'];
-    final int penalty = refundInfo['penalty'];
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 50.0, // Ajusté légèrement pour ne pas coller à la status bar
+        left: 20.0,
+        right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isError ? const Color(0xFFD32F2F) : const Color(0xFF388E3C), // Rouge erreur / Vert succès
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4)
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                    isError ? Icons.error_outline : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 24
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
 
-    // Couleurs dynamiques selon le remboursement
-    Color percentColor = percent >= 70 ? Colors.green : (percent >= 40 ? Colors.orange : Colors.red);
+    overlay.insert(overlayEntry);
 
-    showDialog(
+    // Suppression automatique après 3 secondes
+    Future.delayed(const Duration(seconds: 3), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------------
+  // 🗑️ ACTION D'ANNULATION (AVEC TOP NOTIFICATION)
+  // ------------------------------------------------------------------------
+  Future<void> _cancelTicket() async {
+    // 1. Calculer les montants avant d'ouvrir le dialogue
+    final info = _calculateRefundInfo();
+
+    final int totalPrice = info['total_price'];
+    final int penalty = info['penalty'];
+    final int refundAmount = info['refund'];
+    final String labelCondition = info['label'];
+
+    // 2. Afficher le dialogue détaillé
+    final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: Row(
           children: const [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
             SizedBox(width: 10),
-            Text("Annulation", style: TextStyle(fontWeight: FontWeight.bold)),
+            Text("Annulation", style: TextStyle(fontSize: 18)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Conditions selon le délai restant :"),
+            const Text(
+              "Détail du remboursement :",
+              style: TextStyle(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+            ),
             const SizedBox(height: 15),
 
-            // LIGNE 1 : Pourcentage remboursé
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Remboursement :", style: TextStyle(color: Colors.grey)),
-                Text("$percent%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: percentColor)),
+                const Text("Prix du billet :"),
+                Text("$totalPrice F", style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
+            const SizedBox(height: 8),
 
-            // LIGNE 2 : Pénalité
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Frais d'annulation :", style: TextStyle(color: Colors.grey)),
-                Text("- $penalty F", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                const Text("Frais / Pénalité :"),
+                Text("- $penalty F", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               ],
             ),
-            const Divider(),
 
-            // LIGNE 3 : Total crédité
+            const Divider(thickness: 1, height: 20),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Net à rembourser :", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text("$refundAmount F", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+              ],
+            ),
+
+            const SizedBox(height: 15),
             Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Crédité sur Wallet :", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                  Text("$amount F", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.green)),
-                ],
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(5)
               ),
-            ),
-
-            const SizedBox(height: 10),
-            const Text(
-              "Cette action est irréversible. Le montant sera crédité immédiatement sur votre solde virtuel.",
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+              child: Text(
+                "Condition appliquée : $labelCondition",
+                style: const TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Retour", style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Retour", style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Appeler l'API d'annulation ici (passer refundAmount si besoin)
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text("Réservation annulée. $amount F crédités."),
-                backgroundColor: Colors.green,
-              ));
-              // Tu peux rafraîchir l'écran ou revenir en arrière ici
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Confirmer l'annulation"),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Confirmer l'annulation", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    // Si l'utilisateur annule ou clique à côté
+    if (confirm != true) return;
+
+    // 3. Appel API
+    setState(() => isLoading = true);
+
+    try {
+      final result = await widget.repository.cancelTicket(ticket.id.toString());
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        // ✅ SUCCÈS : Top Notification VERTE
+        _showTopNotification(
+            "Billet annulé. ${result['refund_amount']} F remboursés.",
+            isError: false
+        );
+        Navigator.pop(context, true);
+      } else {
+        // ❌ ERREUR API : Top Notification ROUGE
+        _showTopNotification(
+            result['message'] ?? "Erreur lors de l'annulation",
+            isError: true
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // ❌ ERREUR TECHNIQUE : Top Notification ROUGE
+        _showTopNotification("Erreur technique: $e", isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
-  void _onModifyPressed() {
-    // Modification = Annulation + Nouvelle réservation
-    // On réutilise la logique de remboursement pour informer l'utilisateur
-    final refundInfo = _calculateRefundInfo();
-    final int percent = refundInfo['percent'];
 
-    showDialog(
+
+  // ------------------------------------------------------------------------
+  // ✏️ ACTION DE MODIFICATION
+  // ------------------------------------------------------------------------
+  void _startModificationProcess() async {
+    // 1. Vérifications (Déjà fait)
+    if (!_isActionPossible) {
+      _showTopNotification("Modification impossible...", isError: true);
+      return;
+    }
+
+
+    // 🟢 2. NOUVEAU : On demande confirmation avant de partir
+    bool confirm = await _showModificationDialog();
+    if (!confirm) {
+      // Si l'utilisateur clique sur "Retour" ou à côté, on ne fait rien.
+      return;
+    }
+
+    // 3. Préparation de la date (Code existant)
+    // Utilisation de ticket.date directement car c'est déjà un DateTime
+    DateTime? datePrevue = ticket.date;
+
+    // 4. Navigation vers l'écran de recherche
+    if (!mounted) return; // Sécurité si le widget est fermé entre temps
+
+
+    // 2. 🚀 NAVIGATION VERS LE CHOIX DU NOUVEAU VOYAGE
+    // On ouvre l'écran de recherche de bus (ou directement la liste des programmes)
+    // On passe un argument 'isModificationMode: anntrue' pour dire à l'écran :
+    // "Eh, quand l'utilisateur choisit, ne lance pas le paiement, renvoie juste les données !"
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomeTabScreen( // ⚠️ Mets le nom de ton écran de recherche ici
+          isModificationMode: true,
+          // Tu peux aussi pré-remplir la ville de départ/arrivée si tu veux restreindre
+          initialDepart: ticket.departureCity,
+          initialArrivee: ticket.arrivalCity,
+          initialDate: datePrevue,
+          // 🟢 C'est ici qu'on passe l'info pour verrouiller le type
+          ticketWasAllerRetour: ticket.isAllerRetour,
+        ),
+      ),
+    );
+
+    // 3. RETOUR DE L'UTILISATEUR
+    // Si 'result' est null, c'est que l'utilisateur a fait "Retour" sans choisir.
+    if (result == null) {
+      debugPrint("❌ Modification annulée par l'utilisateur.");
+      return;
+    }
+
+    debugPrint("✅ L'utilisateur a choisi : $result");
+
+    // 4. ON ENVOIE LES DONNÉES CHOISIES À L'API
+    // On cast le résultat en Map car Navigator renvoie un 'dynamic'
+    if (result is Map<String, dynamic>) {
+      _submitModification(result);
+    }
+  }
+
+
+
+  Future<void> _submitModification(Map<String, dynamic> newBusData) async {
+    setState(() => isLoading = true);
+
+    try {
+      debugPrint("📡 Envoi des données à l'API via Repository...");
+
+      final Map<String, dynamic> apiBody = {
+        "programme_id": newBusData['programme_id'],
+        "date_voyage": newBusData['date_voyage'],
+        "seat_number": newBusData['seat_number'],
+        "heure_depart": newBusData['heure_depart'],
+      };
+
+      // Si c'est un aller-retour
+      if (newBusData.containsKey('return_programme_id')) {
+        apiBody.addAll({
+          "return_programme_id": newBusData['return_programme_id'],
+          "return_date_voyage": newBusData['return_date_voyage'],
+          "return_seat_number": newBusData['return_seat_number'],
+          "return_heure_depart": newBusData['return_heure_depart'],
+        });
+      }
+
+      // Appel API
+      // N'oublie pas le .toString() qu'on a vu tout à l'heure ;)
+      final result = await widget.repository.modifyTicket(ticket.id.toString(), apiBody);
+
+      debugPrint("📥 Résultat API reçu : $result");
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        // ✅ SUCCÈS : C'est ici qu'on applique la logique de fusion Aller/Retour
+
+        // 1. Récupération de la liste des tickets retournés par l'API
+        // L'API renvoie souvent { "success": true, "data": [ ...tickets... ] }
+        final List<dynamic> resultsList = (result['data'] is List) ? result['data'] : [];
+
+        if (resultsList.isNotEmpty) {
+          // --- DÉBUT DE LA LOGIQUE INTELLIGENTE ---
+
+          // A. On cherche les infos globales (Date Aller vs Date Retour)
+          DateTime? dateAllerGlobal;
+          DateTime? dateRetourGlobal;
+          String? heureAllerGlobal;
+          String? heureRetourGlobal;
+          String? siegeAllerGlobal;
+          String? siegeRetourGlobal;
+
+          for (var r in resultsList) {
+            // On essaie de deviner si c'est le retour via un flag ou 'is_retour'
+            // Si ton API ne renvoie pas 'is_retour', adapte ici.
+            bool isThisRetour = r['is_retour'] == true || (r['reference'].toString().toLowerCase().contains("retour"));
+
+            if (isThisRetour) {
+              dateRetourGlobal = DateTime.tryParse(r['date_voyage']);
+              heureRetourGlobal = r['heure_depart'];
+              siegeRetourGlobal = r['seat_number'].toString();
+            } else {
+              dateAllerGlobal = DateTime.tryParse(r['date_voyage']);
+              heureAllerGlobal = r['heure_depart'];
+              siegeAllerGlobal = r['seat_number'].toString();
+            }
+          }
+
+          // Sécurité : si on n'a pas trouvé de date aller, on prend le premier
+          if (dateAllerGlobal == null && resultsList.isNotEmpty) {
+            dateAllerGlobal = DateTime.tryParse(resultsList[0]['date_voyage']);
+          }
+
+          // B. On reconstruit les objets TicketModel
+          List<TicketModel> newTickets = [];
+
+          for (var r in resultsList) {
+            bool isRetourItem = r['is_retour'] == true || (r['reference'].toString().toLowerCase().contains("retour"));
+
+            newTickets.add(TicketModel(
+              id: int.tryParse(r['id'].toString()) ?? 0,
+              transactionId: r['reference'] ?? "",
+              ticketNumber: "${r['reference']}",
+              passengerName: "${r['passager_prenom']} ${r['passager_nom']}",
+
+              // ⚡️ LA FUSION MAGIQUE ⚡️
+              // 1. Infos Aller (Colonne Gauche) -> Toujours l'aller
+              date: dateAllerGlobal ?? DateTime.now(),
+              departureTimeRaw: heureAllerGlobal ?? "00:00",
+              seatNumber: siegeAllerGlobal ?? "??",
+
+              // 2. Infos Retour (Colonne Droite) -> Toujours le retour
+              // C'est ça qui force l'affichage de la colonne retour !
+              returnDate: dateRetourGlobal,
+              returnTimeRaw: heureRetourGlobal,
+              returnSeatNumber: siegeRetourGlobal,
+
+              // 3. Flags
+              isAllerRetour: true, // On sait que c'est un A/R modifié
+              isReturnLeg: isRetourItem, // Pour le badge "RETOUR"
+
+              // Reste des données
+              departureCity: r['point_depart'] ?? "Départ",
+              arrivalCity: r['point_arrive'] ?? "Arrivée",
+              companyName: r['company_name'] ?? "Compagnie",
+              status: r['statut'] ?? "Confirmé",
+              qrCodeUrl: r['qr_code'],
+              price: r['montant']?.toString() ?? "0",
+            ));
+          }
+
+          // --- FIN DE LA LOGIQUE INTELLIGENTE ---
+
+          // C. Mise à jour de l'UI immédiate
+          if (mounted) {
+            setState(() {
+              // On affiche le ticket Aller par défaut (celui qui n'est pas le retour)
+              ticket = newTickets.firstWhere((t) => !t.isReturnLeg, orElse: () => newTickets.first);
+              isLoading = false;
+            });
+
+            _showTopNotification("Billet modifié avec succès ! 🎉", isError: false);
+          }
+
+        } else {
+          // Cas rare : succès mais pas de données renvoyées ? On recharge tout au cas où
+          _loadFullDetails();
+        }
+
+      } else {
+        // ECHEC API
+        _showTopNotification(result['message'] ?? "Échec modification", isError: true);
+        setState(() => isLoading = false);
+      }
+
+    } catch (e) {
+      debugPrint("🔴 CRASH DANS _submitModification : $e");
+      if (mounted) {
+        _showTopNotification("Erreur: $e", isError: true);
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+
+  Future<bool> _showModificationDialog() async {
+    return await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Modifier le trajet"),
-        content: Text("Pour modifier, vous devez annuler ce ticket et en réserver un nouveau.\n\n"
-            "Compte tenu de la date, vous récupérerez $percent% du montant ($percent%) sur votre Wallet pour la nouvelle réservation."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Row(
+          children: const [
+            Icon(Icons.edit_calendar_rounded, color: Colors.blueAccent), // Icône modif
+            SizedBox(width: 10),
+            Text("Modifier le voyage", style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Procédure de modification :",
+              style: TextStyle(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+            ),
+            const SizedBox(height: 15),
+
+            const Text("Vous allez être redirigé pour choisir un nouveau trajet (Date ou Horaire)."),
+            const SizedBox(height: 10),
+
+            // Petit récapitulatif du billet actuel
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3))
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Valeur actuelle :", style: TextStyle(fontSize: 12)),
+                      Text("${ticket.price} F", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 15),
+            const Text(
+              "⚠️ Des frais de modification peuvent s'appliquer selon le nouveau trajet choisi.",
+              style: TextStyle(fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false), // Annuler
+            child: const Text("Retour", style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _onCancelPressed(); // On redirige vers le flux d'annulation
-            },
-            child: const Text("Procéder à l'annulation"),
+            onPressed: () => Navigator.pop(ctx, true), // Confirmer
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Choisir un nouveau trajet", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
-    );
+    ) ?? false; // Retourne false si on clique à côté
   }
 
-  void _showQRCodeModal(BuildContext context, String qrData) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.65,
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-          child: Column(
-            children: [
-              const SizedBox(height: 15),
-              Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
-              const Spacer(),
-              Hero(tag: 'qr_code_hero', child: Image.memory(base64Decode(qrData), width: 280, height: 280, fit: BoxFit.contain)),
-              const Spacer(),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text("Fermer", style: TextStyle(color: Colors.white, fontSize: 16)))),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
+
+  // ------------------------------------------------------------------------
+  // 🖥 UI BUILD
+  // ------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     String formatDate(DateTime d) => "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
 
-    String siegeDisplay = ticket.seatNumber;
-    if (ticket.isAllerRetour && ticket.returnSeatNumber != null) {
-      siegeDisplay = "${ticket.seatNumber} (Aller) / ${ticket.returnSeatNumber} (Retour)";
-    }
+    // Calcul sécurité pour QR Code
+    final bool isDepartPasse = _departureDateTime != null && DateTime.now().isAfter(_departureDateTime!);
 
-    return Scaffold(
+    return WillPopScope(
+        onWillPop: () async {
+          // On quitte l'écran en renvoyant l'info : "Est-ce que ça a changé ?"
+          Navigator.pop(context, hasChanged);
+          return false; // false car on a géré le pop manuellement juste au-dessus
+        },
+    child: Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text("Détails du Billet"),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+          title: const Text("Détails du Billet"),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             if (isLoading) const LinearProgressIndicator(),
-            if (errorMessage != null)
-              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(errorMessage!, style: const TextStyle(color: Colors.red))),
 
-            // 🎫 CARTE DU BILLET (inchangé)
+            // ---------------------------------------------------------
+            // 🎫 LA CARTE PRINCIPALE (Détails + Boutons intégrés)
+            // ---------------------------------------------------------
             Card(
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // ✅ IMPORTANT : Coupe tout ce qui dépasse des bords arrondis
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Column(
+                children: [
+                  // --- PARTIE HAUTE : CONTENU DU TICKET ---
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
                       children: [
-                        Text(ticket.companyName.toUpperCase(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
-                        _buildStatusChip(ticket.status),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                ticket.companyName.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildStatusChip(ticket.status),
+                          ],
+                        ),
+                        const Divider(height: 25),
+
+                        _buildTripDetails(ticket, formatDate),
+
+                        const Divider(height: 30),
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(child: _buildCityInfo(ticket.departureCity, "Départ")),
+                              const Icon(Icons.arrow_forward, color: Colors.blue, size: 24),
+                              Expanded(child: _buildCityInfo(ticket.arrivalCity, "Arrivée"))
+                            ]
+                        ),
+                        const Divider(height: 30),
+                        _buildRow("Passager", ticket.passengerName),
+                        _buildRow("Siège", ticket.isAllerRetour && ticket.returnSeatNumber != null ? "${ticket.seatNumber} / ${ticket.returnSeatNumber}" : ticket.seatNumber),
+                        _buildRow("Prix", "${ticket.price} F"),
+                        _buildRow("Réf", ticket.ticketNumber),
                       ],
                     ),
-                    const Divider(height: 25),
-                    _buildTripDetails(ticket, formatDate),
-                    const Divider(height: 30),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: _buildCityInfo(ticket.departureCity, "Départ")),
-                        const Icon(Icons.arrow_forward, color: Colors.blue, size: 24),
-                        Expanded(child: _buildCityInfo(ticket.arrivalCity, "Arrivée")),
-                      ],
-                    ),
-                    const Divider(height: 30),
-                    _buildRow("Passager", ticket.passengerName),
-                    _buildRow("Siège N°", siegeDisplay),
-                    _buildRow("Prix Total", "${ticket.price} F"),
-                    _buildRow("Référence", ticket.ticketNumber),
-                  ],
-                ),
+                  ),
+
+                  // --- PARTIE BASSE : LES BOUTONS "PINCEAUX" ---
+                  if (_isActionPossible) ...[
+                    // Une ligne de séparation fine
+                    const Divider(height: 1, thickness: 1),
+
+                    SizedBox(
+                      height: 55, // Hauteur fixe pour les boutons
+                      child: Row(
+                        children: [
+                          // 🔴 BOUTON ANNULER (Gauche)
+                          Expanded(
+                            child: InkWell(
+                              onTap: _cancelTicket,
+                              // Effet visuel au clic
+                              splashColor: Colors.red.withOpacity(0.2),
+                              child: Container(
+                                color: Colors.red.withOpacity(0.05), // Fond très léger rouge
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
+                                    SizedBox(width: 8),
+                                    Text("Annuler", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Petit trait vertical entre les deux
+                          Container(width: 1, color: Colors.grey.shade300),
+
+                          // 🔵 BOUTON MODIFIER (Droite)
+                          Expanded(
+                            child: InkWell(
+                              onTap: _startModificationProcess,
+                              splashColor: Colors.blue.withOpacity(0.2),
+                              child: Container(
+                                // On peut mettre un fond bleu plein ou léger, ici léger pour l'harmonie
+                                color: Colors.blue.withOpacity(0.05),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.edit_outlined, color: Colors.blue.shade700, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text("Modifier", style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  ]
+                ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // ⚙️ BOUTONS INTELLIGENTS
-            if (_isActionPossible)
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _onCancelPressed,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.cancel_outlined, size: 20),
-                      label: const Text("Annuler"),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _onModifyPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      label: const Text("Modifier"),
-                    ),
-                  ),
-                ],
-              )
-            else if (ticket.status == "Validé")
+            // --- CAS OU MODIFICATION IMPOSSIBLE (Message d'info) ---
+            if (!_isActionPossible && _isStatusValid && !isDepartPasse) ...[
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8)),
-                child: Row(
-                  children: const [
-                    Icon(Icons.lock_clock, color: Colors.orange, size: 20),
-                    SizedBox(width: 10),
-                    Expanded(child: Text("Modifications impossibles moins de 15 min avant le départ.", style: TextStyle(color: Colors.orange, fontSize: 12))),
-                  ],
-                ),
+                decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.orange.shade200)),
+                child: Row(children: const [Icon(Icons.lock_clock, color: Colors.orange, size: 20), SizedBox(width: 10), Expanded(child: Text("Modifications verrouillées (-15 min).", style: TextStyle(color: Colors.orange, fontSize: 12)))]),
               ),
+              const SizedBox(height: 30),
+            ],
 
-            const SizedBox(height: 30),
-
-            if (ticket.status == "Terminé" || ticket.status == "Expiré" || ticket.status == "Annulé")
-              _buildExpiredOrUsedView()
+            // --- QR CODE ---
+            if (_isStatusValid && !isDepartPasse)
+              _buildActiveQRCodeView(context)
             else
-              _buildActiveQRCodeView(context),
+              _buildExpiredOrUsedView(),
 
             const SizedBox(height: 40),
           ],
         ),
       ),
+    ),
     );
   }
 
-  // --- WIDGETS DÉCOUPÉS (Identiques à ta version précédente) ---
+  // --- WIDGETS ---
+
   Widget _buildStatusChip(String status) {
-    Color color;
-    switch (status) {
-      case "Validé": color = Colors.green; break;
-      case "Annulé": color = Colors.red; break;
-      case "Terminé": color = Colors.grey; break;
-      default: color = Colors.blue;
-    }
+    String s = status.toLowerCase();
+    Color color = Colors.blue;
+    if (s.contains("valid") || s.contains("confirm") || s.contains("pay") || s.contains("success")) color = Colors.green;
+    else if (s.contains("annul")) color = Colors.red;
+    else if (s.contains("termin") || s.contains("util")) color = Colors.grey;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-      child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+        child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12))
     );
   }
 
-  Widget _buildTripDetails(TicketModel ticket, Function(DateTime) formatDate) {
+  Widget _buildActiveQRCodeView(BuildContext context) {
+    return Column(children: [
+      const Text("Présentez ce code à l'embarquement", style: TextStyle(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 10),
+      if (ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty)
+        GestureDetector(
+            onTap: () => showModalBottomSheet(context: context, builder: (_) => Center(child: Image.memory(base64Decode(ticket.qrCodeUrl!), width: 300))),
+            child: Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.blue.withOpacity(0.3)), borderRadius: BorderRadius.circular(15)),
+                child: Column(children: [
+                  Image.memory(base64Decode(ticket.qrCodeUrl!), height: 180, width: 180, errorBuilder: (c,e,s) => const Icon(Icons.qr_code, size: 100)),
+                  const SizedBox(height: 10),
+                  const Text("Cliquez pour agrandir", style: TextStyle(color: Colors.blue, fontSize: 12))
+                ])
+            )
+        )
+      else
+        const Text("QR code indisponible")
+    ]);
+  }
+
+  Widget _buildExpiredOrUsedView() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  const Text("ALLER", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 5),
-                  Text(formatDate(ticket.date), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                  Text(ticket.departureTimeRaw, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                ],
-              ),
-            ),
-            if (ticket.isAllerRetour && ticket.returnDate != null) VerticalDivider(color: Colors.grey.shade300, thickness: 1),
-            if (ticket.isAllerRetour && ticket.returnDate != null)
-              Expanded(
-                child: Column(
-                  children: [
-                    const Text("RETOUR", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 5),
-                    Text(formatDate(ticket.returnDate!), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    Text(ticket.returnTimeRaw ?? "--:--", style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                  ],
-                ),
-              )
-            else if (!ticket.isAllerRetour) const SizedBox.shrink(),
-          ],
-        ),
-      ),
+        width: double.infinity, padding: const EdgeInsets.all(30),
+        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
+        child: Column(children: const [Icon(Icons.event_busy, size: 60, color: Colors.grey), SizedBox(height: 15), Text("Billet non valide (Expiré/Annulé)", style: TextStyle(fontSize: 16, color: Colors.grey))])
+    );
+  }
+
+  Widget _buildTripDetails(TicketModel t, Function(DateTime) fmt) {
+    return Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+          Expanded(child: Column(children: [const Text("ALLER", style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)), Text(fmt(t.date), style: const TextStyle(fontWeight: FontWeight.bold)), Text(t.departureTimeRaw)])),
+          if (t.isAllerRetour && t.returnDate != null) ...[
+            Container(width: 1, height: 40, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 10)),
+            Expanded(child: Column(children: [const Text("RETOUR", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)), Text(fmt(t.returnDate!), style: const TextStyle(fontWeight: FontWeight.bold)), Text(t.returnTimeRaw ?? "--:--")]))
+          ]
+        ])
     );
   }
 
   Widget _buildCityInfo(String city, String label) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        const SizedBox(height: 4),
-        Text(city.replaceAll(", Côte d'Ivoire", ""), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-      ],
-    );
+    return Column(children: [
+      Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      const SizedBox(height: 4),
+      Text(city.isEmpty ? "--" : city.replaceAll(", Côte d'Ivoire", ""), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)
+    ]);
   }
+
+  /*Widget _buildRow(String label, String value) {
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.grey)), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]));
+  }*/
 
   Widget _buildRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start, // ✅ Important pour l'alignement vertical si ça passe à la ligne
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Flexible(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
-  }
+          // Le Label (à gauche)
+          Text(
+              label,
+              style: const TextStyle(color: Colors.grey)
+          ),
 
-  Widget _buildActiveQRCodeView(BuildContext context) {
-    return Column(
-      children: [
-        const Text("Présentez ce code à l'embarquement", style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        if (ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty)
-          GestureDetector(
-            onTap: () => _showQRCodeModal(context, ticket.qrCodeUrl!),
-            child: Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.blue.withOpacity(0.3)), borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]),
-              child: Column(
-                children: [
-                  Hero(tag: 'qr_code_hero', child: Image.memory(base64Decode(ticket.qrCodeUrl!), height: 180, width: 180, errorBuilder: (ctx, err, stack) => const Icon(Icons.broken_image, size: 50, color: Colors.grey))),
-                  const SizedBox(height: 10),
-                  Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.zoom_in, size: 16, color: Colors.blue), SizedBox(width: 5), Text("Cliquez pour agrandir", style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold))])
-                ],
-              ),
+          const SizedBox(width: 10), // ✅ Petit espace de sécurité
+
+          // La Valeur (à droite)
+          Expanded( // ✅ Expanded force le texte à prendre la place restante sans déborder
+            child: Text(
+              value,
+              textAlign: TextAlign.end, // ✅ On aligne à droite comme avant
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-          )
-        else
-          const Text("QR code en cours de génération...")
-      ],
-    );
-  }
-
-  Widget _buildExpiredOrUsedView() {
-    bool isTermine = ticket.status == "Terminé";
-    bool isAnnule = ticket.status == "Annulé";
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade300)),
-      child: Column(
-        children: [
-          Icon(isAnnule ? Icons.cancel : (isTermine ? Icons.check_circle : Icons.event_busy), size: 60, color: Colors.grey),
-          const SizedBox(height: 15),
-          Text(isAnnule ? "Billet Annulé" : (isTermine ? "Voyage Effectué" : "Billet Expiré"), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+          ),
         ],
       ),
     );

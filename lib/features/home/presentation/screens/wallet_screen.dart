@@ -62,7 +62,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
       // 2. CONFIGURATION DIO
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api', // Vérifie si c'est /api ou /api/
+        baseUrl: 'https://car225.com/api/', // Vérifie si c'est /api ou /api/
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

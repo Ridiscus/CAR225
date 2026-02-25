@@ -11,58 +11,28 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
 
   WalletRemoteDataSourceImpl({required this.dio});
 
- /* @override
-  Future<WalletModel> getWalletDetails() async {
-    try {
-      // GET /user/wallet
-      final response = await dio.get('/user/wallet');
-
-      // On suppose que la réponse est { "success": true, "data": { "solde": 50000, "transactions": [] } }
-      final data = response.data['data'];
-
-      return WalletModel.fromJson(data);
-    } catch (e) {
-      throw Exception("Erreur récupération wallet: $e");
-    }
-  }*/
-
-
-
-  /*@override
-  Future<WalletModel> getWalletDetails() async {
-    try {
-      final response = await dio.get('/user/wallet');
-
-      // --- AJOUT DEBUG ---
-      print("💰 JSON WALLET REÇU: ${response.data}");
-      // -------------------
-
-      // Vérifie si la réponse est directe ou dans "data"
-      final data = response.data['data'] ?? response.data;
-
-      return WalletModel.fromJson(data);
-    } catch (e) {
-      throw Exception("Erreur récupération wallet: $e");
-    }
-  }*/
-
-
   @override
   Future<WalletModel> getWalletDetails() async {
     try {
+      // 1. On lance la requête
       final response = await dio.get('/user/wallet');
 
-      // Tes logs montrent : { "success": true, "data": { "solde": ... } }
-      // Donc on doit passer response.data['data'] au modèle
+      // 2. On extrait les données (selon le format de ton backend)
       final data = response.data['data'];
 
       return WalletModel.fromJson(data);
+
+    } on DioException catch (e) {
+      // 🟢 C'EST ICI QU'ON INTERCEPTE L'ERREUR 404 DE DIO
+      if (e.requestOptions != null) {
+        print("🔍 L'URL EXACTE appelée était : ${e.requestOptions.uri}");
+      }
+      throw Exception("Erreur API récupération wallet: ${e.message}");
+
     } catch (e) {
+      // 🟠 C'est ici qu'on attrape les autres erreurs (ex: erreur de parsing JSON)
+      print("❌ Erreur interne Wallet: $e");
       throw Exception("Erreur récupération wallet: $e");
     }
   }
-
-
-
-
 }

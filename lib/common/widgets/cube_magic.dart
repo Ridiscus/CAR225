@@ -152,3 +152,9 @@ class _SlidingHeaderBackgroundState extends State<SlidingHeaderBackground> {
     );
   }
 }
+
+
+
+
+
+

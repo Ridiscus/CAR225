@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/networking/api_config.dart';
+import '../../../booking/data/models/user_stats_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 import '../models/user_model.dart';
@@ -22,7 +24,7 @@ abstract class AuthRemoteDataSource {
     required String email,
     required String contact,
     required String nomUrgence,
-    required String prenomUrgence,
+    required String lienParenteUrgence,
     required String contactUrgence,
     String? photoPath,
   });
@@ -32,6 +34,11 @@ abstract class AuthRemoteDataSource {
     required String newPassword,
     required String confirmPassword,
   });
+
+  // 🟢 AJOUTE CES DEUX LIGNES :
+  Future<UserStatsModel> getUserStats();
+  Future<TripDetailsModel> getTripDetails();
+
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -39,7 +46,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   AuthRemoteDataSourceImpl() {
     dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      baseUrl: 'https://car225.com/api/',
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      //baseUrl: ApiConfig.baseUrl,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -168,6 +177,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
+
   @override
   Future<UserModel> updateUserProfile({
     required String name,
@@ -175,7 +185,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String email,
     required String contact,
     required String nomUrgence,
-    required String prenomUrgence,
+    required String lienParenteUrgence, // <-- Remplacé
     required String contactUrgence,
     String? photoPath,
   }) async {
@@ -186,9 +196,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         "email": email,
         "contact": contact,
         "nom_urgence": nomUrgence,
-        "prenom_urgence": prenomUrgence,
+        "lien_parente_urgence": lienParenteUrgence, // <-- La clé exacte attendue par Laravel
         "contact_urgence": contactUrgence,
-        "_method": "PUT", // Important pour Laravel avec FormData
+        "_method": "PUT",
       };
 
       FormData formData = FormData.fromMap(mapData);
@@ -211,6 +221,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception(e.response?.data['message'] ?? "Erreur mise à jour");
     }
   }
+
 
   @override
   Future<void> deactivateAccount(String password) async {
@@ -265,4 +276,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception(e.response?.data['message'] ?? "Erreur reset");
     }
   }
+
+
+  // 🟢 1. Récupérer les stats globales
+  Future<UserStatsModel> getUserStats() async {
+    try {
+      final response = await dio.get('/user/stats'); // ⚠️ Vérifie que ton token est bien passé dans tes intercepteurs Dio !
+      return UserStatsModel.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? "Erreur lors du chargement des statistiques");
+    }
+  }
+
+  // 🟢 2. Récupérer les détails des voyages
+  Future<TripDetailsModel> getTripDetails() async {
+    try {
+      final response = await dio.get('/user/stats/trips');
+      return TripDetailsModel.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? "Erreur lors du chargement des détails");
+    }
+  }
+
+
 }

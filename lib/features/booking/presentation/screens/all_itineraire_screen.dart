@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -7,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../../../common/widgets/BookingConfigurationSheet.dart';
 import '../../../../common/widgets/cube_magic.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../home/presentation/screens/real_time_seat_info.dart';
 import '../../data/datasources/booking_remote_data_source.dart';
 import '../../data/models/program_model.dart';
 import '../../domain/repositories/booking_repository.dart';
@@ -19,12 +22,15 @@ class AllItinerariesScreen extends StatefulWidget {
   State<AllItinerariesScreen> createState() => _AllItinerariesScreenState();
 }
 
-class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
+class _AllItinerariesScreenState extends State<AllItinerariesScreen> with SingleTickerProviderStateMixin {
   // --- ETAT DONNÉES ---
   List<ProgramModel> allItineraries = [];
   List<ProgramModel> filteredItineraries = [];
   bool isLoading = true;
   final TextEditingController _searchController = TextEditingController();
+
+  // 📅 NOUVEAU : Variable pour stocker la date choisie par l'utilisateur
+  DateTime? _selectedDate;
 
   // ✅ CORRECTION : Une seule variable, bien nommée
   late BookingRepositoryImpl _repository;
@@ -33,22 +39,39 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
 
+  // 🟢 2. DECLARATION DU CONTROLLER D'ANIMATION
+  late AnimationController _entranceController;
+
+
   @override
   void initState() {
     super.initState();
+
+    // 🟢 3. INITIALISATION DE L'ANIMATION
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 800), // La durée que tu as choisie
+      vsync: this,
+    );
+
+    // Déclencher l'animation
+    //_entranceController.forward();
+
     _initData();
   }
+
 
   @override
   void dispose() {
     _removeOverlay();
     _searchController.dispose();
+    // 🟢 4. NE PAS OUBLIER DE DISPOSE LE CONTROLLER
+    _entranceController.dispose();
     super.dispose();
   }
 
-  void _initData() async {
+  /*void _initData() async {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      baseUrl: 'https://car225.com/api/',
       headers: {'Content-Type': 'application/json'},
     ));
 
@@ -70,6 +93,32 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
     } catch (e) {
       if (mounted) setState(() => isLoading = false);
     }
+  }*/
+
+  void _initData() async {
+    final dio = Dio(BaseOptions(
+      baseUrl: 'https://car225.com/api/',
+      headers: {'Content-Type': 'application/json'},
+    ));
+
+    final dataSource = BookingRemoteDataSourceImpl(dio: dio);
+    _repository = BookingRepositoryImpl(remoteDataSource: dataSource);
+
+    try {
+      final trips = await _repository.getAllTrips();
+      if (mounted) {
+        setState(() {
+          allItineraries = trips;
+          filteredItineraries = trips;
+          isLoading = false;
+        });
+
+        // ✅ AJOUTE CETTE LIGNE ICI : on lance l'animation quand les données sont là
+        _entranceController.forward(from: 0.0);
+      }
+    } catch (e) {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   void _filterTrips(String query) {
@@ -83,7 +132,43 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
     });
   }
 
-  // ... [Le reste de tes méthodes _showSelectionOverlay, _removeOverlay restent identiques] ...
+
+  // 📅 NOUVEAU : SÉLECTEUR DE DATE
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now(), // On ne peut pas réserver dans le passé
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+      // Optionnel : Tu pourrais recharger l'API ici si l'API supporte le filtrage par date
+    }
+  }
+
+  // 🗑️ RESET DATE
+  void _clearDateFilter() {
+    setState(() {
+      _selectedDate = null;
+    });
+  }
+
 
   void _showSelectionOverlay(BuildContext itemContext, ProgramModel program) {
     _removeOverlay();
@@ -149,7 +234,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
     );
   }
 
-  // ... [Le reste du build et _buildCompanyCard reste identique] ...
+
 
   Color _getCompanyColor(String name) {
     if (name.toLowerCase().contains("utb")) return const Color(0xFFCA8A04);
@@ -159,11 +244,10 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
     return AppColors.primary;
   }
 
+
+
   @override
   Widget build(BuildContext context) {
-    // ... [Ton code build existant, pas besoin de le changer] ...
-    // Je le remets pour que le copier-coller soit facile si tu remplaces tout le fichier
-
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final cardColor = Theme.of(context).cardColor;
@@ -182,35 +266,83 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
       ),
       body: Column(
         children: [
+          // --- BARRE DE RECHERCHE + CALENDRIER ---
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _filterTrips,
-                style: TextStyle(color: textColor),
-                decoration: InputDecoration(
-                  icon: const Icon(Icons.search, color: Colors.grey),
-                  hintText: "Rechercher une destination...",
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  border: InputBorder.none,
+            child: Row(
+              children: [
+                // Champ Texte
+                Expanded(
+                  child: Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _filterTrips,
+                      style: TextStyle(color: textColor),
+                      decoration: InputDecoration(
+                        icon: const Icon(Icons.search, color: Colors.grey),
+                        hintText: "Ville, compagnie...",
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const Gap(10),
+                // Bouton Calendrier
+                GestureDetector(
+                  onTap: _pickDate,
+                  child: Container(
+                    height: 50,
+                    width: 50,
+                    decoration: BoxDecoration(
+                        color: _selectedDate != null ? AppColors.primary : cardColor,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]
+                    ),
+                    child: Icon(
+                        Icons.calendar_month,
+                        color: _selectedDate != null ? Colors.white : Colors.grey
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // --- AFFICHAGE DE LA DATE SÉLECTIONNÉE (FEEDBACK) ---
+          if (_selectedDate != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10, left: 20, right: 20),
+              child: Row(
+                children: [
+                  Text(
+                    "Départs du ${DateFormat('dd MMM yyyy', 'fr').format(_selectedDate!)}",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _clearDateFilter,
+                    child: const Text("Effacer", style: TextStyle(color: Colors.red, fontSize: 12)),
+                  )
+                ],
+              ),
+            ),
+
+          // --- LISTE ---
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredItineraries.isEmpty
                 ? Center(child: Text("Aucun itinéraire trouvé", style: TextStyle(color: textColor)))
                 : GridView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 100),
               itemCount: filteredItineraries.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -218,13 +350,93 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                 crossAxisSpacing: 15,
                 mainAxisSpacing: 15,
               ),
-              itemBuilder: (context, index) {
-                final program = filteredItineraries[index];
+              /*itemBuilder: (context, index) {
+                // On crée une copie du programme pour injecter la date sélectionnée
+                // C'est CRUCIAL pour que RealTimeSeatInfo cherche la bonne date !
+                ProgramModel originalProgram = filteredItineraries[index];
+
+                ProgramModel displayProgram = originalProgram;
+
+                if (_selectedDate != null) {
+                  // Si une date est choisie, on modifie la dateDepart du modèle
+                  // pour que la carte affiche les infos de CETTE date
+                  displayProgram = ProgramModel(
+                    id: originalProgram.id,
+                    compagnieName: originalProgram.compagnieName,
+                    prix: originalProgram.prix,
+                    heureDepart: originalProgram.heureDepart,
+                    heureArrivee: originalProgram.heureArrivee,
+                    duree: originalProgram.duree,
+                    placesDisponibles: originalProgram.placesDisponibles, // Sera recalculé par le widget
+                    capacity: originalProgram.capacity,
+                    isAllerRetour: originalProgram.isAllerRetour,
+                    villeDepart: originalProgram.villeDepart,
+                    villeArrivee: originalProgram.villeArrivee,
+                    // 🔥 ON FORCE LA DATE CHOISIE ICI
+                    dateDepart: DateFormat('yyyy-MM-dd').format(_selectedDate!) + " " + originalProgram.heureDepart,
+                  );
+                }
+
                 return Builder(
                     builder: (itemContext) {
                       return GestureDetector(
-                        onTap: () => _showSelectionOverlay(itemContext, program),
-                        child: _buildCompanyCard(context, program: program, isInteractive: true),
+                        onTap: () => _showSelectionOverlay(itemContext, displayProgram),
+                        child: _buildCompanyCard(context, program: displayProgram, isInteractive: true),
+                      );
+                    }
+                );
+              },*/
+
+              itemBuilder: (context, index) {
+                // 🟢 5. CALCUL DE L'ANIMATION EN CASCADE (Staggered effect)
+                // Chaque carte commencera son animation avec un léger décalage selon son index
+                final double startDelay = (index % 10) * 0.10;
+                final double endDelay = (startDelay + 0.80).clamp(0.0, 1.0);
+
+                final animation = CurvedAnimation(
+                  parent: _entranceController,
+                  curve: Interval(
+                    startDelay,
+                    endDelay,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+
+                ProgramModel originalProgram = filteredItineraries[index];
+                ProgramModel displayProgram = originalProgram;
+
+                if (_selectedDate != null) {
+                  displayProgram = ProgramModel(
+                    id: originalProgram.id,
+                    compagnieName: originalProgram.compagnieName,
+                    prix: originalProgram.prix,
+                    heureDepart: originalProgram.heureDepart,
+                    heureArrivee: originalProgram.heureArrivee,
+                    duree: originalProgram.duree,
+                    placesDisponibles: originalProgram.placesDisponibles,
+                    capacity: originalProgram.capacity,
+                    isAllerRetour: originalProgram.isAllerRetour,
+                    villeDepart: originalProgram.villeDepart,
+                    villeArrivee: originalProgram.villeArrivee,
+                    dateDepart: DateFormat('yyyy-MM-dd').format(_selectedDate!) + " " + originalProgram.heureDepart,
+                  );
+                }
+
+                return Builder(
+                    builder: (itemContext) {
+                      // 🟢 6. APPLICATION VISUELLE DE L'ANIMATION
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.2), // Commence légèrement plus bas
+                          end: Offset.zero,            // Finit à sa position normale
+                        ).animate(animation),
+                        child: FadeTransition(
+                          opacity: animation,          // Fait apparaître en fondu
+                          child: GestureDetector(
+                            onTap: () => _showSelectionOverlay(itemContext, displayProgram),
+                            child: _buildCompanyCard(context, program: displayProgram, isInteractive: true),
+                          ),
+                        ),
                       );
                     }
                 );
@@ -236,18 +448,27 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
     );
   }
 
+  // ------------------------------------------------------------------------
+  // 🎨 WIDGET CARTE COMPAGNIE (CORRIGÉ AVEC SLIDER)
+  // ------------------------------------------------------------------------
   Widget _buildCompanyCard(BuildContext context, {required ProgramModel program, required bool isInteractive}) {
-    // ... [Ton code existant _buildCompanyCard, copie-le tel quel] ...
-    // Je te remets juste le début pour la structure
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final color = _getCompanyColor(program.compagnieName);
     final isAR = program.isAllerRetour;
+
+    // Les images pour le slider
     final List<String> busImages = [
       "assets/images/busheader.jpg",
       "assets/images/busheader1.jpg",
       "assets/images/busheader2.jpg",
     ];
+
+    // Calcul de la barre de progression (fallback visuel)
+    // Note: RealTimeSeatInfo écrasera l'affichage textuel, mais la barre reste ici pour l'instant
+    int placesReservees = program.capacity - program.placesDisponibles;
+    if (placesReservees < 0) placesReservees = 0;
+    double progress = program.capacity > 0 ? placesReservees / program.capacity : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -260,6 +481,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // --- 🖼️ HEADER AVEC SLIDER (CORRIGÉ) ---
           ClipRRect(
             borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
             child: SizedBox(
@@ -268,9 +490,13 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Assure-toi d'avoir importé SlidingHeaderBackground ou remplace par Image.asset
-                  SlidingHeaderBackground(height: 90, images: busImages),
+                  // ✅ UTILISATION DU WIDGET DE SLIDER AUTOMATIQUE
+                  BusImageSlider(images: busImages),
+
+                  // Filtre sombre pour lisibilité
                   Container(color: Colors.black.withOpacity(0.4)),
+
+                  // Infos par dessus l'image
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -280,6 +506,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Badge Aller Simple / Retour
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.5)),
@@ -291,6 +518,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                                 ],
                               ),
                             ),
+                            // Badge Note
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
@@ -298,6 +526,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                             )
                           ],
                         ),
+                        // Nom Compagnie
                         Row(
                           children: [
                             const Icon(Icons.directions_bus_filled, color: Colors.white, size: 18),
@@ -312,6 +541,8 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
               ),
             ),
           ),
+
+          // --- BODY CARD ---
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -319,6 +550,7 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Ligne Trajet
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -327,6 +559,8 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                       Row(children: [Icon(Icons.location_on, size: 8, color: Colors.grey), const Gap(5), Expanded(child: Text(program.villeArrivee, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor), overflow: TextOverflow.ellipsis))]),
                     ],
                   ),
+
+                  // Infos Prix & Places INTELLIGENTES
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -335,8 +569,11 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
                         Text("${program.prix} F", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
                         Text(program.heureDepart, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
                       ]),
-                      const Gap(4),
-                      Text("${program.placesDisponibles} places restantes", style: TextStyle(fontSize: 9, color: program.placesDisponibles < 10 ? Colors.redAccent : Colors.green)),
+                      const Gap(8),
+
+                      // 🚀 C'EST ICI QUE LA MAGIE OPÈRE
+                      // On passe le programme qui contient potentiellement la date modifiée
+                      RealTimeSeatInfo(program: program),
                     ],
                   )
                 ],
@@ -345,6 +582,71 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> {
           )
         ],
       ),
+    );
+  }
+}
+
+
+
+
+
+// -------------------------------------------------------------------------
+// 🎞️ WIDGET SLIDER D'IMAGES AUTOMATIQUE (AJOUTE LE EN BAS DU FICHIER)
+// -------------------------------------------------------------------------
+class BusImageSlider extends StatefulWidget {
+  final List<String> images;
+  const BusImageSlider({super.key, required this.images});
+
+  @override
+  State<BusImageSlider> createState() => _BusImageSliderState();
+}
+
+class _BusImageSliderState extends State<BusImageSlider> {
+  late PageController _pageController;
+  int _currentPage = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0);
+
+    // Défilement automatique toutes les 3 secondes
+    _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
+      if (_currentPage < widget.images.length - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
+      }
+
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: widget.images.length,
+      itemBuilder: (context, index) {
+        return Image.asset(
+          widget.images[index],
+          fit: BoxFit.cover,
+        );
+      },
     );
   }
 }
@@ -367,24 +669,41 @@ class _BranchAndButtonWidget extends StatelessWidget {
           size: Size(cardWidth, 80),
           painter: _BranchPainter(color: AppColors.primary),
         ),
-
-        // 2. Le Bouton au bout de la branche
         Positioned(
-          top: 50, // Ajusté selon la courbe du Painter
-          left: (cardWidth / 2) - 70, // Centré par rapport à la courbe
+          top: 50,
+          left: (cardWidth / 2) - 70, // Centré
           child: ScaleTransition(
-            scale: const AlwaysStoppedAnimation(1.0), // Pourrait être animé
-            child: SizedBox(
+            scale: const AlwaysStoppedAnimation(1.0),
+            child: Container(
               width: 140,
               height: 45,
+              // ✅ 1. Coupe l'image pour qu'elle suive l'arrondi (25)
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25), // Arrondi bien rond
+                // ✅ 2. L'image de fond
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                // ✅ 3. On recrée l'effet "Elevation 10" ici
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.4), // Ombre teintée c'est plus joli
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: onBookPressed,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  // ✅ 4. Fond transparent
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent, // On désactive l'ombre par défaut
                   foregroundColor: Colors.white,
-                  elevation: 10,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -447,309 +766,3 @@ class _BranchPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-
-
-
-
-
-
-
-
-
-// -------------------------------------------------------------------------
-// ⚙️ MODAL DE CONFIGURATION (Dates, Passagers, Type)
-// -------------------------------------------------------------------------
-/*class _BookingConfigurationSheet extends StatefulWidget {
-  final ProgramModel program;
-  const _BookingConfigurationSheet({required this.program});
-
-  @override
-  State<_BookingConfigurationSheet> createState() => _BookingConfigurationSheetState();
-}
-
-class _BookingConfigurationSheetState extends State<_BookingConfigurationSheet> {
-  // État local de la configuration
-  late bool isAllerRetour;
-  late DateTime dateAller;
-  DateTime? dateRetour;
-  int passengerCount = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    isAllerRetour = widget.program.isAllerRetour;
-
-    // Initialisation intelligente de la date
-    try {
-      dateAller = DateTime.parse(widget.program.dateDepart);
-      if (dateAller.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
-        dateAller = DateTime.now(); // Si la date par défaut est passée, on met aujourd'hui
-      }
-    } catch (_) {
-      dateAller = DateTime.now();
-    }
-  }
-
-  // Sélecteur de date
-  Future<void> _pickDate(bool isRetour) async {
-    final initial = isRetour ? (dateRetour ?? dateAller.add(const Duration(days: 1))) : dateAller;
-    final first = isRetour ? dateAller : DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: first,
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: AppColors.primary),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        if (isRetour) {
-          dateRetour = picked;
-        } else {
-          dateAller = picked;
-          // Si la nouvelle date aller est après la date retour, on reset le retour
-          if (dateRetour != null && dateRetour!.isBefore(dateAller)) {
-            dateRetour = null;
-          }
-        }
-      });
-    }
-  }
-
-  void _incrementPassenger() {
-    if (passengerCount < widget.program.placesDisponibles) {
-      setState(() => passengerCount++);
-    }
-  }
-
-  void _decrementPassenger() {
-    if (passengerCount > 1) {
-      setState(() => passengerCount--);
-    }
-  }
-
-  void _validateAndContinue() {
-    if (isAllerRetour && dateRetour == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez choisir une date de retour")),
-      );
-      return;
-    }
-
-    // 🚀 NAVIGATION VERS LA SÉLECTION DES SIÈGES
-    Navigator.pop(context); // Fermer la modal
-
-    // TODO: Rediriger vers ton écran de sélection de sièges
-    // C'est ici qu'on transmet toutes les infos collectées
-    /*
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SeatSelectionScreen(
-           program: widget.program,
-           dateAller: dateAller,
-           dateRetour: dateRetour,
-           passengerCount: passengerCount,
-           isAllerRetour: isAllerRetour,
-        ),
-      ),
-    );
-    */
-
-    // Pour l'instant, simu vers résumé direct (A REMPLACER PAR SEAT SCREEN)
-    print("Configuration validée : $passengerCount pers, $dateAller");
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      padding: const EdgeInsets.all(20),
-      // Hauteur dynamique selon le contenu
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Header (Barre grise)
-          Center(
-            child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const Gap(20),
-
-          Text("Configurez votre voyage", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const Gap(20),
-
-          // 2. Switch Aller Simple / Retour
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: _buildTabOption("Aller Simple", !isAllerRetour, () => setState(() => isAllerRetour = false))),
-                Expanded(child: _buildTabOption("Aller-Retour", isAllerRetour, () => setState(() => isAllerRetour = true))),
-              ],
-            ),
-          ),
-          const Gap(20),
-
-          // 3. Choix des Dates
-          Row(
-            children: [
-              Expanded(child: _buildDateSelector("Départ", dateAller, () => _pickDate(false))),
-              if (isAllerRetour) ...[
-                const Gap(15),
-                Expanded(child: _buildDateSelector("Retour", dateRetour, () => _pickDate(true))),
-              ],
-            ],
-          ),
-          const Gap(20),
-
-          // 4. Nombre de passagers
-          Text("Passagers", style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
-          const Gap(10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.people_alt_outlined, color: AppColors.primary),
-                    const Gap(10),
-                    Text("$passengerCount personne(s)", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
-                ),
-                Row(
-                  children: [
-                    _buildCounterBtn(Icons.remove, _decrementPassenger),
-                    const Gap(15),
-                    _buildCounterBtn(Icons.add, _incrementPassenger),
-                  ],
-                )
-              ],
-            ),
-          ),
-          const Gap(30),
-
-          // 5. Bouton Continuer
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _validateAndContinue,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 0,
-              ),
-              child: const Text("Choisir les places", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          const Gap(10),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabOption(String title, bool isActive, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isActive ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : [],
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.black : Colors.grey,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDateSelector(String label, DateTime? date, VoidCallback onTap) {
-    final isSelected = date != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          const Gap(5),
-          Container(
-            height: 50,
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade300, width: isSelected ? 1.5 : 1),
-              borderRadius: BorderRadius.circular(12),
-              color: isSelected ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today, size: 18, color: isSelected ? AppColors.primary : Colors.grey),
-                const Gap(8),
-                Text(
-                  isSelected ? DateFormat('dd MMM yyyy', 'fr_FR').format(date) : "Choisir date", // Ajoute intl et initializeDateFormatting si besoin
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? AppColors.primary : Colors.black,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCounterBtn(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(5),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 20),
-      ),
-    );
-  }
-}*/

@@ -42,7 +42,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
       if (token == null) return;
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api',
+        baseUrl: 'https://car225.com/api/',
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -79,7 +79,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
       final token = prefs.getString('auth_token');
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: 'https://car225.com/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -372,7 +372,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }*/
 
 
-  void _showSuccessDialog() {
+/*  void _showSuccessDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -412,6 +412,78 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 child: const Text("OK, Voir mes billets", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             )
+          ],
+        ),
+      ),
+    );
+  }*/
+
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 60),
+            const Gap(10),
+            const Text("Réservation Réussie !", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Gap(10),
+            const Text(
+              "Votre billet a été réservé avec succès.\nVous pouvez le retrouver dans l'onglet Billets.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const Gap(20),
+
+            // --- LE BOUTON MODIFIÉ ICI ---
+            Container(
+              width: double.infinity,
+              height: 50, // Hauteur fixe pour que l'image se voie bien
+              // ✅ Coupe l'image pour respecter les coins arrondis
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                // ✅ L'image de fond
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                // Optionnel : Une petite ombre portée
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const MainScreen(initialIndex: 1)
+                      ),
+                          (route) => false
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  // ✅ Le bouton devient transparent
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    // On retire le padding vertical car le Container gère la hauteur (50)
+                    padding: EdgeInsets.zero
+                ),
+                child: const Text("OK, Voir mes billets", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            )
+            // -----------------------------
           ],
         ),
       ),
@@ -461,8 +533,57 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
             color: cardColor,
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]
         ),
-        child: SafeArea(
-          child: SizedBox(
+          child: SafeArea(
+            // ✅ CORRECTION : Ajout de 'child:' ici
+            child: Container(
+              width: double.infinity,
+              height: 55,
+              // ✅ Coupe l'image pour respecter les bords arrondis
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                image: const DecorationImage(
+                  image: AssetImage("assets/images/tabaa.jpg"),
+                  fit: BoxFit.cover,
+                ),
+                // Optionnel : Une petite ombre pour le relief
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: ElevatedButton(
+                // Si on soumet, on désactive le clic (null)
+                onPressed: isSubmitting ? null : () => _showPaymentMethodSelector(context, total),
+
+                style: ElevatedButton.styleFrom(
+                  // ✅ CRUCIAL : Transparent partout pour voir l'image derrière
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.transparent, // Même désactivé, on voit l'image !
+                  disabledForegroundColor: Colors.white, // Le loader reste blanc
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+
+                child: isSubmitting
+                    ? const SizedBox(
+                    width: 25,
+                    height: 25,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                )
+                    : Text(
+                    "Payer ${_formatCurrency(total)}",
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                ),
+              ),
+            ),
+
+
+          /*child: SizedBox(
             width: double.infinity, height: 55,
             child: ElevatedButton(
               onPressed: isSubmitting ? null : () => _showPaymentMethodSelector(context, total),
@@ -471,7 +592,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : Text("Payer ${_formatCurrency(total)}", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             ),
-          ),
+          ),*/
         ),
       ),
       body: SingleChildScrollView(

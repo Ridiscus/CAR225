@@ -1,8 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/providers/user_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../booking/data/datasources/booking_remote_data_source.dart';
 import '../../data/models/program_model.dart';
@@ -11,6 +15,8 @@ import 'booking_summary_screen.dart';
 
 class SeatSelectionScreen extends StatefulWidget {
   final bool isGuestMode;
+  // 1️⃣ AJOUTE CETTE LIGNE
+  final bool isModificationMode;
   final int passengerCount;
   final ProgramModel program; // Programme Aller
   final String? dateRetourChoisie; // Date retour formatée YYYY-MM-DD
@@ -19,6 +25,7 @@ class SeatSelectionScreen extends StatefulWidget {
   const SeatSelectionScreen({
     super.key,
     this.isGuestMode = false,
+    this.isModificationMode = false,
     required this.passengerCount,
     required this.program,
     this.dateRetourChoisie,
@@ -61,14 +68,46 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     super.dispose();
   }
 
+
   void _initControllers() {
+    // 1. On récupère l'utilisateur connecté avec context.read (méthode moderne sans erreur)
+    final userProvider = context.read<UserProvider>();
+    final user = userProvider.user;
+
     for (int i = 0; i < widget.passengerCount; i++) {
+      final nomCtrl = TextEditingController();
+      final prenomCtrl = TextEditingController();
+      final telCtrl = TextEditingController();
+      final emailCtrl = TextEditingController();
+      final urgenceCtrl = TextEditingController();
+
+      if (user != null) {
+        // 2. On gère les nulls proprement grâce à tes champs de UserModel
+        String nomU = user.nomUrgence ?? "";
+        String prenomU = user.lienParenteUrgence ?? "";
+        String contactU = user.contactUrgence ?? "";
+
+        String contactUrgenceComplet = "$nomU $prenomU $contactU".trim();
+
+        if (i == 0) {
+          // 🙎‍♂️ PASSAGER 1 : On pré-remplit tout
+          nomCtrl.text = user.name;
+          prenomCtrl.text = user.prenom;
+          telCtrl.text = user.contact;
+          emailCtrl.text = user.email;
+          urgenceCtrl.text = contactUrgenceComplet;
+        } else {
+          // 👥 AUTRES PASSAGERS : Uniquement le contact d'urgence
+          urgenceCtrl.text = contactUrgenceComplet;
+        }
+      }
+
       _passengerControllers.add({
-        "nom": TextEditingController(),
-        "prenom": TextEditingController(),
-        "telephone": TextEditingController(),
-        "email": TextEditingController(),
-        "urgence": TextEditingController(),
+        "nom": nomCtrl,
+        "prenom": prenomCtrl,
+        "telephone": telCtrl,
+        "email": emailCtrl,
+        "urgence": urgenceCtrl,
       });
     }
   }
@@ -83,7 +122,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     });
 
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api',
+      baseUrl: 'https://car225.com/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     ));
@@ -201,9 +240,6 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 3), () { if(mounted) overlayEntry.remove(); });
   }
-// ---------------------------------------------------------------------------
-// 📝 MODAL PASSAGERS & SUBMIT (VERSION FLATICON)
-// ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
 // 📝 MODAL PASSAGERS & SUBMIT (CORRIGÉ)
 // ---------------------------------------------------------------------------
@@ -320,6 +356,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                                   context, "Téléphone",
                                   controller: controllers["telephone"]!,
                                   imagePath: "assets/images/phone-call.png",
+                                  isPhone: true,
                                   keyboardType: TextInputType.phone
                               ),
                               const Gap(15),
@@ -342,8 +379,17 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                   SafeArea(
                     child: Container(
                       padding: const EdgeInsets.all(20),
-                      child: SizedBox(
-                        width: double.infinity, height: 55,
+                      child: Container( // On remplace le SizedBox par Container
+                        width: double.infinity,
+                        height: 55,
+                        clipBehavior: Clip.hardEdge,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          image: const DecorationImage(
+                            image: AssetImage("assets/images/tabaa.jpg"),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                         child: ElevatedButton(
                           onPressed: () {
                             if (_formKey.currentState!.validate()) {
@@ -351,7 +397,12 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                               _submitDataAndNavigate();
                             }
                           },
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent, // Transparent
+                              shadowColor: Colors.transparent,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                          ),
                           child: const Text("Continuer vers le résumé", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ),
@@ -368,7 +419,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 // ---------------------------------------------------------------------------
 // 👇 WIDGET HELPER MIS À JOUR (VERSION IMAGE)
 // ---------------------------------------------------------------------------
-  Widget _buildTextField(BuildContext context, String label, {
+  /*Widget _buildTextField(BuildContext context, String label, {
     required TextEditingController controller,
     String? imagePath, // ✅ Changé de IconData à String
     TextInputType keyboardType = TextInputType.text,
@@ -410,39 +461,163 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
         ),
       ],
     );
+  }*/
+
+
+  Widget _buildTextField(
+      BuildContext context,
+      String label, {
+        required TextEditingController controller,
+        String? imagePath,
+        TextInputType keyboardType = TextInputType.text,
+        String? hint,
+        bool isPhone = false, // 🟢 Le nouveau paramètre est bien intégré
+      }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final fillColor = isDark ? Colors.grey[800] : Colors.grey[100];
+    final borderColor = isDark ? Colors.transparent : Colors.grey.shade300;
+    final iconColor = Colors.grey;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // --- LE LABEL AU DESSUS DU CHAMP ---
+        Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor)),
+        const Gap(6),
+
+        // --- LE CHAMP DE TEXTE ---
+        TextFormField(
+          controller: controller,
+          // 💡 Astuce : force le clavier numérique automatiquement si c'est un téléphone
+          keyboardType: isPhone ? TextInputType.phone : keyboardType,
+          style: TextStyle(color: textColor, fontSize: 14),
+
+          // 🛡️ 1. BLOQUER LA SAISIE PHYSIQUEMENT (Chiffres uniquement et 10 max)
+          inputFormatters: isPhone
+              ? [
+            FilteringTextInputFormatter.digitsOnly, // Que des chiffres
+            LengthLimitingTextInputFormatter(10),   // Pas plus de 10
+          ]
+              : null,
+
+          // 🛡️ 2. VALIDATION LORS DU CLIC SUR LE BOUTON
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return "Requis";
+            }
+            if (isPhone && value.length != 10) {
+              return "10 chiffres requis"; // Bloque si < 10
+            }
+            if (label.toLowerCase() == "email" && !value.contains("@")) {
+              return "Email invalide";
+            }
+            return null;
+          },
+
+          // 🎨 3. TON DESIGN INTACT (Couleurs, bordures, image)
+          decoration: InputDecoration(
+            prefixIcon: imagePath != null
+                ? Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Image.asset(imagePath, width: 20, height: 20, color: iconColor),
+            )
+                : null,
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
+            filled: true,
+            fillColor: fillColor,
+          ),
+        ),
+      ],
+    );
   }
 
+
+
   void _submitDataAndNavigate() {
+    // -----------------------------------------------------------
+    // 1. VALIDATION PRÉLIMINAIRE (Commune aux deux modes)
+    // -----------------------------------------------------------
+    if (selectedSeatsAller.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez sélectionner au moins une place aller.")),
+      );
+      return;
+    }
+
+    // On trie les sièges pour être propre
     final sortedSeatsAller = selectedSeatsAller.toList()..sort();
     final sortedSeatsRetour = selectedSeatsRetour.toList()..sort();
+
+    // -----------------------------------------------------------
+    // 2. 🟢 INTERCEPTION : MODE MODIFICATION
+    // -----------------------------------------------------------
+    if (widget.isModificationMode) {
+      // On prépare uniquement les données nécessaires pour l'API "modify"
+      Map<String, dynamic> modificationData = {
+        "programme_id": widget.program.id,
+        // On s'assure d'avoir le format YYYY-MM-DD
+        "date_voyage": widget.program.dateDepart.split(' ')[0],
+        "heure_depart": widget.program.heureDepart,
+        // En modif, on considère souvent 1 seul ticket, donc on prend le 1er siège
+        "seat_number": sortedSeatsAller.first,
+      };
+
+      // Gestion du Retour (si applicable)
+      if (widget.program.isAllerRetour && widget.returnProgram != null) {
+        modificationData["return_programme_id"] = widget.returnProgram!.id;
+        modificationData["return_heure_depart"] = widget.returnProgram!.heureDepart;
+
+        if (sortedSeatsRetour.isNotEmpty) {
+          modificationData["return_seat_number"] = sortedSeatsRetour.first;
+        }
+
+        if (widget.dateRetourChoisie != null) {
+          modificationData["return_date_voyage"] = widget.dateRetourChoisie;
+        }
+      }
+
+      // 🚀 RETOUR VERS L'ÉCRAN PRÉCÉDENT AVEC LES DONNÉES
+      // Cela va remonter la chaîne jusqu'à TicketDetailScreen
+      Navigator.pop(context, modificationData);
+      return; // ⛔ ON ARRÊTE TOUT ICI POUR LE MODE MODIF
+    }
+
+    // -----------------------------------------------------------
+    // 3. 🔴 LOGIQUE NORMALE (RÉSERVATION CLASSIQUE)
+    // -----------------------------------------------------------
+    // Le code ci-dessous ne s'exécute que si isModificationMode == false
 
     List<Map<String, dynamic>> passengersData = [];
 
     for (int i = 0; i < widget.passengerCount; i++) {
+      // ... Ta logique existante de boucle passagers ...
       final controllers = _passengerControllers[i];
 
-      // On prépare l'objet passager avec les sièges
       final Map<String, dynamic> passager = {
         "nom": controllers["nom"]!.text,
         "prenom": controllers["prenom"]!.text,
         "email": controllers["email"]!.text,
         "telephone": controllers["telephone"]!.text,
         "urgence": controllers["urgence"]!.text,
-        "seat_number": sortedSeatsAller[i], // Siège Aller standard
+        "seat_number": sortedSeatsAller[i],
       };
 
-      // Si retour, on ajoute le champ spécifique pour le siège retour
       if (widget.program.isAllerRetour && i < sortedSeatsRetour.length) {
         passager["seat_number_return"] = sortedSeatsRetour[i];
       }
-
       passengersData.add(passager);
     }
 
     String? dateRetourFinal;
     if (widget.program.isAllerRetour) {
+      // ... Ta logique existante de date retour ...
       dateRetourFinal = widget.dateRetourChoisie;
-      // Fallback de sécurité si la date est nulle
       if (dateRetourFinal == null) {
         DateTime dateDepart = DateTime.parse(widget.program.dateDepart);
         DateTime retour = dateDepart.add(const Duration(days: 7));
@@ -450,17 +625,16 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       }
     }
 
-    // CONSTRUCTION DU PAYLOAD FINAL
+
+
+    // PAYLOAD FINAL RÉSERVATION
     final bookingData = {
       "programme_id": widget.program.id,
       "date_voyage": widget.program.dateDepart,
       "nombre_places": widget.passengerCount,
-
-      // On envoie les listes brutes
       "seats": sortedSeatsAller,
       if (widget.program.isAllerRetour) "seats_retour": sortedSeatsRetour,
-      if (widget.returnProgram != null) "return_programme_id": widget.returnProgram!.id, // Utile pour le backend
-
+      if (widget.returnProgram != null) "return_programme_id": widget.returnProgram!.id,
       "passagers": passengersData,
       "is_aller_retour": widget.program.isAllerRetour,
       if (dateRetourFinal != null) "date_retour": dateRetourFinal,
@@ -480,6 +654,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       );
     }
   }
+
 
   // ---------------------------------------------------------------------------
   // 🖥 UI PRINCIPALE
@@ -591,21 +766,53 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     );
   }
 
-  // --- WIDGETS DE CONSTRUCTION (INCHANGÉS MAIS UTILISENT LE NOUVEL ÉTAT) ---
 
   Widget _buildBusLayout(BuildContext context) {
+    // 1. On récupère la capacité réelle du bus courant (Aller ou Retour)
+    final currentProgram = isSelectingReturnPhase ? widget.returnProgram! : widget.program;
+    int totalSeats = currentProgram.capacity;
+
+    // Sécurité : si la capacité est bizarre (ex: 0), on met 48 par défaut
+    if (totalSeats <= 0) totalSeats = 48;
+
+    print("🚌 [DEBUG] Construction du bus : $totalSeats places au total.");
+
+    // 2. On calcule le nombre de rangées nécessaires (4 sièges par rangée)
+    // Ex: 30 places / 4 = 7.5 -> On arrondit à 8 rangées
+    int rowCount = (totalSeats / 4).ceil();
+
     return Column(
-      children: List.generate(12, (rowIndex) {
+      children: List.generate(rowCount, (rowIndex) {
+        // Calcul des numéros de sièges pour cette rangée
+        int seatA = (rowIndex * 4) + 1;
+        int seatB = (rowIndex * 4) + 2;
+        int seatC = (rowIndex * 4) + 3;
+        int seatD = (rowIndex * 4) + 4;
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 15),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildSeatItem(context, (rowIndex * 4) + 1),
-              _buildSeatItem(context, (rowIndex * 4) + 2),
-              const SizedBox(width: 20),
-              _buildSeatItem(context, (rowIndex * 4) + 3),
-              _buildSeatItem(context, (rowIndex * 4) + 4),
+              // On affiche le siège seulement s'il existe (numéro <= capacité totale)
+              // Sinon on affiche un espace vide (SizedBox) pour garder l'alignement
+              seatA <= totalSeats
+                  ? _buildSeatItem(context, seatA)
+                  : const Expanded(child: SizedBox()),
+
+              seatB <= totalSeats
+                  ? _buildSeatItem(context, seatB)
+                  : const Expanded(child: SizedBox()),
+
+              const SizedBox(width: 20), // L'allée centrale
+
+              seatC <= totalSeats
+                  ? _buildSeatItem(context, seatC)
+                  : const Expanded(child: SizedBox()),
+
+              seatD <= totalSeats
+                  ? _buildSeatItem(context, seatD)
+                  : const Expanded(child: SizedBox()),
             ],
           ),
         );
@@ -660,9 +867,12 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   }
 
 
+
   Widget _buildBottomBar(BuildContext context, int totalPrice) {
+    // 1. Ta logique de validation
     bool isComplete = currentSelectedSeats.length == widget.passengerCount;
 
+    // 2. Ta logique de texte
     String buttonText;
     if (widget.returnProgram != null && !isSelectingReturnPhase) {
       // On est à l'aller, et il y a un retour prévu
@@ -672,25 +882,67 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       buttonText = isComplete ? "Confirmer pour $totalPrice FCFA" : "Sélectionnez ${widget.passengerCount} siège(s)";
     }
 
+    // 3. Le Rendu Visuel
     return Container(
       padding: const EdgeInsets.all(20),
+      // Important : On garde la couleur de fond de la barre elle-même (sinon on voit la liste derrière)
       color: Theme.of(context).cardColor,
       child: SafeArea(
-        child: SizedBox(
-          width: double.infinity, height: 55,
+        child: Container(
+          width: double.infinity,
+          height: 55,
+          // ✅ Coupe l'image pour qu'elle respecte les coins arrondis
+          clipBehavior: Clip.hardEdge,
+
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+
+            // ✅ LOGIQUE IMAGE :
+            // Si isComplete est VRAI -> On affiche l'image.
+            // Si isComplete est FAUX -> On met null (pas d'image).
+            image: isComplete
+                ? const DecorationImage(
+              image: AssetImage("assets/images/tabaa.jpg"),
+              fit: BoxFit.cover,
+            )
+                : null,
+
+            // Couleur de fond de secours (Gris si désactivé)
+            color: isComplete ? null : Colors.grey.shade300,
+
+            // Ombre seulement si le bouton est actif
+            boxShadow: isComplete
+                ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]
+                : [],
+          ),
+
           child: ElevatedButton(
+            // ✅ J'ai remis ta fonction originale '_handleMainButtonPress'
             onPressed: isComplete ? _handleMainButtonPress : null,
+
             style: ElevatedButton.styleFrom(
-                backgroundColor: isSelectingReturnPhase ? Colors.orange : AppColors.primary,
+              // ✅ TOUT TRANSPARENT (pour voir le Container décoré derrière)
+                backgroundColor: Colors.transparent,
+                disabledBackgroundColor: Colors.transparent, // Crucial pour le gris
+                shadowColor: Colors.transparent,
+                elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
             ),
+
             child: Text(
                 buttonText,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                style: TextStyle(
+                  // Blanc si actif, Gris foncé si inactif
+                    color: isComplete ? Colors.white : Colors.grey.shade600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold
+                )
             ),
           ),
         ),
       ),
     );
   }
+
+
 }

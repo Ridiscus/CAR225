@@ -14,7 +14,8 @@ import 'core/theme/app_theme.dart';
 import 'core/services/theme_provider.dart';
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
-import 'features/auth/domain/repositories/auth_repository.dart' hide AuthRepositoryImpl;
+import 'features/auth/domain/repositories/auth_repository.dart'
+    hide AuthRepositoryImpl;
 import 'features/booking/data/repositories/notification_repository.dart';
 import 'features/booking/domain/repositories/company_repository.dart';
 import 'features/onboarding/presentation/screens/splash_screen.dart';
@@ -23,9 +24,6 @@ import 'features/onboarding/presentation/screens/splash_screen.dart';
 // (Vérifie que les chemins correspondent bien à tes dossiers)
 import 'core/services/device/device_service.dart';
 import 'core/services/notifications/fcm_service.dart';
-
-
-
 
 // Déclare cette clé en variable globale (hors des classes)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -45,15 +43,17 @@ void main() async {
 
   // 4. ✅ CONFIGURATION DIO (Pour les requêtes HTTP)
   // Remplace 'http://10.0.2.2:8000/api' par ta vraie URL d'API (10.0.2.2 pour Émulateur Android)
-  final dio = Dio(BaseOptions(
-    baseUrl: 'https://car225.com/api/',
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: 'https://car225.com/api/',
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    ),
+  );
 
   // 5. Lancement de l'App avec les Providers
   /*runApp(
@@ -84,8 +84,6 @@ void main() async {
     ),
   );*/
 
-
-
   runApp(
     MultiProvider(
       providers: [
@@ -113,25 +111,14 @@ void main() async {
 
         // ✅ PROVIDER COMPANY
         ChangeNotifierProvider(
-          create: (_) => CompanyProvider(
-            repository: CompanyRepository(dio: dio),
-          ),
+          create: (_) =>
+              CompanyProvider(repository: CompanyRepository(dio: dio)),
         ),
       ],
       child: const Car225App(),
     ),
   );
-
-
 }
-
-
-
-
-
-
-
-
 
 class Car225App extends StatelessWidget {
   const Car225App({super.key});

@@ -15,6 +15,8 @@ import 'features/hostess/presentation/providers/hostess_profile_provider.dart';
 import 'features/driver/presentation/providers/driver_provider.dart';
 import 'features/onboarding/presentation/screens/splash_screen.dart';
 
+// Test
+
 void main() async {
   // Nécessaire pour initialiser les SharedPreferences avant le lancement de l'UI
   WidgetsFlutterBinding.ensureInitialized();

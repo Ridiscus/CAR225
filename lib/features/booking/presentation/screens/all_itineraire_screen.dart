@@ -16,7 +16,9 @@ class AllItinerariesScreen extends StatelessWidget {
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final shadowColor = isDark ? Colors.black26 : Colors.black.withOpacity(0.05);
+    final shadowColor = isDark
+        ? Colors.black26
+        : Colors.black.withOpacity(0.05);
 
     // Liste des données (Mock Data)
     final List<Map<String, dynamic>> itineraries = [
@@ -26,7 +28,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "15 000 F",
         "type": "Standard",
         "rating": "4.7",
-        "route": "Korhogo ➝ Abidjan"
+        "route": "Korhogo ➝ Abidjan",
       },
       {
         "company": "UTB",
@@ -34,7 +36,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "8 000 F",
         "type": "Express",
         "rating": "4.8",
-        "route": "Bouaké ➝ Abidjan"
+        "route": "Bouaké ➝ Abidjan",
       },
       {
         "company": "Fabiola",
@@ -42,7 +44,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "12 000 F",
         "type": "Standard",
         "rating": "4.5",
-        "route": "Man ➝ Abidjan"
+        "route": "Man ➝ Abidjan",
       },
       {
         "company": "A.V.S",
@@ -50,7 +52,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "6 500 F",
         "type": "VIP",
         "rating": "4.9",
-        "route": "Yakro ➝ Abidjan"
+        "route": "Yakro ➝ Abidjan",
       },
       {
         "company": "SBTA",
@@ -58,7 +60,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "7 000 F",
         "type": "Standard",
         "rating": "4.2",
-        "route": "San Pedro ➝ Abidjan"
+        "route": "San Pedro ➝ Abidjan",
       },
       {
         "company": "ST Transport",
@@ -66,7 +68,7 @@ class AllItinerariesScreen extends StatelessWidget {
         "price": "5 000 F",
         "type": "Eco",
         "rating": "4.0",
-        "route": "Daloa ➝ Abidjan"
+        "route": "Daloa ➝ Abidjan",
       },
     ];
 
@@ -76,7 +78,10 @@ class AllItinerariesScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor), // <--- ICONE DYNAMIQUE
+          icon: Icon(
+            Icons.arrow_back,
+            color: textColor,
+          ), // <--- ICONE DYNAMIQUE
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -86,9 +91,12 @@ class AllItinerariesScreen extends StatelessWidget {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_list, color: textColor), // <--- ICONE DYNAMIQUE
+            icon: Icon(
+              Icons.filter_list,
+              color: textColor,
+            ), // <--- ICONE DYNAMIQUE
             onPressed: () {},
-          )
+          ),
         ],
       ),
       body: Column(
@@ -99,11 +107,15 @@ class AllItinerariesScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
-                  color: cardColor, // <--- FOND BARRE RECHERCHE
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(color: shadowColor, blurRadius: 10, offset: const Offset(0, 4))
-                  ]
+                color: cardColor, // <--- FOND BARRE RECHERCHE
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: shadowColor,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: TextField(
                 style: TextStyle(color: textColor), // Couleur du texte tapé
@@ -169,7 +181,11 @@ class AllItinerariesScreen extends StatelessWidget {
         color: cardColor, // <--- FOND CARTE DYNAMIQUE
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
-          BoxShadow(color: shadowColor, blurRadius: 5, offset: const Offset(0, 2))
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -181,7 +197,10 @@ class AllItinerariesScreen extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color,
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -190,28 +209,60 @@ class AllItinerariesScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.3), borderRadius: BorderRadius.circular(8)),
-                      child: Text(type, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        type,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: Row(
                         children: [
                           const Icon(Icons.star, color: Colors.orange, size: 9),
                           const Gap(2),
                           // Le texte rating reste noir car le fond est blanc (Container au dessus)
-                          Text(rating, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black)),
+                          Text(
+                            rating,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
                 const Icon(Icons.directions_bus, color: Colors.white, size: 28),
-                Text(companyName,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                    maxLines: 1, overflow: TextOverflow.ellipsis
+                Text(
+                  companyName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -228,14 +279,26 @@ class AllItinerariesScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(companyName, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                      Text(
+                        companyName,
+                        style: const TextStyle(fontSize: 9, color: Colors.grey),
+                      ),
                       const Gap(2),
                       // Route en couleur dynamique
-                      Text(route, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        route,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
 
                       const Gap(5),
-                      Row(
-                        children: const [
+                      const Row(
+                        children: [
                           Icon(Icons.wifi, size: 12, color: AppColors.primary),
                           Gap(5),
                           Icon(Icons.flash_on, size: 12, color: Colors.grey),
@@ -246,16 +309,33 @@ class AllItinerariesScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Divider(height: 10, color: isDark ? Colors.grey[800] : Colors.grey[300]),
+                      Divider(
+                        height: 10,
+                        color: isDark ? Colors.grey[800] : Colors.grey[300],
+                      ),
                       // Prix en couleur dynamique
-                      Text(price, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
-                      const Text("Dispo", style: TextStyle(fontSize: 9, color: AppColors.secondary, fontWeight: FontWeight.bold)),
+                      Text(
+                        price,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      const Text(
+                        "Dispo",
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );

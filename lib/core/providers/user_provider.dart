@@ -5,7 +5,9 @@ import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../services/notifications/fcm_service.dart';
 import '../services/device/device_service.dart';
 
+
 class UserProvider extends ChangeNotifier {
+
   // Le repository (On l'instancie ici pour faire simple)
   final AuthRepositoryImpl _authRepository = AuthRepositoryImpl(
     remoteDataSource: AuthRemoteDataSourceImpl(),
@@ -27,7 +29,7 @@ class UserProvider extends ChangeNotifier {
 
     try {
       final user = await _authRepository.getUserProfile();
-      _user = user;
+      _user = user; 
     } catch (e) {
       debugPrint("Erreur Provider LoadUser: $e");
       // On garde l'ancien user ou null en cas d'erreur
@@ -35,6 +37,7 @@ class UserProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners(); // Dit aux écrans : "C'est fini, mettez à jour l'affichage !"
     }
+    
   }
 
   // 2. VIDER L'UTILISATEUR (Logout)
@@ -42,4 +45,5 @@ class UserProvider extends ChangeNotifier {
     _user = null;
     notifyListeners();
   }
+  
 }

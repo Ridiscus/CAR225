@@ -1,45 +1,3 @@
-/*import 'package:flutter/material.dart';
-import 'app_colors.dart';
-
-class AppTheme {
-  static ThemeData get lightTheme {
-    return ThemeData(
-      primaryColor: AppColors.primary,
-      scaffoldBackgroundColor: AppColors.background,
-
-      // Configuration par défaut des boutons
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
-
-      // Configuration des inputs
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-      ),
-
-      useMaterial3: true,
-    );
-  }
-}*/
-
-
-
-
-
-
-
-
-
-
 import 'package:flutter/material.dart';
 import 'app_colors.dart'; // Assure-toi que le chemin est bon
 
@@ -72,7 +30,9 @@ class AppTheme {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), // Un peu plus arrondi
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ), // Un peu plus arrondi
         elevation: 0,
       ),
     ),
@@ -148,6 +108,6 @@ class AppTheme {
 
     // Card & Dialogs
     cardColor: AppColors.darkSurface,
-    dialogBackgroundColor: AppColors.darkSurface,
+    dialogTheme: const DialogThemeData(backgroundColor: AppColors.darkSurface),
   );
 }

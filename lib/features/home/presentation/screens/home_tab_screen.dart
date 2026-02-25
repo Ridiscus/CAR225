@@ -11,7 +11,6 @@ import '../../../booking/presentation/screens/all_itineraire_screen.dart';
 import '../../../booking/presentation/screens/search_results_screen.dart';
 import 'notification_screen.dart';
 
-
 class HomeTabScreen extends StatefulWidget {
   const HomeTabScreen({super.key});
 
@@ -34,7 +33,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       "price": "15 000 F",
       "type": "Standard",
       "rating": "4.7",
-      "route": "Korhogo ➝ Abidjan"
+      "route": "Korhogo ➝ Abidjan",
     },
     {
       "company": "UTB",
@@ -42,7 +41,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       "price": "15 000 F",
       "type": "Express",
       "rating": "4.8",
-      "route": "Bouaké ➝ Abidjan"
+      "route": "Bouaké ➝ Abidjan",
     },
     {
       "company": "Fabiola",
@@ -50,12 +49,9 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       "price": "12 000 F",
       "type": "Standard",
       "rating": "4.5",
-      "route": "Man ➝ Abidjan"
+      "route": "Man ➝ Abidjan",
     },
   ];
-
-
-
 
   @override
   void initState() {
@@ -81,7 +77,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
   void _goToAllItineraries(BuildContext context) {
     // Navigation vers la page voir tout
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const AllItinerariesScreen()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AllItinerariesScreen()),
+    );
   }
 
   /*@override
@@ -217,10 +216,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     );
   }*/
 
-
-
-
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -263,8 +258,24 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Itinéraire de la semaine", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                        TextButton(onPressed: () => _goToAllItineraries(context), child: const Text("Voir tout", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold))),
+                        Text(
+                          "Itinéraire de la semaine",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _goToAllItineraries(context),
+                          child: const Text(
+                            "Voir tout",
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -278,7 +289,18 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                       separatorBuilder: (context, index) => const Gap(15),
                       itemBuilder: (context, index) {
                         final item = _recentItineraries[index];
-                        return SizedBox(width: 200, child: _buildCompanyCard(context, companyName: item['company'], color: item['color'], price: item['price'], type: item['type'], rating: item['rating'], route: item['route']));
+                        return SizedBox(
+                          width: 200,
+                          child: _buildCompanyCard(
+                            context,
+                            companyName: item['company'],
+                            color: item['color'],
+                            price: item['price'],
+                            type: item['type'],
+                            rating: item['rating'],
+                            route: item['route'],
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -288,18 +310,53 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
             Transform.translate(
               offset: const Offset(0, -40),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF263238) : const Color(0xFF37474F),
+                  color: isDark
+                      ? const Color(0xFF263238)
+                      : const Color(0xFF37474F),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Column(
                   children: [
-                    const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    const Text("Trouvez votre voyage parfait.", style: TextStyle(color: AppColors.grey)),
+                    const Text(
+                      "Prêt à réserver ?",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const Text(
+                      "Trouvez votre voyage parfait.",
+                      style: TextStyle(color: AppColors.grey),
+                    ),
                     const Gap(15),
-                    SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _goToBooking(context), style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () => _goToBooking(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          "Réserver maintenant",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -311,18 +368,25 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     );
   }
 
-
-
   // MODIFICATION ICI : On accepte l'URL photo en paramètre
   Widget _buildHeader(BuildContext context, String? photoUrl) {
     return Container(
       height: 320,
       width: double.infinity,
       decoration: const BoxDecoration(
-        image: DecorationImage(image: AssetImage("assets/images/bus_header.jpg"), fit: BoxFit.cover),
+        image: DecorationImage(
+          image: AssetImage("assets/images/bus_header.jpg"),
+          fit: BoxFit.cover,
+        ),
       ),
       child: Container(
-        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.6), Colors.transparent])),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+          ),
+        ),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -334,13 +398,19 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     // --- 1. PROFIL DYNAMIQUE ---
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileScreen(),
+                          ),
+                        );
                       },
                       child: CircleAvatar(
                         radius: 22,
                         backgroundColor: Colors.white,
                         // 5. LOGIQUE D'AFFICHAGE MISE À JOUR
-                        backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                        backgroundImage:
+                            (photoUrl != null && photoUrl.isNotEmpty)
                             ? NetworkImage(photoUrl) as ImageProvider
                             : const AssetImage("assets/images/ci.jpg"),
                       ),
@@ -350,25 +420,52 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Ma localisation", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        const Text(
+                          "Ma localisation",
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
                         Row(
                           children: [
-                            Image.asset("assets/icons/pin.png", width: 14, height: 14, color: AppColors.primary),
+                            Image.asset(
+                              "assets/icons/pin.png",
+                              width: 14,
+                              height: 14,
+                              color: AppColors.primary,
+                            ),
                             const Gap(4),
-                            const Text("Abidjan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            const Text(
+                              "Abidjan",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
                 // --- NOTIFICATION ---
                 GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen())),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationScreen(),
+                    ),
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                    child: Image.asset("assets/icons/notification.png", width: 20, height: 20, color: Colors.white),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Image.asset(
+                      "assets/icons/notification.png",
+                      width: 20,
+                      height: 20,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -379,10 +476,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     );
   }
 
-
-
   // Ajoute 'BuildContext context' ici pour pouvoir faire la navigation
- /* Widget _buildHeader(BuildContext context) {
+  /* Widget _buildHeader(BuildContext context) {
 
     // --- SIMULATION DE LA LOGIQUE USER ---
     // Dans ton vrai code, cette variable viendra de ta base de données ou de ton Provider/Bloc.
@@ -498,7 +593,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     final cardColor = Theme.of(context).cardColor; // Blanc ou Gris Foncé
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final shadowColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.black26 // Ombre plus discrète en mode nuit
+        ? Colors
+              .black26 // Ombre plus discrète en mode nuit
         : Colors.grey.withOpacity(0.2);
 
     return Container(
@@ -517,8 +613,14 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Ou souhaitez-vous voyager ?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const Text("Réservez votre billet en quelques clics", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const Text(
+            "Ou souhaitez-vous voyager ?",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const Text(
+            "Réservez votre billet en quelques clics",
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
           const Gap(20),
 
           // Ligne 1 : Départ et Destination
@@ -535,22 +637,22 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
           Row(
             children: [
               Expanded(
-                  child: _buildDropdownField(
-                      context,
-                      "Départ",
-                      "Sélectionner",
-                      "assets/images/map.png" // <--- Ton image de départ ici
-                  )
+                child: _buildDropdownField(
+                  context,
+                  "Départ",
+                  "Sélectionner",
+                  "assets/images/map.png", // <--- Ton image de départ ici
+                ),
               ),
               const Gap(10),
               Expanded(
-                  child: _buildDropdownField(
-                      context,
-                      "Destination",
-                      "Sélectionner",
-                      "assets/images/map.png", // <--- Ton image d'arrivée ici
-                      isGreen: true
-                  )
+                child: _buildDropdownField(
+                  context,
+                  "Destination",
+                  "Sélectionner",
+                  "assets/images/map.png", // <--- Ton image d'arrivée ici
+                  isGreen: true,
+                ),
               ),
             ],
           ),
@@ -558,13 +660,11 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
           // Ligne 2 : Date et Checkbox sur la même ligne
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center, // Alignement vertical centré
+            crossAxisAlignment:
+                CrossAxisAlignment.center, // Alignement vertical centré
             children: [
               // Champ Date (prend plus de place)
-              Expanded(
-                  flex: 3,
-                  child: _buildDateField(context)
-              ),
+              Expanded(flex: 3, child: _buildDateField(context)),
               const Gap(15),
 
               // Checkbox (prend moins de place)
@@ -584,14 +684,19 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                           child: Checkbox(
                             value: isRoundTrip,
                             activeColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
 
                             onChanged: (v) => setState(() => isRoundTrip = v!),
                           ),
                         ),
                         const Gap(5),
                         const Expanded(
-                          child: Text("Aller-retour", style: TextStyle(fontSize: 13, height: 1.2)),
+                          child: Text(
+                            "Aller-retour",
+                            style: TextStyle(fontSize: 13, height: 1.2),
+                          ),
                         ),
                       ],
                     ),
@@ -611,10 +716,19 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
               onPressed: () => _goToBooking(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 elevation: 0,
               ),
-              child: const Text("Rechercher des trajets", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              child: const Text(
+                "Rechercher des trajets",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],
@@ -622,12 +736,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     );
   }
 
-
-
-
-
-
-  Widget _buildCompanyCard(BuildContext context, {
+  Widget _buildCompanyCard(
+    BuildContext context, {
     required String companyName,
     required Color color,
     required String price,
@@ -641,14 +751,20 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     // Ombre plus sombre et discrète en mode nuit
-    final shadowColor = isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.1);
+    final shadowColor = isDark
+        ? Colors.black.withOpacity(0.3)
+        : Colors.grey.withOpacity(0.1);
 
     return Container(
       decoration: BoxDecoration(
         color: cardColor, // <--- FOND DYNAMIQUE
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
-          BoxShadow(color: shadowColor, blurRadius: 5, offset: const Offset(0, 2))
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -660,7 +776,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color,
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -669,26 +788,62 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.3), borderRadius: BorderRadius.circular(10)),
-                      child: Text(type, style: const TextStyle(color: Colors.white, fontSize: 10)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        type,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.orange, size: 10),
+                          const Icon(
+                            Icons.star,
+                            color: Colors.orange,
+                            size: 10,
+                          ),
                           const Gap(2),
                           // IMPORTANT : Fond blanc ici -> Texte forcé en Noir même en mode nuit
-                          Text(rating, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black)),
+                          Text(
+                            rating,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
                 const Icon(Icons.directions_bus, color: Colors.white, size: 30),
-                Text(companyName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(
+                  companyName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -704,12 +859,27 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(companyName, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                      Text(
+                        companyName,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
+                      ),
                       // ICI : On applique textColor pour que le nom du trajet soit visible en nuit
-                      Text(route, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        route,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const Gap(5),
-                      Row(
-                        children: const [
+                      const Row(
+                        children: [
                           Icon(Icons.wifi, size: 14, color: AppColors.primary),
                           Gap(5),
                           Icon(Icons.flash_on, size: 14, color: Colors.grey),
@@ -717,31 +887,39 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                       ),
                     ],
                   ),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Divider(height: 10),
-                      const Text("15 places", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      Divider(height: 10),
+                      Text(
+                        "15 places",
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-
-
-
-  Widget _buildDropdownField(BuildContext context, String label, String hint, String imagePath, {bool isGreen = false}) {
+  Widget _buildDropdownField(
+    BuildContext context,
+    String label,
+    String hint,
+    String imagePath, {
+    bool isGreen = false,
+  }) {
     // --- 1. Gestion des couleurs (Dark / Light) ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Texte : Blanc si sombre, Noir (ou couleur du thème) si clair
-    final textColor = isDark ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textColor = isDark
+        ? Colors.white
+        : Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
 
     // Bordure : Subtile en dark mode, grise classique en light mode
     final borderColor = isDark ? Colors.white24 : Colors.grey.shade300;
@@ -754,8 +932,12 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       children: [
         // LABEL (Au-dessus de la boîte)
         Text(
-            label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
         ),
         const Gap(5),
 
@@ -775,22 +957,30 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                 imagePath,
                 width: 20, // Taille contrainte pour ne pas casser le layout
                 height: 20,
-                color: imageColor, // ⚠️ Retire cette ligne si ton image est déjà colorée (ex: drapeau)
+                color:
+                    imageColor, // ⚠️ Retire cette ligne si ton image est déjà colorée (ex: drapeau)
                 fit: BoxFit.contain,
               ),
-              // -------------------------------------------
 
+              // -------------------------------------------
               const Gap(10), // Un peu plus d'espace qu'avec une icône simple
 
               Expanded(
-                  child: Text(
-                      hint,
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis
-                  )
+                child: Text(
+                  hint,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
 
-              const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 18),
+              const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.grey,
+                size: 18,
+              ),
             ],
           ),
         ),
@@ -807,7 +997,14 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Date de départ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+        Text(
+          "Date de départ",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        ),
         const Gap(5),
         Container(
           height: 48,
@@ -821,11 +1018,15 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
               const Icon(Icons.calendar_today, color: Colors.grey, size: 18),
               const Gap(10),
               Expanded(
-                  child: Text(
-                      "Sélectionner",
-                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: textColor), // <--- TEXTE DYNAMIQUE
-                      overflow: TextOverflow.ellipsis
-                  )
+                child: Text(
+                  "Sélectionner",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    color: textColor,
+                  ), // <--- TEXTE DYNAMIQUE
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -834,5 +1035,3 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     );
   }
 }
-
-

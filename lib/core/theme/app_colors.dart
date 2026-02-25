@@ -19,11 +19,11 @@ class AppColors {
 
 
 
-
-
 import 'package:flutter/material.dart';
 
+
 class AppColors {
+
   // --- Couleurs Principales (Brand) ---
   static const Color primary = Color(0xFFFF7900); // Orange Car225
   static const Color primaryLight = Color(0xFFFFE0B2); // Orange très clair
@@ -43,4 +43,5 @@ class AppColors {
   static const Color darkBackground = Color(0xFF121212);
   static const Color darkSurface = Color(0xFF1E1E1E);
   static const Color darkInputFill = Color(0xFF2C2C2C);
+  
 }

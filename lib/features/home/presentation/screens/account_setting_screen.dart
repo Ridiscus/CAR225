@@ -38,8 +38,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
       appBar: AppBar(
         title: Text(
-            "Paramètres",
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
+          "Paramètres",
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
@@ -70,7 +70,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             context: context,
             title: "Mode Sombre",
             subtitle: "Thème nuit pour l'application",
-            value: themeProvider.isDarkMode, // Valeur globale venant du Provider
+            value:
+                themeProvider.isDarkMode, // Valeur globale venant du Provider
             onChanged: (v) => themeProvider.toggleTheme(v), // Action globale
           ),
 
@@ -85,7 +86,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           _buildActionTile(
             context: context,
             title: "Taille de la police",
-            subtitle: themeProvider.currentFontSizeName, // Affiche "Petite", "Moyenne" ou "Grande"
+            subtitle: themeProvider
+                .currentFontSizeName, // Affiche "Petite", "Moyenne" ou "Grande"
             icon: Icons.format_size,
             onTap: () => _showFontSizeSelector(context, themeProvider),
           ),
@@ -99,7 +101,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             title: "FAQ / Aide",
             icon: Icons.help_outline,
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const FaqScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FaqScreen()),
+              );
             },
           ),
 
@@ -108,7 +113,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             title: "Politique de confidentialité",
             icon: Icons.privacy_tip_outlined,
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PrivacyPolicyScreen(),
+                ),
+              );
             },
           ),
         ],
@@ -123,17 +133,30 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).cardColor, // Fond adaptatif
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Choisir la langue", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                "Choisir la langue",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const Gap(15),
-              _buildRadioItem("Français", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
-              _buildRadioItem("English", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
+              _buildRadioItem(
+                "Français",
+                _currentLanguage,
+                (val) => setState(() => _currentLanguage = val!),
+              ),
+              _buildRadioItem(
+                "English",
+                _currentLanguage,
+                (val) => setState(() => _currentLanguage = val!),
+              ),
             ],
           ),
         );
@@ -177,7 +200,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       padding: const EdgeInsets.only(bottom: 10, left: 5),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey,
+        ),
       ),
     );
   }
@@ -187,18 +214,26 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required Function(bool) onChanged
+    required Function(bool) onChanged,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor, // Couleur adaptative (Blanc ou Gris foncé)
+        color: Theme.of(
+          context,
+        ).cardColor, // Couleur adaptative (Blanc ou Gris foncé)
         borderRadius: BorderRadius.circular(15),
       ),
       child: SwitchListTile(
-        activeColor: AppColors.primary, // Orange Car225
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        activeThumbColor: AppColors.primary, // Orange Car225
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
         value: value,
         onChanged: onChanged,
       ),
@@ -210,7 +245,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     required String title,
     String? subtitle,
     IconData? icon,
-    required VoidCallback onTap
+    required VoidCallback onTap,
   }) {
     // Couleur d'icône adaptative
     final iconColor = Theme.of(context).brightness == Brightness.dark
@@ -226,16 +261,34 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       child: ListTile(
         onTap: onTap,
         leading: icon != null ? Icon(icon, color: iconColor) : null,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
         subtitle: subtitle != null
-            ? Text(subtitle, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13))
+            ? Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              )
             : null,
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey,
+        ),
       ),
     );
   }
 
-  Widget _buildRadioItem(String title, String groupValue, ValueChanged<String?> onChanged) {
+  Widget _buildRadioItem(
+    String title,
+    String groupValue,
+    ValueChanged<String?> onChanged,
+  ) {
     return RadioListTile<String>(
       title: Text(title),
       value: title,

@@ -2,7 +2,7 @@ name: car225
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -32,50 +32,53 @@ dependencies:
     sdk: flutter
 
   # --- Architecture & State Management ---
-  flutter_riverpod: ^2.4.9    # Gestion d'état robuste
-  flutter_hooks: ^0.20.4      # Utile pour simplifier les contrôleurs d'animation
-  hooks_riverpod: ^2.4.9      # Liaison entre Hooks et Riverpod
+  flutter_riverpod: ^2.4.9 # Gestion d'état robuste
+  flutter_hooks: ^0.20.4 # Utile pour simplifier les contrôleurs d'animation
+  hooks_riverpod: ^2.4.9 # Liaison entre Hooks et Riverpod
 
   # --- Navigation & Réseau ---
-  go_router: ^13.1.0          # Gestion des routes (Splash -> Auth -> Home)
-  dio: ^5.9.1                 # Requêtes HTTP avancées
-  connectivity_plus: ^5.0.2   # Vérifier si on est Hors Ligne/En Ligne
+  go_router: ^13.1.0 # Gestion des routes (Splash -> Auth -> Home)
+  dio: ^5.9.1 # Requêtes HTTP avancées
+  connectivity_plus: ^5.0.2 # Vérifier si on est Hors Ligne/En Ligne
 
   # --- UI & Animations (Le coeur du design) ---
-  flutter_animate: ^4.5.0     # Pour séquencer ton Splash Screen complexe
-  flutter_svg: ^2.2.3         # Pour afficher tes logos vectoriels nets
-  google_fonts: ^6.1.0        # Pour la typo (probablement Poppins ou Montserrat ?)
-  gap: ^3.0.0                 # Pour gérer les espacements facilement
+  flutter_animate: ^4.5.0 # Pour séquencer ton Splash Screen complexe
+  flutter_svg: ^2.2.3 # Pour afficher tes logos vectoriels nets
+  google_fonts: ^6.1.0 # Pour la typo (probablement Poppins ou Montserrat ?)
+  gap: ^3.0.0 # Pour gérer les espacements facilement
 
   # --- Stockage Local (Pour le mode Hors Ligne) ---
-  hive: ^2.2.3                # Base de données ultra rapide
+  hive: ^2.2.3 # Base de données ultra rapide
   hive_flutter: ^1.1.0
 
   flutter_launcher_icons: ^0.13.1
 
-
-  provider: ^6.1.1          # Pour la gestion d'état globale
+  provider: ^6.1.1 # Pour la gestion d'état globale
   shared_preferences: ^2.5.4 # Pour sauvegarder les préférences
 
   # --- Utilitaires ---
-  intl: ^0.19.0               # Formatage dates et devises (FCFA)
-  equatable: ^2.0.5           # Comparaison d'objets (Clean Arch)
-  fpdart: ^1.1.0              # Programmation fonctionnelle (pour gérer les erreurs proprement)
+  intl: ^0.19.0 # Formatage dates et devises (FCFA)
+  equatable: ^2.0.5 # Comparaison d'objets (Clean Arch)
+  fpdart: ^1.1.0 # Programmation fonctionnelle (pour gérer les erreurs proprement)
+  dartz: ^0.10.1 # Alternative pour la programmation fonctionnelle (utilisé dans certains usecases)
 
   image_picker: ^1.0.7
-
 
   curved_navigation_bar: ^1.0.3 # Ajoute ceci
   firebase_core: ^4.4.0
   firebase_messaging: ^16.1.1
   device_info_plus: ^12.3.0
   io: ^1.0.5
+  mobile_scanner: ^7.1.4
+  qr_flutter: ^4.1.0
+  printing: ^5.13.4
+  pdf: ^3.11.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  build_runner: ^2.4.8        # Nécessaire pour générer le code Hive/Riverpod
+  build_runner: ^2.4.8 # Nécessaire pour générer le code Hive/Riverpod
   hive_generator: ^2.0.1
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -86,14 +89,11 @@ dev_dependencies:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
-
-
-
-
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/icons/icone.jpg" # Sert pour iOS (qui gère mal la transparence)
+  remove_alpha_ios: true # Ajoute cette sécurité pour iOS
   min_sdk_android: 21
   # Spécifique Android (Adaptive Icon)
   #adaptive_icon_background: "#FFFF4500" # Votre Orange Car225 en Hexa !
@@ -101,12 +101,10 @@ flutter_launcher_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
 
   # Ajoute cette partie :
   assets:

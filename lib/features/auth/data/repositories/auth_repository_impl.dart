@@ -41,7 +41,6 @@ class AuthRepositoryImpl implements AuthRepository {
         await prefs.setString('auth_token', responseData['token']);
         print("💾 Token sauvegardé localement");
       }
-
     } catch (e) {
       rethrow;
     }
@@ -82,7 +81,6 @@ class AuthRepositoryImpl implements AuthRepository {
         await prefs.setString('auth_token', responseData['token']);
         print("💾 Token inscription sauvegardé localement");
       }
-
     } catch (e) {
       rethrow;
     }
@@ -96,7 +94,9 @@ class AuthRepositoryImpl implements AuthRepository {
       try {
         await remoteDataSource.logout();
       } catch (e) {
-        print("Info: Le serveur n'a pas répondu (peut-être token expiré), suite logique...");
+        print(
+          "Info: Le serveur n'a pas répondu (peut-être token expiré), suite logique...",
+        );
       }
 
       // 2. NETTOYAGE OBLIGATOIRE DU TELEPHONE
@@ -106,14 +106,10 @@ class AuthRepositoryImpl implements AuthRepository {
       await prefs.clear();
 
       print("🗑️ Données locales supprimées (Déconnexion réussie)");
-
     } catch (e) {
       rethrow;
     }
   }
-
-
-
 
   @override
   Future<UserModel> getUserProfile() async {
@@ -141,7 +137,6 @@ class AuthRepositoryImpl implements AuthRepository {
     );
   }
 
-
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -154,8 +149,4 @@ class AuthRepositoryImpl implements AuthRepository {
       confirmPassword: confirmPassword,
     );
   }
-
-
-
-
 }

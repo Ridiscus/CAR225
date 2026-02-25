@@ -19,12 +19,21 @@ class _TopUpScreenState extends State<TopUpScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final cardColor = Theme.of(context).cardColor; // Blanc (Light) ou Gris Foncé (Dark)
+    final cardColor = Theme.of(
+      context,
+    ).cardColor; // Blanc (Light) ou Gris Foncé (Dark)
 
     return Scaffold(
       backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: Text("RECHARGER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor)),
+        title: Text(
+          "RECHARGER",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: textColor,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -39,7 +48,14 @@ class _TopUpScreenState extends State<TopUpScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // LABEL
-            Text("MONTANT A AJOUTER", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              "MONTANT A AJOUTER",
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.blueGrey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const Gap(10),
 
             // --- 1. ZONE ORANGE (Sélecteur Montant) ---
@@ -47,29 +63,47 @@ class _TopUpScreenState extends State<TopUpScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFFE64A19), // Reste orange même en dark mode
+                color: const Color(
+                  0xFFE64A19,
+                ), // Reste orange même en dark mode
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFFE64A19).withOpacity(0.4), blurRadius: 15, offset: const Offset(0, 5))
+                  BoxShadow(
+                    color: const Color(0xFFE64A19).withOpacity(0.4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
               child: Column(
                 children: [
                   // Compteur
-                  Row(
+                  const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         "5000",
-                        style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const Gap(15),
+                      Gap(15),
                       Column(
-                        children: const [
-                          Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 30),
-                          Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
+                        children: [
+                          Icon(
+                            Icons.keyboard_arrow_up,
+                            color: Colors.white,
+                            size: 30,
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                   const Gap(25),
@@ -84,14 +118,21 @@ class _TopUpScreenState extends State<TopUpScreen> {
                       const Gap(10),
                       _buildAmountChip(context, "+10000"),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
             const Gap(30),
 
             // --- 2. GRILLE OPERATEURS (SÉLECTIONNABLE) ---
-            Text("CHOISIR L'OPERATEUR", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              "CHOISIR L'OPERATEUR",
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.blueGrey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const Gap(15),
 
             GridView.count(
@@ -108,7 +149,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
                   color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(15.0),
-                    child: Image.asset("assets/images/om.png", fit: BoxFit.contain),
+                    child: Image.asset(
+                      "assets/images/om.png",
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
 
@@ -119,7 +163,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
                   isBrandColor: true,
                   child: Padding(
                     padding: const EdgeInsets.all(15.0),
-                    child: Image.asset("assets/images/MTNmoney.png", fit: BoxFit.contain),
+                    child: Image.asset(
+                      "assets/images/MTNmoney.png",
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
 
@@ -130,7 +177,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
                   isBrandColor: true,
                   child: Padding(
                     padding: const EdgeInsets.all(10.0),
-                    child: Image.asset("assets/images/wavee.png", fit: BoxFit.contain),
+                    child: Image.asset(
+                      "assets/images/wavee.png",
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
 
@@ -167,7 +217,11 @@ class _TopUpScreenState extends State<TopUpScreen> {
       ),
       child: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -193,7 +247,9 @@ class _TopUpScreenState extends State<TopUpScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         // Zoom léger si sélectionné
-        transform: isSelected ? Matrix4.identity().scaled(1.02) : Matrix4.identity(),
+        transform: isSelected
+            ? Matrix4.identity().scaled(1.02)
+            : Matrix4.identity(),
 
         child: ColorFiltered(
           // Si sélectionné : Pas de filtre (Couleurs réelles)
@@ -201,11 +257,27 @@ class _TopUpScreenState extends State<TopUpScreen> {
           colorFilter: isSelected
               ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
               : const ColorFilter.matrix(<double>[
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0,      0,      0,      1, 0,
-          ]),
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                ]),
           child: Container(
             decoration: BoxDecoration(
               color: color,
@@ -214,7 +286,11 @@ class _TopUpScreenState extends State<TopUpScreen> {
               border: Border.all(
                 color: isSelected
                     ? AppColors.primary
-                    : (isBrandColor ? Colors.transparent : (isDark ? Colors.grey[800]! : Colors.grey.shade200)),
+                    : (isBrandColor
+                          ? Colors.transparent
+                          : (isDark
+                                ? Colors.grey[800]!
+                                : Colors.grey.shade200)),
                 width: isSelected ? 2 : 1,
               ),
               boxShadow: [
@@ -224,7 +300,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
                       : Colors.black.withOpacity(isDark ? 0.2 : 0.05),
                   blurRadius: isSelected ? 12 : 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: Center(child: child),

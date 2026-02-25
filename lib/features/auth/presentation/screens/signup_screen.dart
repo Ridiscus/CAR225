@@ -132,8 +132,6 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 }*/
 
-
-
 /*import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
@@ -303,8 +301,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }*/
-
-
 
 /*import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -544,10 +540,6 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 }*/
 
-
-
-
-
 import 'dart:io'; // Pour File
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -585,13 +577,14 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureTextConfirm = true;
   bool _isLoading = false;
 
-
   // --- VARIABLE POUR GÉRER L'OVERLAY (Correction du bug "reste fixe") ---
   OverlayEntry? _currentOverlayEntry;
 
   // --- FONCTION CHOIX PHOTO ---
   Future<void> _pickImage() async {
-    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+    );
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -599,13 +592,13 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-
   // Fonction utilitaire pour nettoyer l'overlay proprement
   void _removeOverlay() {
     _currentOverlayEntry?.remove();
     _currentOverlayEntry = null;
   }
-// --- NOTIF TOP BAR ---
+
+  // --- NOTIF TOP BAR ---
   void _showTopNotification(String message, {bool isError = false}) {
     // 1. On nettoie l'ancienne s'il y en a une
     _removeOverlay();
@@ -624,29 +617,37 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
             decoration: BoxDecoration(
-              color: isError ? const Color(0xFFD32F2F).withOpacity(0.95) : const Color(0xFF222222).withOpacity(0.95),
+              color: isError
+                  ? const Color(0xFFD32F2F).withOpacity(0.95)
+                  : const Color(0xFF222222).withOpacity(0.95),
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                    isError ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20
+                  isError
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 20,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     message,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                     textAlign: TextAlign.center,
                     maxLines: 2,
                   ),
@@ -669,7 +670,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // --- LOGIQUE INSCRIPTION ---
   Future<void> _handleRegister() async {
-    if (_nomController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    if (_nomController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _passwordController.text.isEmpty) {
       _showTopNotification("Champs obligatoires manquants", isError: true);
       return;
     }
@@ -702,7 +705,6 @@ class _SignupScreenState extends State<SignupScreen> {
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
       Navigator.pop(context);
-
     } catch (e) {
       if (!mounted) return;
       String errorMsg = e.toString().replaceAll("Exception:", "").trim();
@@ -712,9 +714,6 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-
-
-
   @override
   void dispose() {
     // --- IMPORTANT : On nettoie la notification si on quitte l'écran ---
@@ -722,13 +721,12 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final secondaryTextColor = isDark ? Colors.grey[400] : AppColors.grey;
-    final primaryColor = AppColors.primary;
+    const primaryColor = AppColors.primary;
 
     return Scaffold(
       backgroundColor: scaffoldColor,
@@ -756,13 +754,25 @@ class _SignupScreenState extends State<SignupScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isDark ? Colors.grey[800] : Colors.grey[200],
-                        border: Border.all(color: primaryColor.withOpacity(0.5), width: 2),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.5),
+                          width: 2,
+                        ),
                         image: _selectedImage != null
-                            ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
+                            ? DecorationImage(
+                                image: FileImage(_selectedImage!),
+                                fit: BoxFit.cover,
+                              )
                             : null,
                       ),
                       child: _selectedImage == null
-                          ? Icon(Icons.person, size: 50, color: isDark ? Colors.grey[600] : Colors.grey[400])
+                          ? Icon(
+                              Icons.person,
+                              size: 50,
+                              color: isDark
+                                  ? Colors.grey[600]
+                                  : Colors.grey[400],
+                            )
                           : null,
                     ),
                     Positioned(
@@ -774,35 +784,85 @@ class _SignupScreenState extends State<SignupScreen> {
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               const Gap(10),
-              Text("Ajouter une photo", style: TextStyle(color: secondaryTextColor, fontSize: 12)),
+              Text(
+                "Ajouter une photo",
+                style: TextStyle(color: secondaryTextColor, fontSize: 12),
+              ),
               const Gap(20),
 
-              Text("Créez votre compte",
-                  style: TextStyle(color: isDark ? Colors.white : AppColors.primary, fontSize: 24, fontWeight: FontWeight.bold)
+              Text(
+                "Créez votre compte",
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.primary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Gap(30),
 
               // --- FORMULAIRE ---
-              _buildAuthInput("Nom", Icons.person_outline, controller: _nomController),
+              _buildAuthInput(
+                "Nom",
+                Icons.person_outline,
+                controller: _nomController,
+              ),
               const Gap(15),
-              _buildAuthInput("Prénom", Icons.person, controller: _prenomController),
+              _buildAuthInput(
+                "Prénom",
+                Icons.person,
+                controller: _prenomController,
+              ),
               const Gap(15),
-              _buildAuthInput("Contact", Icons.phone_android, controller: _contactController, inputType: TextInputType.phone),
+              _buildAuthInput(
+                "Contact",
+                Icons.phone_android,
+                controller: _contactController,
+                inputType: TextInputType.phone,
+              ),
               const Gap(15),
-              _buildAuthInput("Adresse", Icons.location_on_outlined, controller: _adresseController),
+              _buildAuthInput(
+                "Adresse",
+                Icons.location_on_outlined,
+                controller: _adresseController,
+              ),
               const Gap(15),
-              _buildAuthInput("Email", Icons.email_outlined, controller: _emailController, inputType: TextInputType.emailAddress),
+              _buildAuthInput(
+                "Email",
+                Icons.email_outlined,
+                controller: _emailController,
+                inputType: TextInputType.emailAddress,
+              ),
               const Gap(15),
-              _buildAuthInput("Mot de passe", Icons.lock_outline, controller: _passwordController, isPassword: true, obscureText: _obscureText, onToggleVisibility: () => setState(() => _obscureText = !_obscureText)),
+              _buildAuthInput(
+                "Mot de passe",
+                Icons.lock_outline,
+                controller: _passwordController,
+                isPassword: true,
+                obscureText: _obscureText,
+                onToggleVisibility: () =>
+                    setState(() => _obscureText = !_obscureText),
+              ),
               const Gap(15),
-              _buildAuthInput("Confirmer mot de passe", Icons.lock_outline, controller: _confirmPassController, isPassword: true, obscureText: _obscureTextConfirm, onToggleVisibility: () => setState(() => _obscureTextConfirm = !_obscureTextConfirm)),
+              _buildAuthInput(
+                "Confirmer mot de passe",
+                Icons.lock_outline,
+                controller: _confirmPassController,
+                isPassword: true,
+                obscureText: _obscureTextConfirm,
+                onToggleVisibility: () =>
+                    setState(() => _obscureTextConfirm = !_obscureTextConfirm),
+              ),
 
               const Gap(40),
 
@@ -812,10 +872,29 @@ class _SignupScreenState extends State<SignupScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleRegister,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
                   child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("S'inscrire", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "S'inscrire",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const Gap(30),
@@ -830,7 +909,15 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // Helper _buildAuthInput identique à avant
-  Widget _buildAuthInput(String hint, IconData icon, {bool isPassword = false, bool obscureText = false, VoidCallback? onToggleVisibility, TextEditingController? controller, TextInputType inputType = TextInputType.text}) {
+  Widget _buildAuthInput(
+    String hint,
+    IconData icon, {
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleVisibility,
+    TextEditingController? controller,
+    TextInputType inputType = TextInputType.text,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -838,13 +925,33 @@ class _SignupScreenState extends State<SignupScreen> {
     final iconColor = isDark ? Colors.grey[400] : AppColors.grey;
 
     return Container(
-      decoration: BoxDecoration(color: isDark ? cardColor : AppColors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey.shade300)),
+      decoration: BoxDecoration(
+        color: isDark ? cardColor : AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey.shade300,
+        ),
+      ),
       child: TextField(
-        controller: controller, keyboardType: inputType, obscureText: obscureText, style: TextStyle(color: textColor),
+        controller: controller,
+        keyboardType: inputType,
+        obscureText: obscureText,
+        style: TextStyle(color: textColor),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: iconColor),
-          suffixIcon: isPassword ? IconButton(icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility, color: iconColor), onPressed: onToggleVisibility) : null,
-          hintText: hint, hintStyle: TextStyle(color: hintColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: iconColor,
+                  ),
+                  onPressed: onToggleVisibility,
+                )
+              : null,
+          hintText: hint,
+          hintStyle: TextStyle(color: hintColor),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),
       ),
     );

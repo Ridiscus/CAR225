@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/login_request_model.dart';
@@ -9,7 +7,6 @@ import '../models/user_model.dart';
 abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> login(LoginRequestModel params);
   Future<Map<String, dynamic>> register(RegisterRequestModel params); // Ajout
-
 
   Future<UserModel> getUserProfile();
   Future<UserModel> updateUserProfile({
@@ -21,8 +18,7 @@ abstract class AuthRemoteDataSource {
     String? photoPath, // Optionnel (fichier local)
   });
 
-
-// 👇 AJOUTE CETTE LIGNE OBLIGATOIREMENT ICI 👇
+  // 👇 AJOUTE CETTE LIGNE OBLIGATOIREMENT ICI 👇
   Future<void> logout();
 
   // ✅ AJOUTE CECI :
@@ -31,26 +27,25 @@ abstract class AuthRemoteDataSource {
     required String newPassword,
     required String confirmPassword,
   });
-
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  final Dio dio = Dio(BaseOptions(
-    // ⚠️ L'URL fournie par ton dev
-    //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev',
-
-    baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-  ));
+  final Dio dio = Dio(
+    BaseOptions(
+      // ⚠️ L'URL fournie par ton dev
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev',
+      baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
 
   // ✅ Constructeur vide (plus besoin de passer dio)
   AuthRemoteDataSourceImpl();
-
 
   @override
   Future<Map<String, dynamic>> login(LoginRequestModel params) async {
@@ -60,10 +55,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // On suppose que l'endpoint est /api/login ou /api/v1/auth/login
       // Demande à ton dev le chemin EXACT après l'URL de base.
       // Ici je mets '/api/login' par défaut standard Laravel/Node.
-      final response = await dio.post(
-        '/user/login',
-        data: params.toJson(),
-      );
+      final response = await dio.post('/user/login', data: params.toJson());
 
       print("✅ REPONSE API: ${response.statusCode} - ${response.data}");
 
@@ -79,9 +71,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception(e.response?.data['message'] ?? "Erreur de connexion");
     }
   }
-
-
-
 
   @override
   Future<Map<String, dynamic>> register(RegisterRequestModel params) async {
@@ -106,10 +95,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // ATTENTION : Demande au dev si le champ s'appelle "photo", "image" ou "avatar"
       // Je mets "photo" par défaut (standard Laravel)
       if (params.photoPath != null) {
-        formData.files.add(MapEntry(
-          "photo_profile", // <--- NOM DU CHAMP CÔTÉ LARAVEL
-          await MultipartFile.fromFile(params.photoPath!),
-        ));
+        formData.files.add(
+          MapEntry(
+            "photo_profile", // <--- NOM DU CHAMP CÔTÉ LARAVEL
+            await MultipartFile.fromFile(params.photoPath!),
+          ),
+        );
       }
 
       print("📡 INSCRIPTION (MULTIPART) ENVOI...");
@@ -121,15 +112,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       print("✅ INSCRIPTION SUCCÈS: ${response.statusCode}");
       return response.data;
-
     } on DioException catch (e) {
       print("❌ ERREUR INSCRIPTION: ${e.response?.data}");
-      throw Exception(e.response?.data['message'] ?? "Erreur lors de l'inscription");
+      throw Exception(
+        e.response?.data['message'] ?? "Erreur lors de l'inscription",
+      );
     }
   }
-
-
-
 
   // 👇 C'EST ICI LA CORRECTION 👇
   @override
@@ -144,13 +133,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         dio.options.headers["Authorization"] = "Bearer $token";
       }
 
-      print("📡 DECONNEXION SERVER (Token: ${token != null ? 'OK' : 'MANQUANT'})...");
+      print(
+        "📡 DECONNEXION SERVER (Token: ${token != null ? 'OK' : 'MANQUANT'})...",
+      );
 
       // 3. Appel API
       await dio.post('/user/logout');
 
       print("✅ LOGOUT SERVER SUCCÈS");
-
     } catch (e) {
       // Si le serveur refuse (ex: token expiré), ce n'est pas grave
       // on veut quand même que l'app se déconnecte localement.
@@ -158,7 +148,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception("Erreur serveur logout");
     }
   }
-
 
   @override
   Future<UserModel> getUserProfile() async {
@@ -168,7 +157,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // On parse la partie "user" de la réponse JSON
       return UserModel.fromJson(response.data['user']);
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? "Erreur chargement profil");
+      throw Exception(
+        e.response?.data['message'] ?? "Erreur chargement profil",
+      );
     }
   }
 
@@ -199,10 +190,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       FormData formData = FormData.fromMap(mapData);
 
       if (photoPath != null) {
-        formData.files.add(MapEntry(
-          "photo_profile", // Vérifie ce nom avec ton backend (parfois "photo", "avatar")
-          await MultipartFile.fromFile(photoPath),
-        ));
+        formData.files.add(
+          MapEntry(
+            "photo_profile", // Vérifie ce nom avec ton backend (parfois "photo", "avatar")
+            await MultipartFile.fromFile(photoPath),
+          ),
+        );
       }
 
       // On utilise POST à cause du FormData (avec _method: PUT dedans)
@@ -216,7 +209,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   // Méthode utilitaire pour ajouter le token (comme vu précédemment)
- /* Future<void> _addTokenHeader() async {
+  /* Future<void> _addTokenHeader() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     if (token != null) {
@@ -236,7 +229,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }*/
 
-
   // Ta méthode utilitaire pour le token
   Future<void> _addTokenHeader() async {
     final prefs = await SharedPreferences.getInstance();
@@ -245,9 +237,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       dio.options.headers["Authorization"] = "Bearer $token";
     }
   }
-
-
-
 
   // ✅ NOUVELLE MÉTHODE : CHANGE PASSWORD
   @override
@@ -272,16 +261,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // Succès (pas d'exception levée)
     } on DioException catch (e) {
       // Gestion erreur API
-      throw Exception(e.response?.data['message'] ?? "Erreur changement mot de passe");
+      throw Exception(
+        e.response?.data['message'] ?? "Erreur changement mot de passe",
+      );
     }
   }
-
-
 }
-
-
-
-
-
-
-

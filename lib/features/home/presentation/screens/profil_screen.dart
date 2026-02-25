@@ -364,7 +364,6 @@ import 'account_setting_screen.dart';
 // ⚠️ TRANSFORMATION EN STATEFUL WIDGET POUR GERER LE CHARGEMENT
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -423,6 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final cardColor = Theme.of(context).cardColor;

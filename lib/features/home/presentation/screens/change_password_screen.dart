@@ -279,14 +279,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 }*/
 
-
-
-
-
-
-
-
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import '../../../../core/services/device/device_service.dart';
@@ -322,8 +314,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   // (Dans une vraie clean arch avec GetIt/Provider, on l'injecterait, mais ici on l'instancie direct)
   late AuthRepositoryImpl _authRepository;
 
-
-
   @override
   void initState() {
     super.initState();
@@ -341,8 +331,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       fcmService: fcmService,
     );
   }
-
-
 
   @override
   void dispose() {
@@ -367,17 +355,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
 
     if (newPass.length < 8) {
-      _showTopNotification("Le nouveau mot de passe doit faire 8 caractères min.", isError: true);
+      _showTopNotification(
+        "Le nouveau mot de passe doit faire 8 caractères min.",
+        isError: true,
+      );
       return;
     }
 
     if (newPass != confirmPass) {
-      _showTopNotification("Les nouveaux mots de passe ne correspondent pas", isError: true);
+      _showTopNotification(
+        "Les nouveaux mots de passe ne correspondent pas",
+        isError: true,
+      );
       return;
     }
 
     if (oldPass == newPass) {
-      _showTopNotification("Le nouveau mot de passe doit être différent de l'actuel", isError: true);
+      _showTopNotification(
+        "Le nouveau mot de passe doit être différent de l'actuel",
+        isError: true,
+      );
       return;
     }
 
@@ -394,7 +391,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       // SUCCÈS
       if (mounted) {
         setState(() => _isLoading = false);
-        _showTopNotification("Mot de passe mis à jour avec succès !", isError: false);
+        _showTopNotification(
+          "Mot de passe mis à jour avec succès !",
+          isError: false,
+        );
 
         // On vide les champs
         _oldPassController.clear();
@@ -406,7 +406,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           if (mounted) Navigator.pop(context);
         });
       }
-
     } catch (e) {
       // ERREUR
       if (mounted) {
@@ -443,7 +442,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Opacity(
                   opacity: value,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 15,
+                    ),
                     decoration: BoxDecoration(
                       color: isError
                           ? Colors.redAccent.withOpacity(0.95)
@@ -454,7 +456,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           color: Colors.black.withOpacity(0.2),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
-                        )
+                        ),
                       ],
                     ),
                     child: Row(
@@ -462,7 +464,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          isError ? Icons.error_outline : Icons.check_circle_outline,
+                          isError
+                              ? Icons.error_outline
+                              : Icons.check_circle_outline,
                           color: Colors.white,
                           size: 22,
                         ),
@@ -471,9 +475,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           child: Text(
                             message,
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 2,
@@ -508,8 +512,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       backgroundColor: scaffoldColor, // <--- DYNAMIQUE
       appBar: AppBar(
         title: Text(
-            "Changer mot de passe",
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)
+          "Changer mot de passe",
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
@@ -522,18 +530,38 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             Text(
               "Pour votre sécurité, votre mot de passe doit contenir au moins 8 caractères, un chiffre et un caractère spécial.",
               style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey, // Gris plus clair en mode sombre
-                  fontSize: 13,
-                  height: 1.5
+                color: isDark
+                    ? Colors.grey[400]
+                    : Colors.grey, // Gris plus clair en mode sombre
+                fontSize: 13,
+                height: 1.5,
               ),
             ),
             const Gap(30),
 
-            _buildPasswordField(context, "Mot de passe actuel", _oldPassController, _obscureOld, () => setState(() => _obscureOld = !_obscureOld)),
+            _buildPasswordField(
+              context,
+              "Mot de passe actuel",
+              _oldPassController,
+              _obscureOld,
+              () => setState(() => _obscureOld = !_obscureOld),
+            ),
             const Gap(20),
-            _buildPasswordField(context, "Nouveau mot de passe", _newPassController, _obscureNew, () => setState(() => _obscureNew = !_obscureNew)),
+            _buildPasswordField(
+              context,
+              "Nouveau mot de passe",
+              _newPassController,
+              _obscureNew,
+              () => setState(() => _obscureNew = !_obscureNew),
+            ),
             const Gap(20),
-            _buildPasswordField(context, "Confirmer le nouveau", _confirmPassController, _obscureConfirm, () => setState(() => _obscureConfirm = !_obscureConfirm)),
+            _buildPasswordField(
+              context,
+              "Confirmer le nouveau",
+              _confirmPassController,
+              _obscureConfirm,
+              () => setState(() => _obscureConfirm = !_obscureConfirm),
+            ),
 
             const Gap(40),
 
@@ -545,13 +573,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 onPressed: _isLoading ? null : _updatePassword,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
-                  disabledBackgroundColor: Colors.green.withOpacity(0.5), // Style quand désactivé
+                  disabledBackgroundColor: Colors.green.withOpacity(
+                    0.5,
+                  ), // Style quand désactivé
                 ),
                 child: _isLoading
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text("Mettre à jour le mot de passe", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        "Mettre à jour le mot de passe",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
 
@@ -561,22 +606,32 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             TextButton(
               onPressed: () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ForgotPasswordEmailScreen())
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ForgotPasswordEmailScreen(),
+                  ),
                 );
               },
               child: Text(
-                  "J'ai oublié mon mot de passe actuel",
-                  style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey)
+                "J'ai oublié mon mot de passe actuel",
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey,
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPasswordField(BuildContext context, String label, TextEditingController controller, bool obscure, VoidCallback onToggle) {
+  Widget _buildPasswordField(
+    BuildContext context,
+    String label,
+    TextEditingController controller,
+    bool obscure,
+    VoidCallback onToggle,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -585,8 +640,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: textColor,
+          ),
         ),
         const Gap(8),
         Container(
@@ -604,11 +663,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               hintText: "••••••••",
               hintStyle: TextStyle(color: Colors.grey.shade400),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
-                    obscure ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
                 ),
                 onPressed: onToggle,
               ),

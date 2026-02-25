@@ -34,7 +34,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
   final List<NotificationModel> notifications = [
     NotificationModel(
       title: "Voyage confirmé",
-      description: "Votre billet pour Yamoussoukro est prêt. Bon voyage avec UTB.",
+      description:
+          "Votre billet pour Yamoussoukro est prêt. Bon voyage avec UTB.",
       date: "Mardi 20 janv. • 14:52",
       icon: Icons.confirmation_number_outlined,
       color: const Color(0xFF2E7D32), // Vert
@@ -43,7 +44,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     ),
     NotificationModel(
       title: "Offre Spéciale Assinie",
-      description: "Profitez de -20% sur tous les trajets vers Assinie ce weekend.",
+      description:
+          "Profitez de -20% sur tous les trajets vers Assinie ce weekend.",
       date: "Lundi 19 janv. • 09:30",
       icon: Icons.flash_on,
       color: const Color(0xFFE65100), // Orange
@@ -104,14 +106,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 tag: "profile_pic",
                 child: CircleAvatar(
                   radius: 18,
-                  backgroundImage: AssetImage("assets/images/user_avatar.png"), // Remplace par ton image
+                  backgroundImage: AssetImage(
+                    "assets/images/user_avatar.png",
+                  ), // Remplace par ton image
                   // Si pas d'image, mettre un backgroundColor et une lettre
                   backgroundColor: Colors.orange,
                   child: Text("K", style: TextStyle(color: Colors.white)),
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
       body: ListView.separated(
@@ -135,7 +139,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         // Navigation vers le détail style "SMS"
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => NotificationDetailScreen(notif: notif)),
+          MaterialPageRoute(
+            builder: (_) => NotificationDetailScreen(notif: notif),
+          ),
         );
       },
       child: Container(
@@ -148,7 +154,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
           // Bordure fine à gauche comme sur notif1 (optionnel)
           border: Border.all(color: Colors.grey.withOpacity(0.1)),
@@ -177,7 +183,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     children: [
                       Text(
                         notif.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Text(
                         notif.timeAgo,
@@ -198,7 +207,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -224,7 +233,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   height: 250,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
-                      image: AssetImage("assets/images/user_avatar.png"), // Ton image
+                      image: AssetImage(
+                        "assets/images/user_avatar.png",
+                      ), // Ton image
                       fit: BoxFit.cover,
                     ),
                     color: Colors.orange, // Fallback color
@@ -236,14 +247,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 color: Colors.white,
                 width: 250,
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: const [
+                  children: [
                     Icon(Icons.message, color: Colors.green),
                     Icon(Icons.info_outline, color: Colors.green),
                   ],
                 ),
-              )
+              ),
             ],
           ),
         );
@@ -263,24 +274,29 @@ class NotificationDetailScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F5), // Fond gris clair comme SMS
+      backgroundColor: isDark
+          ? Colors.black
+          : const Color(0xFFF5F5F5), // Fond gris clair comme SMS
       appBar: AppBar(
         title: Text(notif.title), // Nom de l'expéditeur
         elevation: 0.5,
         backgroundColor: Theme.of(context).cardColor,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : Colors.black,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          const Padding(
+        actions: const [
+          Padding(
             padding: EdgeInsets.only(right: 15),
             child: CircleAvatar(
               radius: 16,
               backgroundColor: Colors.orange, // Couleur Avatar
               child: Icon(Icons.person, color: Colors.white, size: 20),
             ),
-          )
+          ),
         ],
       ),
       body: Column(
@@ -314,12 +330,18 @@ class NotificationDetailScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE3F2FD), // Bleu très clair ou Gris sombre
+                      color: isDark
+                          ? const Color(0xFF2C2C2C)
+                          : const Color(
+                              0xFFE3F2FD,
+                            ), // Bleu très clair ou Gris sombre
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(15),
                         topRight: Radius.circular(15),
                         bottomRight: Radius.circular(15),
-                        bottomLeft: Radius.circular(0), // Coin carré en bas à gauche
+                        bottomLeft: Radius.circular(
+                          0,
+                        ), // Coin carré en bas à gauche
                       ),
                     ),
                     child: Column(
@@ -336,8 +358,12 @@ class NotificationDetailScreen extends StatelessWidget {
                         // Petit label de sécurité ou signature
                         Text(
                           "Envoyé automatiquement par le système",
-                          style: TextStyle(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic),
-                        )
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -357,19 +383,25 @@ class NotificationDetailScreen extends StatelessWidget {
                 const Gap(10),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark ? Colors.grey[800] : Colors.grey[100],
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text("Ne pas répondre à ce message", style: TextStyle(color: Colors.grey[500])),
+                    child: Text(
+                      "Ne pas répondre à ce message",
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
                   ),
                 ),
                 const Gap(10),
                 Icon(Icons.send, color: Colors.grey[400]),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

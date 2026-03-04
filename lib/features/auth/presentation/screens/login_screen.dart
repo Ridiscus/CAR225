@@ -8,7 +8,9 @@ import '../../../../core/providers/user_provider.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/device/device_service.dart';
+import '../../../home/presentation/screens/VerifOtpScreen.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
+import '../../data/models/login_request_model.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 
 import '../../../../features/home/presentation/screens/main_wrapper_screen.dart';
@@ -102,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
   // --- 3. FONCTION DE CONNEXION (AVEC DÉBOGAGE) ---
-  Future<void> _handleLogin() async {
+  /*Future<void> _handleLogin() async {
     // 0. Nettoyage des entrées
     final emailClean = _emailController.text.trim();
     final passwordClean = _passwordController.text; // Pas de trim sur le mdp, certains en ont besoin
@@ -186,6 +188,91 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       _showTopNotification(errorMsg, isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }*/
+
+
+  Future<void> _handleLogin() async {
+    final emailClean = _emailController.text.trim();
+    final passwordClean = _passwordController.text;
+
+    if (emailClean.isEmpty || passwordClean.isEmpty) {
+      _showTopNotification("Veuillez remplir tous les champs", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final fcmService = FcmService();
+      final deviceService = DeviceService();
+
+      final authRepository = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: fcmService,
+        deviceService: deviceService,
+      );
+
+      // 1. Préparation des données techniques
+      String fcmToken = await fcmService.getToken() ?? "no_token";
+      String deviceName = await deviceService.getDeviceName();
+
+      // 📦 CRÉATION DU MODÈLE (C'est ici que l'erreur se règle)
+      final loginParams = LoginRequestModel(
+        email: emailClean,
+        password: passwordClean,
+        fcmToken: fcmToken,
+        deviceName: deviceName,
+      );
+
+      print("⏳ [STEP 1] Appel API login()...");
+
+      // 2. Appel API (On récupère maintenant AuthResponseModel)
+      final response = await authRepository.login(loginParams);
+
+      if (!mounted) return;
+
+      // 3. GESTION DU FLUX (Succès vs OTP)
+      if (response.success) {
+        if (response.requiresOtp) {
+          // 🚨 CAS OTP : On redirige vers l'écran de vérification
+          print("📲 [OTP] Redirection vers l'écran de vérification...");
+          _showTopNotification(response.message); // Affiche "Code envoyé au..."
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VerifOtpScreen(
+                email: emailClean,
+                contact: response.contact ?? "",
+              ),
+            ),
+          );
+        } else {
+          // ✅ CAS CONNEXION DIRECTE
+          print("✅ [STEP 1] Connexion réussie, chargement du profil...");
+
+          await context.read<UserProvider>().loadUser();
+
+          _showTopNotification("Connexion réussie !");
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          if (!mounted) return;
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+                (route) => false,
+          );
+        }
+      }
+
+    } catch (e, stackTrace) {
+      print("🔴 [ERREUR] $e");
+      // ... ton code de gestion d'erreur reste identique
+      _showTopNotification(e.toString(), isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -350,29 +437,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const Gap(20),
-
-              // --- BOUTON ---
-
-
-
-
-
-
-              /*SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("Connexion", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),*/
-
 
               // --- BOUTON CONNEXION ---
               Container(

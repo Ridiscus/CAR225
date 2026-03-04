@@ -4,6 +4,7 @@ import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
+import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 import '../models/user_model.dart';
@@ -19,16 +20,134 @@ class AuthRepositoryImpl implements AuthRepository {
     required this.deviceService,
   });
 
+  // ===========================================================================
+  // 🔐 LOGIN (CONNEXION) - CORRIGÉ SELON LE CONTRAT
+  // ===========================================================================
   @override
-  Future<void> sendOtp(String email) async {
-    await remoteDataSource.sendOtp(email);
+  Future<AuthResponseModel> login(LoginRequestModel params) async {
+    try {
+      // 1. Appel API via la Data Source (qui renvoie un AuthResponseModel)
+      final AuthResponseModel response = await remoteDataSource.login(params);
+
+      // 2. 💾 SAUVEGARDE DU TOKEN (Seulement si pas d'OTP requis)
+      if (response.success && !response.requiresOtp && response.token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', response.token!);
+        print("✅ REPOSITORY: Token sauvegardé avec succès");
+      } else if (response.requiresOtp) {
+        print("🚨 REPOSITORY: OTP Requis pour ce compte");
+      }
+
+      return response;
+    } catch (e) {
+      print("❌ REPOSITORY ERROR LOGIN: $e");
+      rethrow;
+    }
   }
+
+  // ===========================================================================
+  // 📝 REGISTER (INSCRIPTION) - CORRIGÉ SELON LE CONTRAT
+  // ===========================================================================
+  @override
+  Future<AuthResponseModel> register(RegisterRequestModel params) async {
+    try {
+      // 1. Appel API
+      final AuthResponseModel response = await remoteDataSource.register(params);
+
+      // 2. 💾 SAUVEGARDE TOKEN (Seulement si pas d'OTP requis)
+      if (response.success && !response.requiresOtp && response.token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', response.token!);
+        print("✅ REPOSITORY: Token Inscription sauvegardé");
+      }
+
+      return response;
+    } catch (e) {
+      print("❌ REPOSITORY ERROR REGISTER: $e");
+      rethrow;
+    }
+  }
+
+  // ===========================================================================
+  // 🔵 LOGIN GOOGLE
+  // ===========================================================================
+  @override
+  Future<void> loginWithGoogle({
+    required String googleId,
+    required String idToken,
+    required String fcmToken,
+    String? email,
+    String? fullName,
+    String? photoUrl,
+    String? accessToken,
+  }) async {
+    try {
+      String deviceName = await deviceService.getDeviceName();
+      String prenom = "";
+      String nomFamille = "";
+
+      if (fullName != null && fullName.isNotEmpty) {
+        List<String> parts = fullName.split(' ');
+        prenom = parts.first;
+        if (parts.length > 1) nomFamille = parts.sublist(1).join(' ');
+      }
+
+      final Map<String, dynamic> body = {
+        "email": email ?? "",
+        "google_id": googleId,
+        "name": nomFamille,
+        "prenom": prenom,
+        "contact": "",
+        "avatar_url": photoUrl ?? "",
+        "google_token": idToken,
+        "fcm_token": fcmToken,
+        "nom_device": deviceName
+      };
+
+      final responseData = await remoteDataSource.loginSocial(body);
+      final String? token = responseData['token'] ?? responseData['access_token'];
+
+      if (token != null && token.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ===========================================================================
+  // 🔑 OTP & AUTRES MÉTHODES
+  // ===========================================================================
+
+  @override
+  Future<void> sendOtp(String email) async => await remoteDataSource.sendOtp(email);
+
+  /*@override
+  Future<void> verifyOtp(String email, String otpCode) async => await remoteDataSource.verifyOtp(email, otpCode);*/
 
   @override
   Future<void> verifyOtp(String email, String otpCode) async {
-    await remoteDataSource.verifyOtp(email, otpCode);
-  }
+    try {
+      // 1. On récupère la réponse (qui contient {success: true, message: ..., token: ...})
+      final responseData = await remoteDataSource.verifyOtp(email, otpCode);
 
+      // 2. On extrait le token
+      final String? token = responseData['token'];
+
+      // 3. On sauvegarde le token dans les SharedPreferences
+      if (token != null && token.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+        print("✅ REPOSITORY [OTP] : Token sauvegardé avec succès dans le téléphone !");
+      } else {
+        print("❌ REPOSITORY [OTP] : Attention, aucun token trouvé dans la réponse !");
+      }
+    } catch (e) {
+      print("❌ REPOSITORY ERROR OTP: $e");
+      rethrow;
+    }
+  }
 
   @override
   Future<void> resetPassword({
@@ -40,194 +159,14 @@ class AuthRepositoryImpl implements AuthRepository {
     await remoteDataSource.resetPassword(email, otpCode, password, passwordConfirmation);
   }
 
-  // ===========================================================================
-  // 🔐 LOGIN (CONNEXION) - CORRIGÉ
-  // ===========================================================================
   @override
-  Future<void> login(String email, String password) async {
-    try {
-      // 1. Récupération des infos techniques
-      String fcmToken = await fcmService.getToken() ?? "";
-      String deviceName = await deviceService.getDeviceName();
-
-      // 2. Création de la requête
-      final requestBody = LoginRequestModel(
-        email: email,
-        password: password,
-        fcmToken: fcmToken,
-        deviceName: deviceName,
-      );
-
-      // 3. Appel API
-      final responseData = await remoteDataSource.login(requestBody);
-
-      // 4. 💾 SAUVEGARDE DU TOKEN
-      // On vérifie les clés possibles renvoyées par Laravel (token ou access_token)
-      final String? token = responseData['token'] ?? responseData['access_token'];
-
-      if (token != null && token.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
-        print("✅ REPOSITORY: Token sauvegardé avec succès ($token)");
-      } else {
-        print("⚠️ REPOSITORY: Connexion OK mais aucun token trouvé dans la réponse : $responseData");
-      }
-
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // 🟢 AJOUTE LE @override POUR ÊTRE PROPRE
-  @override
-  Future<UserStatsModel> getUserStats() async {
-    return await remoteDataSource.getUserStats();
-  }
+  Future<UserModel> getUserProfile() async => await remoteDataSource.getUserProfile();
 
   @override
-  Future<TripDetailsModel> getTripDetails() async {
-    return await remoteDataSource.getTripDetails();
-  }
+  Future<UserStatsModel> getUserStats() async => await remoteDataSource.getUserStats();
 
-
-
-
-  // ===========================================================================
-  // 🔵 LOGIN GOOGLE (IMPLEMENTATION MANQUANTE)
-  // ===========================================================================
-  // ===========================================================================
-  // 🔵 LOGIN GOOGLE (ADAPTÉ AU JSON BACKEND)
-  // ===========================================================================
   @override
-  Future<void> loginWithGoogle({
-    required String googleId,    // <--- AJOUTÉ
-    required String idToken,
-    required String fcmToken,
-    String? email,
-    String? fullName,            // Renommé pour clarté
-    String? photoUrl,
-    String? accessToken,         // Gardé si besoin, mais le backend demande 'google_token' (idToken)
-  }) async {
-    try {
-      // 1. Récupération infos appareil
-      String deviceName = await deviceService.getDeviceName();
-
-      // 2. DÉCOUPAGE DU NOM (Le backend veut 'prenom' et 'name' séparés)
-      String prenom = "";
-      String nomFamille = "";
-
-      if (fullName != null && fullName.isNotEmpty) {
-        List<String> parts = fullName.split(' ');
-        if (parts.isNotEmpty) {
-          prenom = parts.first; // Premier mot = Prénom
-          if (parts.length > 1) {
-            // Le reste = Nom de famille
-            nomFamille = parts.sublist(1).join(' ');
-          }
-        }
-      }
-
-      // 3. CONSTRUCTION EXACTE DU JSON BACKEND
-      final Map<String, dynamic> body = {
-        "email": email ?? "",
-        "google_id": googleId,           // Backend: 'google_id'
-        "name": nomFamille,              // Backend: 'name' = Nom de famille
-        "prenom": prenom,                // Backend: 'prenom' = Prénom
-        "contact": "",                   // Google ne donne pas le téléphone
-        "avatar_url": photoUrl ?? "",    // Backend: 'avatar_url'
-        "google_token": idToken,         // Backend: 'google_token' (C'est souvent l'ID Token qu'on envoie ici)
-        "fcm_token": fcmToken,
-        "nom_device": deviceName
-      };
-
-      print("🚀 [REPO] ENVOI JSON AU BACKEND : $body");
-
-      // 4. Appel API
-      final responseData = await remoteDataSource.loginSocial(body);
-
-      // 5. Sauvegarde du Token
-      final String? token = responseData['token'] ?? responseData['access_token'];
-
-      if (token != null && token.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
-        print("✅ REPOSITORY: Token Google sauvegardé ($token)");
-      } else {
-        print("⚠️ REPOSITORY: Login Google OK mais pas de token reçu.");
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-
-
-  // ===========================================================================
-  // 📝 REGISTER (INSCRIPTION)
-  // ===========================================================================
-  @override
-  Future<void> register({
-    required String nom,
-    required String prenom,
-    required String email,
-    required String password,
-    required String contact,
-    String? photoPath,
-  }) async {
-    try {
-      String fcmToken = await fcmService.getToken() ?? "";
-      String deviceName = await deviceService.getDeviceName();
-
-      final requestBody = RegisterRequestModel(
-        nom: nom,
-        prenom: prenom,
-        email: email,
-        password: password,
-        passwordConfirmation: password,
-        contact: contact,
-        fcmToken: fcmToken,
-        deviceName: deviceName,
-        photoPath: photoPath,
-      );
-
-      final responseData = await remoteDataSource.register(requestBody);
-
-      // 💾 SAUVEGARDE TOKEN INSCRIPTION
-      final String? token = responseData['token'] ?? responseData['access_token'];
-      if (token != null && token.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
-        print("✅ REPOSITORY: Token Inscription sauvegardé");
-      }
-
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // ===========================================================================
-  // 🚪 LOGOUT
-  // ===========================================================================
-  @override
-  Future<void> logout() async {
-    try {
-      await remoteDataSource.logout();
-    } catch (e) {
-      print("Info: Le serveur n'a pas répondu au logout, force cleaning local.");
-    } finally {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      print("🗑️ REPOSITORY: Token supprimé (Déconnexion)");
-    }
-  }
-
-  // ===========================================================================
-  // 👤 AUTRES MÉTHODES
-  // ===========================================================================
-  @override
-  Future<UserModel> getUserProfile() async {
-    return await remoteDataSource.getUserProfile();
-  }
+  Future<TripDetailsModel> getTripDetails() async => await remoteDataSource.getTripDetails();
 
   @override
   Future<UserModel> updateUserProfile({
@@ -236,7 +175,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String contact,
     required String nomUrgence,
-    required String lienParenteUrgence, // <-- Remplacé
+    required String lienParenteUrgence,
     required String contactUrgence,
     String? photoPath,
   }) async {
@@ -270,5 +209,15 @@ class AuthRepositoryImpl implements AuthRepository {
     await remoteDataSource.deactivateAccount(password);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+  }
+
+  @override
+  Future<void> logout() async {
+    try {
+      await remoteDataSource.logout();
+    } finally {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+    }
   }
 }

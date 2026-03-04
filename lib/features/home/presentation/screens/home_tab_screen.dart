@@ -592,7 +592,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   }
 
 
-
   Widget _buildPromoBanner(bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -625,7 +624,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                   onPressed: _onSearchPressed,
                   style: ElevatedButton.styleFrom(
                     // ✅ 3. On rend le fond du bouton TRANSPARENT pour voir l'image derrière
-                      backgroundColor: Colors.transparent,
+                      backgroundColor: const Color(0xFF07AC4C),
                       shadowColor: Colors.transparent,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
@@ -743,7 +742,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
               // 🟢 CORRECTION 1 : J'ai réduit le padding à droite (right: 10 au lieu de 20)
               // Ça rapproche naturellement tout le bloc de droite vers le bord
               child: Padding(
-                padding: const EdgeInsets.only(left: 20.0, right: 2, top: 15.0, bottom: 15.0),
+                padding: const EdgeInsets.only(left: 20.0, right: 20, top: 15.0, bottom: 15.0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -1192,7 +1191,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                         : Row(
                         children: [
                           // VILLE DÉPART
-                          Expanded(
+                          /*Expanded(
                               child: _buildRealDropdown(
                                   context,
                                   "Départ",
@@ -1217,7 +1216,33 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                                   isRouteLocked ? null : (val) => setState(() => arrivalCity = val),
                                   isGreen: true
                               )
-                          )
+                          )*/
+
+                          Expanded(
+                            child: _buildCitySearchSelector(
+                              context: context,
+                              label: "Départ",
+                              value: departureCity,
+                              cities: cities,
+                              icon: Icons.location_on,
+                              enabled: !isRouteLocked,
+                              onSelected: (val) => setState(() => departureCity = val),
+                            ),
+                          ),
+                          const Gap(10),
+                          Expanded(
+                            child: _buildCitySearchSelector(
+                              context: context,
+                              label: "Destination",
+                              value: arrivalCity,
+                              cities: cities,
+                              icon: Icons.flag,
+                              enabled: !isRouteLocked,
+                              isGreen: true,
+                              onSelected: (val) => setState(() => arrivalCity = val),
+                            ),
+                          ),
+
                         ]
                     ),
 
@@ -1273,19 +1298,153 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
           ),
 
           // Badge pulse si voyage en cours (Masqué en mode modif pour épurer)
-          /*if (hasActiveTrip && !widget.isModificationMode)
-            Positioned(
-                top: 15,
-                right: 15,
-                child: _buildLiveTripPulseBadge(activeReservations.first)
-            ),*/
         ]
     );
   }
 
-  /*Widget _buildLiveTripPulseBadge(ActiveReservationModel trip) {
-    return GestureDetector(onTap: () { setState(() { isLiveExpanded = !isLiveExpanded; }); }, child: AnimatedBuilder(animation: _pulseAnimation, builder: (context, child) { return Transform.scale(scale: isLiveExpanded ? 1.0 : _pulseAnimation.value, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutBack, width: isLiveExpanded ? 220 : 85, height: isLiveExpanded ? 90 : 36, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.6), blurRadius: isLiveExpanded ? 5 : 10 * _pulseAnimation.value, spreadRadius: isLiveExpanded ? 0 : 2)]), child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Column(mainAxisSize: MainAxisSize.min, children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)), const Gap(6), const Text("LIVE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10))]), if (!isLiveExpanded) const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16), if (isLiveExpanded) const Icon(Icons.close, color: Colors.white, size: 14)]), if (isLiveExpanded) ...[const Gap(8), Container(height: 1, color: Colors.white24), const Gap(8), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(trip.pointDepart, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis)), AnimatedBuilder(animation: _busAnimation, builder: (context, child) => Transform.translate(offset: Offset(_busAnimation.value, 0), child: const Icon(Icons.directions_bus, color: Colors.white, size: 14))), Expanded(child: Text(trip.pointArrive, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis))])]]))), ); }, ));
-  }*/
+  Widget _buildCitySearchSelector({
+    required BuildContext context,
+    required String label,
+    required String? value,
+    required List<String> cities,
+    required IconData icon,
+    required bool enabled,
+    required Function(String) onSelected,
+    bool isGreen = false,
+  }) {
+    final color = isGreen ? Colors.green : AppColors.primary;
+
+    return GestureDetector(
+      onTap: !enabled
+          ? null
+          : () => _openCitySearchSheet(
+        context: context,
+        title: label,
+        cities: cities,
+        onSelected: onSelected,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.grey.shade100 : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                value ?? label,
+                style: TextStyle(
+                  color: value == null ? Colors.grey : Colors.black,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  void _openCitySearchSheet({
+    required BuildContext context,
+    required String title,
+    required List<String> cities,
+    required Function(String) onSelected,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        List<String> filteredCities = List.from(cities);
+        final TextEditingController controller = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+
+                  const SizedBox(height: 12),
+
+                  // 🔍 Champ de recherche
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      controller: controller,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: "Rechercher une ville...",
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setModalState(() {
+                          filteredCities = cities
+                              .where((c) =>
+                              c.toLowerCase().contains(value.toLowerCase()))
+                              .toList();
+                        });
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // 📜 Liste filtrée
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filteredCities.length,
+                      itemBuilder: (context, index) {
+                        final city = filteredCities[index];
+                        return ListTile(
+                          title: Text(city),
+                          onTap: () {
+                            Navigator.pop(context);
+                            onSelected(city);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
 
   Widget _buildLiveTripPulseBadge(ActiveReservationModel trip) {
     return Material(

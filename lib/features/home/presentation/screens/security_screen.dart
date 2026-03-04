@@ -101,9 +101,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
   void _showDeleteConfirmDialog() {
     final passwordController = TextEditingController();
 
-    // On utilise showDialog mais on ne déclare pas 'isLoading' ici
-    // car il doit être géré DANS le builder pour rafraichir la modale.
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -159,8 +156,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                       // Nettoyage Provider
                       context.read<UserProvider>().clearUser();
 
-                      // Feedback et Redirection
-                      _showSnack("Compte désactivé avec succès.");
+                      // ✅ NOTIFICATION DE SUCCÈS (en vert)
+                      _showTopNotification("Compte désactivé avec succès.", isError: false);
 
                       Navigator.pushAndRemoveUntil(
                         context,
@@ -170,10 +167,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                     } catch (e) {
                       setStateModal(() => isLoading = false);
-                      // On ferme la modale pour afficher le snackbar sur l'écran principal
-                      Navigator.pop(context);
-                      // ✅ Maintenant ça marche car on a modifié _showSnack
-                      _showSnack("Erreur: ${e.toString().replaceAll('Exception:', '')}", isError: true);
+                      Navigator.pop(context); // Ferme la modale en cas d'erreur
+
+                      // ✅ NOTIFICATION D'ERREUR (en sombre)
+                      String errorMsg = e.toString().replaceAll('Exception:', '').trim();
+                      _showTopNotification(errorMsg, isError: true);
                     }
                   },
                   child: const Text("SUPPRIMER", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
@@ -184,6 +182,37 @@ class _SecurityScreenState extends State<SecurityScreen> {
         );
       },
     );
+  }
+
+
+  void _showTopNotification(String message, {bool isError = true}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 60.0, left: 20.0, right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isError ? const Color(0xFF222222) : Colors.green.shade700,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13), textAlign: TextAlign.center, maxLines: 2)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () { if(mounted) overlayEntry.remove(); });
   }
 
   @override

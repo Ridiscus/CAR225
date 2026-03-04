@@ -45,6 +45,7 @@ void main() async {
   // Remplace 'http://10.0.2.2:8000/api' par ta vraie URL d'API (10.0.2.2 pour Émulateur Android)
   final dio = Dio(
     BaseOptions(
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       baseUrl: 'https://car225.com/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),

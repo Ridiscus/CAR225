@@ -49,7 +49,7 @@ class FaqScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateClaimScreen())),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ClaimTypeSelectorScreen())),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
                             foregroundColor: Colors.white,
@@ -62,7 +62,13 @@ class FaqScreen extends StatelessWidget {
                     const Gap(10),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ClaimsHistoryScreen())),
+                        // ✅ On remplace 'type' par 'initialType'
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ClaimsHistoryScreen(initialType: "objet_oublie")
+                            )
+                        ),
                         style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             side: BorderSide(color: textColor ?? Colors.black),

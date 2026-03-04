@@ -1,21 +1,26 @@
 import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/user_stats_model.dart';
+import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 import '../models/user_model.dart';
 
-// L'interface reste identique
+
+
 abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body);
-  Future<Map<String, dynamic>> login(LoginRequestModel params);
-  Future<Map<String, dynamic>> register(RegisterRequestModel params);
+
+  // ✅ CHANGEMENT ICI : On utilise AuthResponseModel au lieu de Map
+  Future<AuthResponseModel> login(LoginRequestModel params);
+  Future<AuthResponseModel> register(RegisterRequestModel params);
+
   Future<void> deactivateAccount(String password);
   Future<void> sendOtp(String email);
-  Future<void> verifyOtp(String email, String otpCode);
+  // DANS L'INTERFACE (AuthRemoteDataSource)
+  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode);
   Future<void> resetPassword(String email, String otpCode, String password, String passwordConfirmation);
   Future<UserModel> getUserProfile();
   Future<UserModel> updateUserProfile({
@@ -35,11 +40,10 @@ abstract class AuthRemoteDataSource {
     required String confirmPassword,
   });
 
-  // 🟢 AJOUTE CES DEUX LIGNES :
   Future<UserStatsModel> getUserStats();
   Future<TripDetailsModel> getTripDetails();
-
 }
+
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   late final Dio dio;
@@ -101,35 +105,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 🚀 LOGIN (CORRECTION CRITIQUE DU JSON)
-  // ---------------------------------------------------------------------------
+
   @override
-  Future<Map<String, dynamic>> login(LoginRequestModel params) async {
+  Future<AuthResponseModel> login(LoginRequestModel params) async {
     try {
-      // ⚠️ C'EST ICI QU'ON RÈGLE TON PROBLÈME "IDENTIFIANT OBLIGATOIRE"
-      // On construit manuellement le JSON pour être sûr d'avoir la clé "login"
       final Map<String, dynamic> body = {
-        "login": params.email,       // <-- On force l'email dans le champ "login"
+        "login": params.email,
         "password": params.password,
         "fcm_token": params.fcmToken,
         "nom_device": params.deviceName,
       };
 
-      print("📤 DATA SOURCE ENVOIE : $body");
-
-      // Vérifie bien si c'est /user/login ou /auth/login avec ton dev backend
-      // D'après ton code précédent c'était /user/login
       final response = await dio.post('/user/login', data: body);
-
-      return response.data; // On retourne juste la réponse, le Repo gère la sauvegarde
+      return AuthResponseModel.fromJson(response.data); // 🆕 Retourne le modèle complet
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Erreur de connexion");
     }
   }
 
-  @override
-  Future<Map<String, dynamic>> register(RegisterRequestModel params) async {
+  /*@override
+  Future<AuthResponseModel> register(RegisterRequestModel params) async {
     try {
       FormData formData = FormData.fromMap({
         "name": params.nom,
@@ -143,18 +138,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       });
 
       if (params.photoPath != null) {
-        formData.files.add(MapEntry(
-          "photo_profile",
-          await MultipartFile.fromFile(params.photoPath!),
-        ));
+        formData.files.add(MapEntry("photo_profile", await MultipartFile.fromFile(params.photoPath!)));
       }
 
       final response = await dio.post('/user/register', data: formData);
-      return response.data;
+      return AuthResponseModel.fromJson(response.data); // 🆕 Retourne le modèle complet
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Erreur inscription");
     }
-  }
+  }*/
+
+
 
   @override
   Future<void> logout() async {
@@ -254,14 +248,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  @override
-  Future<void> verifyOtp(String email, String otpCode) async {
+
+
+
+// DANS L'IMPLÉMENTATION (AuthRemoteDataSourceImpl)
+  /*@override
+  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode) async {
     try {
-      await dio.post('/user/password/verify-otp', data: {'email': email, 'otp': otpCode});
+      final response = await dio.post('/user/verify-phone-otp', data: {
+        'contact': contact,
+        'otp': otpCode,
+      });
+
+      // ✅ On retourne les données reçues (qui contiennent le token)
+      return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Code invalide");
     }
-  }
+  }*/
 
   @override
   Future<void> resetPassword(String email, String otpCode, String password, String passwordConfirmation) async {
@@ -295,6 +299,79 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return TripDetailsModel.fromJson(response.data);
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Erreur lors du chargement des détails");
+    }
+  }
+
+
+  @override
+  Future<AuthResponseModel> register(RegisterRequestModel params) async {
+    try {
+      print("⏳ [REGISTER] Préparation des données pour : ${params.email}...");
+
+      FormData formData = FormData.fromMap({
+        "name": params.nom,
+        "prenom": params.prenom,
+        "email": params.email,
+        "password": params.password,
+        "password_confirmation": params.passwordConfirmation,
+        "contact": params.contact,
+        "fcm_token": params.fcmToken,
+        "nom_device": params.deviceName,
+      });
+
+      if (params.photoPath != null) {
+        print("📸 [REGISTER] Ajout de la photo de profil depuis : ${params.photoPath}");
+        formData.files.add(MapEntry("photo_profile", await MultipartFile.fromFile(params.photoPath!)));
+      }
+
+      print("🚀 [REGISTER] Envoi de la requête à /user/register...");
+      final response = await dio.post('/user/register', data: formData);
+
+      // --- NOUVEAUX LOGS DE DÉBOGAGE ---
+      print("✅ [REGISTER] Statut de la réponse : ${response.statusCode}");
+      print("📦 [REGISTER] Données brutes reçues (response.data) : ${response.data}");
+      print("🔍 [REGISTER] Type des données reçues : ${response.data.runtimeType}");
+      // ---------------------------------
+
+      return AuthResponseModel.fromJson(response.data);
+
+    } on DioException catch (e) {
+      print("❌ [REGISTER DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? "Erreur inscription");
+    } catch (e, stacktrace) {
+      // Capture l'erreur de parsing JSON (celle du 'String' is not subtype of 'int')
+      print("🚨 [REGISTER PARSING ERROR] Erreur inattendue : $e");
+      print("📜 [REGISTER STACKTRACE] $stacktrace");
+      rethrow;
+    }
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode) async {
+    try {
+      print("⏳ [OTP] Début de la vérification pour le contact: $contact, Code: $otpCode...");
+
+      final response = await dio.post('/user/verify-phone-otp', data: {
+        'contact': contact,
+        'otp': otpCode,
+      });
+
+      // --- NOUVEAUX LOGS DE DÉBOGAGE ---
+      print("✅ [OTP] Statut de la réponse : ${response.statusCode}");
+      print("📦 [OTP] Données brutes reçues (response.data) : ${response.data}");
+      print("🔍 [OTP] Type des données reçues : ${response.data.runtimeType}");
+      // ---------------------------------
+
+      return response.data;
+
+    } on DioException catch (e) {
+      print("❌ [OTP DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? "Code invalide");
+    } catch (e, stacktrace) {
+      print("🚨 [OTP PARSING ERROR] Erreur inattendue : $e");
+      print("📜 [OTP STACKTRACE] $stacktrace");
+      rethrow;
     }
   }
 

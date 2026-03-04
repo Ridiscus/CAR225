@@ -11,6 +11,8 @@ import '../../../../core/services/theme_provider.dart';
 
 // --- IMPORTS ECRANS ---
 import '../../../../core/theme/app_colors.dart';
+import 'claim_history_screen.dart';
+import 'claim_screen.dart';
 import 'faq_screen.dart';
 import 'privacy_policy_screen.dart';
 
@@ -145,7 +147,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Widg
           const Gap(20),
 
           // --- SECTION SUPPORT ---
-          _sectionTitle("Support & Informations"),
+          /*_sectionTitle("Support & Informations"),
           _buildActionTile(
             context: context,
             title: "FAQ / Aide",
@@ -153,6 +155,60 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Widg
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const FaqScreen()));
             },
+          ),*/
+
+          // --- SECTION SUPPORT ---
+          _sectionTitle("Support & Informations"),
+
+          _buildActionTile(
+            context: context,
+            title: "FAQ / Aide",
+            icon: Icons.help_outline,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const FaqScreen()));
+            },
+          ),
+
+// ✅ AJOUT DES DEUX BOUTONS EN OPTION SUR LA MÊME LIGNE
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ClaimTypeSelectorScreen())
+                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text("Réclamer", style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                    ),
+                  ),
+                ),
+                const Gap(10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ClaimsHistoryScreen())
+                    ),
+                    icon: Icon(Icons.history, size: 18, color: textColor),
+                    label: Text("Historique", style: TextStyle(fontSize: 12, color: textColor)),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: textColor?.withOpacity(0.2) ?? Colors.grey),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           _buildActionTile(

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -9,7 +8,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/device/device_service.dart';
+import '../../../home/presentation/screens/VerifOtpScreen.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
+import '../../data/models/register_request_model.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -85,65 +86,16 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  /*Future<void> _handleRegister() async {
-    // Validation
-    if (_nomController.text.isEmpty || _prenomController.text.isEmpty ||
-        _emailController.text.isEmpty || _contactController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
-      _showTopNotification("Tous les champs sont obligatoires", isError: true);
-      return;
-    }
-
-    if (_passwordController.text != _confirmPassController.text) {
-      _showTopNotification("Les mots de passe ne correspondent pas", isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final authRepository = AuthRepositoryImpl(
-        remoteDataSource: AuthRemoteDataSourceImpl(),
-        fcmService: FcmService(),
-        deviceService: DeviceService(),
-      );
-
-      // ⚠️ ADAPTATION API : Suppression du champ 'adresse'
-      await authRepository.register(
-        nom: _nomController.text.trim(),
-        prenom: _prenomController.text.trim(),
-        email: _emailController.text.trim(),
-        contact: _contactController.text.trim(),
-        password: _passwordController.text, // Le repo gèrera le password_confirmation si besoin, ou l'API le déduira
-        photoPath: _selectedImage?.path,
-      );
-
-      if (!mounted) return;
-      _showTopNotification("Compte créé avec succès !");
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) Navigator.pop(context);
-
-    } catch (e) {
-      if (!mounted) return;
-      // Nettoyage du message d'erreur
-      String errorMsg = e.toString().replaceAll("Exception:", "").trim();
-      _showTopNotification(errorMsg, isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }*/
-
-
   Future<void> _handleRegister() async {
     // 1. Validation : Champs vides
     if (_nomController.text.isEmpty || _prenomController.text.isEmpty ||
-        _emailController.text.isEmpty || _contactController.text.isEmpty ||
+         _contactController.text.isEmpty ||
         _passwordController.text.isEmpty) {
-      _showTopNotification("Tous les champs sont obligatoires", isError: true);
+      _showTopNotification("Tous les champs sont obligatoires sauf le email", isError: true);
       return;
     }
 
-    // 🟢 2. NOUVELLE VALIDATION : 10 chiffres obligatoires
+    // 2. Validation : 10 chiffres obligatoires
     if (_contactController.text.length != 10) {
       _showTopNotification("Le numéro de téléphone doit contenir exactement 10 chiffres", isError: true);
       return;
@@ -158,30 +110,66 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final fcmService = FcmService();
+      final deviceService = DeviceService();
+
       final authRepository = AuthRepositoryImpl(
         remoteDataSource: AuthRemoteDataSourceImpl(),
-        fcmService: FcmService(),
-        deviceService: DeviceService(),
+        fcmService: fcmService,
+        deviceService: deviceService,
       );
 
-      // ⚠️ ADAPTATION API : Suppression du champ 'adresse'
-      await authRepository.register(
+      // 4. Récupération des données techniques
+      String fcmToken = await fcmService.getToken() ?? "no_token";
+      String deviceName = await deviceService.getDeviceName();
+
+      // 📦 5. CRÉATION DU MODÈLE (C'est ici qu'on règle l'erreur de type)
+      final registerParams = RegisterRequestModel(
         nom: _nomController.text.trim(),
         prenom: _prenomController.text.trim(),
         email: _emailController.text.trim(),
         contact: _contactController.text.trim(),
-        password: _passwordController.text, // Le repo gèrera le password_confirmation si besoin, ou l'API le déduira
+        password: _passwordController.text,
+        passwordConfirmation: _confirmPassController.text,
+        fcmToken: fcmToken,
+        deviceName: deviceName,
         photoPath: _selectedImage?.path,
       );
 
+      // 6. Appel API
+      print("⏳ [STEP 1] Appel API register()...");
+      final response = await authRepository.register(registerParams);
+
       if (!mounted) return;
-      _showTopNotification("Compte créé avec succès !");
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) Navigator.pop(context);
+
+      // 7. GESTION DU FLUX OTP / SUCCÈS
+      if (response.success) {
+        if (response.requiresOtp) {
+          // 🚨 REDIRECTION OTP
+          print("📲 [REGISTER OTP] Redirection vers l'écran de vérification...");
+          _showTopNotification(response.message);
+
+          // Importe VerifOtpScreen en haut du fichier !
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VerifOtpScreen(
+                email: _emailController.text.trim(),
+                contact: response.contact ?? _contactController.text.trim(),
+              ),
+            ),
+          );
+        } else {
+          // ✅ CAS DIRECT (Si OTP désactivé sur le serveur)
+          _showTopNotification("Compte créé avec succès !");
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) Navigator.pop(context);
+        }
+      }
 
     } catch (e) {
       if (!mounted) return;
-      // Nettoyage du message d'erreur
+      print("❌ [REGISTER ERROR] $e");
       String errorMsg = e.toString().replaceAll("Exception:", "").trim();
       _showTopNotification(errorMsg, isError: true);
     } finally {
@@ -200,7 +188,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPassController.dispose();
     super.dispose();
   }
-
 
 
   @override
@@ -408,57 +395,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // --- WIDGET HELPER ADAPTÉ POUR IMAGES ---
-  /*Widget _buildModernInput(BuildContext context, {
-    required String hint,
-    required String imagePath, // ✅ String path au lieu de IconData
-    required TextEditingController controller,
-    TextInputType inputType = TextInputType.text,
-    bool isPassword = false,
-    bool obscureText = false,
-    VoidCallback? onToggle,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
-    final iconColor = Colors.grey[500]; // Couleur grise pour un look pro
-
-    return Container(
-      decoration: BoxDecoration(
-        color: fillColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.transparent),
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: inputType,
-        obscureText: obscureText,
-        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
-        decoration: InputDecoration(
-          // ✅ Image Flaticon avec Padding pour ajuster la taille
-          prefixIcon: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Image.asset(
-                imagePath,
-                width: 20,
-                height: 20,
-                color: iconColor // Retire 'color' si tu veux les images en couleur originale
-            ),
-          ),
-          suffixIcon: isPassword
-              ? IconButton(
-            icon: Icon(obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: iconColor),
-            onPressed: onToggle,
-          )
-              : null,
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 15),
-        ),
-      ),
-    );
-  }*/
-
 
   // --- WIDGET HELPER ADAPTÉ POUR IMAGES ET TELEPHONE ---
   Widget _buildModernInput(BuildContext context, {
@@ -520,6 +456,4 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-
-
 }

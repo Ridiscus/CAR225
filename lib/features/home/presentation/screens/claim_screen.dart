@@ -1,163 +1,391 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:intl/intl.dart';
 
-class CreateClaimScreen extends StatefulWidget {
-  const CreateClaimScreen({super.key});
+import 'forget_bag_screen.dart';
 
-  @override
-  State<CreateClaimScreen> createState() => _CreateClaimScreenState();
-}
-
-class _CreateClaimScreenState extends State<CreateClaimScreen> {
-  // Mock Data : Simulation des trajets de l'utilisateur
-  // Dans la vraie vie, cela viendrait de ton API
-  final List<Map<String, dynamic>> _myTrips = [
-    {
-      "id": "TRIP-001",
-      "destination": "Abidjan - Bouaké",
-      "date": DateTime.now().subtract(const Duration(hours: 5)), // Fini il y a 5h (ÉLIGIBLE)
-      "status": "Terminé"
-    },
-    {
-      "id": "TRIP-002",
-      "destination": "Yamoussoukro - Abidjan",
-      "date": DateTime.now().add(const Duration(hours: 2)), // Futur (NON ÉLIGIBLE pour objet perdu, mais peut-être actif)
-      "status": "Confirmé"
-    },
-    {
-      "id": "TRIP-003",
-      "destination": "San Pedro - Abidjan",
-      "date": DateTime.now().subtract(const Duration(hours: 30)), // Fini il y a 30h (NON ÉLIGIBLE > 24h)
-      "status": "Terminé"
-    },
-  ];
-
-  String? _selectedTripId;
-  String? _selectedSubject;
-  final TextEditingController _descriptionController = TextEditingController();
-
-  // Liste filtrée des trajets éligibles
-  List<Map<String, dynamic>> get _eligibleTrips {
-    final now = DateTime.now();
-    return _myTrips.where((trip) {
-      final tripDate = trip['date'] as DateTime;
-      // Logique : Le trajet est terminé depuis moins de 24h
-      // (Ici j'assume que 'date' est l'heure d'arrivée, sinon ajoute la durée du trajet)
-      final difference = now.difference(tripDate).inHours;
-      return difference < 24 && difference >= 0; // Entre 0 et 24h dans le passé
-    }).toList();
-  }
+class ClaimTypeSelectorScreen extends StatelessWidget {
+  const ClaimTypeSelectorScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final eligibleList = _eligibleTrips;
+    // Définition des catégories basées sur ta capture d'écran
+    final List<Map<String, dynamic>> categories = [
+      {
+        "title": "Bagage Perdu",
+        "desc": "Vous n'avez pas retrouvé votre bagage à l'arrivée ? Signalez-le immédiatement.",
+        "icon": Icons.luggage,
+        "color": Colors.orange[800],
+        "actionText": "DÉCLARER",
+      },
+      {
+        "title": "Objet Oublié",
+        "desc": "Vous avez oublié un téléphone, des clés ou un vêtement dans le bus ? Nous allons vérifier.",
+        "icon": Icons.visibility_outlined,
+        "color": Colors.blue[700],
+        "actionText": "DÉCLARER",
+      },
+      {
+        "title": "Remboursement",
+        "desc": "Une erreur de paiement ou un voyage annulé ? Demandez un remboursement sur votre solde.",
+        "icon": Icons.account_balance_wallet_outlined,
+        "color": Colors.green[600],
+        "actionText": "DEMANDER",
+      },
+      {
+        "title": "Qualité de Service",
+        "desc": "Un problème avec le chauffeur, l'hotesse ou le confort du véhicule ? Dites-le nous.",
+        "icon": Icons.stars_rounded,
+        "color": Colors.purple[400],
+        "actionText": "SIGNALER",
+      },
+      {
+        "title": "Mon Compte",
+        "desc": "Problème d'accès, modification de profil ou erreur de solde portefeuille.",
+        "icon": Icons.manage_accounts_outlined,
+        "color": Colors.grey[700],
+        "actionText": "AIDE",
+      },
+      {
+        "title": "Autre demande",
+        "desc": "Pour toute autre question ou suggestion non listée ci-dessus.",
+        "icon": Icons.help_outline,
+        "color": Colors.red[400],
+        "actionText": "CONTACTER",
+      },
+    ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Nouvelle Réclamation")),
+      backgroundColor: const Color(0xFFF8F9FA), // Fond légèrement gris comme sur le web
+      appBar: AppBar(
+        title: const Text("Support Client", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Sélectionnez le trajet concerné", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Text("Seuls les trajets des dernières 24h apparaissent ici.", style: TextStyle(color: Colors.grey, fontSize: 12)),
-            const Gap(10),
-
-            // --- LISTE DEROULANTE DES TRAJETS ---
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedTripId,
-                  hint: const Text("Choisir un trajet..."),
-                  isExpanded: true,
-                  items: eligibleList.map((trip) {
-                    return DropdownMenuItem<String>(
-                      value: trip['id'],
-                      child: Text("${trip['destination']} (${DateFormat('dd/MM HH:mm').format(trip['date'])})"),
-                    );
-                  }).toList(),
-                  onChanged: (value) => setState(() => _selectedTripId = value),
-                ),
-              ),
+            const Text(
+              "Comment pouvons-nous vous aider aujourd'hui ?",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-
-            // Message si vide
-            if (eligibleList.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text("Aucun trajet récent éligible pour une réclamation d'objet perdu.", style: TextStyle(color: Colors.red[300], fontSize: 12)),
-              ),
-
             const Gap(25),
-
-            // --- TYPE DE PROBLEME ---
-            const Text("Quel est le problème ?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Gap(10),
-            Wrap(
-              spacing: 10,
-              children: ["Objet perdu", "Problème bagage", "Autre"].map((subject) {
-                final isSelected = _selectedSubject == subject;
-                return ChoiceChip(
-                  label: Text(subject),
-                  selected: isSelected,
-                  selectedColor: Colors.green.withOpacity(0.2),
-                  onSelected: (bool selected) {
-                    setState(() {
-                      _selectedSubject = selected ? subject : null;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-
-            const Gap(25),
-
-            // --- DESCRIPTION ---
-            const Text("Description détaillée", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Gap(10),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: "Décrivez l'objet (couleur, marque, emplacement dans le car...)",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                fillColor: Theme.of(context).cardColor,
-                filled: true,
+            // Utilisation d'un GridView pour l'aspect "Cartes"
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 1, // On commence par 1 par ligne pour mobile, ou 2 si tu préfères
+                childAspectRatio: 1.8,
+                mainAxisSpacing: 15,
+                crossAxisSpacing: 15,
               ),
-            ),
-
-            const Gap(30),
-
-            // --- BOUTON SOUMETTRE ---
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: (_selectedTripId != null && _selectedSubject != null)
-                    ? () {
-                  // TODO: Appel API pour envoyer la réclamation
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Réclamation envoyée !"), backgroundColor: Colors.green));
-                  Navigator.pop(context);
-                }
-                    : null, // Désactivé si pas rempli
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                ),
-                child: const Text("Envoyer la réclamation"),
-              ),
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final item = categories[index];
+                return _buildCategoryCard(context, item);
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+
+  Widget _buildCategoryCard(BuildContext context, Map<String, dynamic> item) {
+    return GestureDetector(
+        onTap: () {
+          if (item['title'] == "Bagage Perdu") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "bagage_perdu", // Ajouté
+              title: "Déclarer un Bagage Perdu",
+              categoryName: "Bagage perdu",
+              hintObject: "Ex: Valise bleue à roulettes, sac à dos noir...",
+              hintDetails: "Décrivez votre bagage (couleur, taille, contenu) et les circonstances de la perte. Plus vous êtes précis, plus vite nous pourrons le retrouver.",
+            )));
+          }
+          else if (item['title'] == "Objet Oublié") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "objet_oublie", // Ajouté
+              title: "Signaler un Objet Oublié",
+              categoryName: "Objet oublié",
+              hintObject: "Ex: Téléphone Samsung, lunettes de soleil, clés...",
+              hintDetails: "Décrivez l'objet oublié et où il se trouvait dans le véhicule (sous le siège, dans le compartiment...). Indiquez aussi votre numéro de place.",
+            )));
+          }
+          else if (item['title'] == "Remboursement") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "remboursement", // Ajouté
+              title: "Demander un Remboursement",
+              categoryName: "Réservation annulée",
+              dropdownLabel: "RÉSERVATION ANNULÉE *",
+              hintObject: "Ex: Remboursement réservation annulée du 15/02...",
+              hintDetails: "Expliquez les circonstances de l'annulation et le montant que vous attendez. Si vous avez une preuve d'annulation, mentionnez-la.",
+            )));
+          }
+          else if (item['title'] == "Qualité de Service") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "qualite_service", // Ajouté
+              title: "Signaler un Problème de Qualité",
+              categoryName: "voyage récent à signaler",
+              hintObject: "Ex: Comportement du chauffeur, propreté du véhicule...",
+              hintDetails: "Décrivez le problème rencontré (chauffeur, hôtesse, véhicule, ponctualité...). Soyez aussi précis que possible.",
+            )));
+          }
+          else if (item['title'] == "Mon Compte") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "mon_compte", // Ajouté
+              title: "Aide sur mon Compte",
+              categoryName: "Compte",
+              showDropdown: false,
+              hintObject: "Ex: Erreur de solde portefeuille, accès impossible...",
+              hintDetails: "Décrivez votre problème : erreur de solde, problème de connexion, modification de profil...",
+            )));
+          }
+          else if (item['title'] == "Autre demande") {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GenericClaimFormScreen(
+              apiType: "autre", // Ajouté
+              title: "Nouvelle Demande d'Assistance",
+              categoryName: "Autre",
+              showDropdown: false,
+              hintObject: "Ex: Suggestion, question sur un service...",
+              hintDetails: "Décrivez votre demande ou question en détail.",
+            )));
+          }
+        },
+
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icone avec fond coloré léger
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: item['color'].withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(item['icon'], color: item['color'], size: 28),
+            ),
+            const Gap(12),
+            Text(
+              item['title'],
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const Gap(8),
+            Expanded(
+              child: Text(
+                item['desc'],
+                style: TextStyle(color: Colors.grey[600], fontSize: 13, height: 1.4),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Gap(10),
+            // Bouton d'action en bas
+            Row(
+              children: [
+                Text(
+                  item['actionText'],
+                  style: TextStyle(
+                    color: item['color'],
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                    fontSize: 13,
+                  ),
+                ),
+                const Gap(5),
+                Icon(Icons.arrow_forward, color: item['color'], size: 16),
+              ],
+            ),
+          ],
+        ),
+      )
+    );
+  }
+
+}*/
+
+
+
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import '../../../booking/data/models/categorie_models.dart';
+import '../../../booking/data/repositories/support_repository.dart';
+import 'forget_bag_screen.dart'; // Ton fichier GenericClaimFormScreen
+
+class ClaimTypeSelectorScreen extends StatefulWidget {
+  const ClaimTypeSelectorScreen({super.key});
+
+  @override
+  State<ClaimTypeSelectorScreen> createState() => _ClaimTypeSelectorScreenState();
+}
+
+class _ClaimTypeSelectorScreenState extends State<ClaimTypeSelectorScreen> {
+  final SupportRepository _repository = SupportRepository();
+  List<SupportCategory> _categories = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final data = await _repository.fetchCategories();
+      setState(() {
+        _categories = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      // Optionnel: Afficher une erreur si l'API échoue
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Text("Support Client",
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Comment pouvons-nous vous aider aujourd'hui ?",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const Gap(25),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 1,
+                childAspectRatio: 1.8,
+                mainAxisSpacing: 15,
+                crossAxisSpacing: 15,
+              ),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                return _buildCategoryCard(context, _categories[index]);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(BuildContext context, SupportCategory cat) {
+    // Conversion de la couleur String (#hex) en Color Flutter
+    final cardColor = Color(int.parse(cat.color.replaceFirst('#', '0xff')));
+
+    return GestureDetector(
+      onTap: () {
+        // PLUS BESOIN DE IF/ELSE ! On passe juste l'objet
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GenericClaimFormScreen(category: cat),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: cardColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(_getIconData(cat.icon), color: cardColor, size: 28),
+            ),
+            const Gap(12),
+            Text(
+              cat.title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const Gap(8),
+            Expanded(
+              child: Text(
+                cat.description,
+                style: TextStyle(color: Colors.grey[600], fontSize: 13, height: 1.4),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Gap(10),
+            Row(
+              children: [
+                Text(
+                  "CONTINUER",
+                  style: TextStyle(
+                    color: cardColor,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                    fontSize: 13,
+                  ),
+                ),
+                const Gap(5),
+                Icon(Icons.arrow_forward, color: cardColor, size: 16),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper pour mapper les noms d'icônes de l'API vers des Icons Flutter
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'suitcase-rolling': return Icons.luggage;
+      case 'glasses': return Icons.visibility_outlined;
+      case 'hand-holding-usd': return Icons.account_balance_wallet_outlined;
+      case 'star': return Icons.stars_rounded;
+      case 'user-cog': return Icons.manage_accounts_outlined;
+      default: return Icons.help_outline;
+    }
   }
 }

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:gap/gap.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // <--- IMPORT CRUCIAL
 
 // Tes imports d'écrans
@@ -64,7 +63,9 @@ class _SplashScreenState extends State<SplashScreen> {
         ? const HostessMainWrapper()
         : userType == "driver"
         ? const DriverMainWrapper()
-        : const AgentMainWrapper();
+        : userType == "agent"
+        ? const AgentMainWrapper()
+        : const OnboardingScreen();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(

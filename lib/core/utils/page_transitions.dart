@@ -44,7 +44,44 @@ class PageTransitions {
   }) {
     switch (type) {
       case PageTransitionType.cupertino:
-        return CupertinoPageRoute<T>(builder: (context) => page);
+        return PageRouteBuilder<T>(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: const Duration(milliseconds: 350),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            );
+            final reverseCurve = CurvedAnimation(
+              parent: secondaryAnimation,
+              curve: Curves.easeInOutCubic,
+            );
+
+            // La nouvelle page glisse depuis la droite
+            final slideIn = Tween<Offset>(
+              begin: const Offset(1.0, 0),
+              end: Offset.zero,
+            ).animate(curve);
+
+            // L'ancienne page recule légèrement (effet iOS natif)
+            final slideOut = Tween<Offset>(
+              begin: Offset.zero,
+              end: const Offset(-0.25, 0),
+            ).animate(reverseCurve);
+
+            return SlideTransition(
+              position: slideOut,
+              child: SlideTransition(
+                position: slideIn,
+                child: FadeTransition(
+                  opacity: Tween<double>(begin: 0.85, end: 1.0).animate(curve),
+                  child: child,
+                ),
+              ),
+            );
+          },
+        );
 
       case PageTransitionType.zoom:
         return PageRouteBuilder<T>(

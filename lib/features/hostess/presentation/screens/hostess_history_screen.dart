@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:car225/core/theme/app_colors.dart';
-import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
 
 class HostessHistoryScreen extends StatefulWidget {
   const HostessHistoryScreen({super.key});
@@ -128,40 +127,215 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: const CustomAppBar(
-        title: 'Historique des Ventes',
-        showLeading: false,
+      body: Column(
+        children: [
+          _buildPremiumHeader(),
+          Expanded(
+            child: filtered.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    key: const PageStorageKey('hostess_history_scroll'),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      10,
+                      20,
+                      120,
+                    ), // Padding bas pour CurvedNavigationBar
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) =>
+                        _buildHistoryItem(context, filtered[index]),
+                  ),
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildDatePickerButton(filtered.length),
-            Expanded(
-              child: filtered.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) =>
-                          _buildHistoryItem(context, filtered[index]),
+    );
+  }
+
+  Widget _buildPremiumHeader() {
+    final String startDate = _selectedDateRange == null
+        ? 'Choisir'
+        : DateFormat('dd MMM yyyy', 'fr_FR').format(_selectedDateRange!.start);
+
+    final String endDate = _selectedDateRange == null
+        ? 'Choisir'
+        : DateFormat('dd MMM yyyy', 'fr_FR').format(_selectedDateRange!.end);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        MediaQuery.of(context).padding.top + 10,
+        24,
+        25,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 0,
+            offset: const Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Historique des ventes',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -1,
                     ),
+                  ),
+                  Text(
+                    'Suivi de vos transactions',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              if (_selectedDateRange != null)
+                GestureDetector(
+                  onTap: () => setState(() => _selectedDateRange = null),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Gap(25),
+          // SÉLECTEUR DE DATE DESIGN
+          GestureDetector(
+            onTap: () => _selectDateRange(context),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                children: [
+                  _buildDateColumn(
+                    "DU",
+                    startDate,
+                    Icons.calendar_today_rounded,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    child: Container(
+                      width: 1,
+                      height: 35,
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  _buildDateColumn(
+                    "AU",
+                    endDate,
+                    Icons.event_available_rounded,
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, Color(0xFFFF8A65)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.search_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateColumn(String label, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 12, color: AppColors.primary),
+            const Gap(6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF94A3B8),
+                letterSpacing: 0.5,
+              ),
             ),
           ],
         ),
-      ),
+        const Gap(4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildEmptyState() {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Container(
+            margin: const EdgeInsets.only(top: 70),
             padding: const EdgeInsets.all(24),
             decoration: const BoxDecoration(
               color: Color(0xFFF1F5F9),
@@ -186,122 +360,6 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
           const Text(
             'Essayez une autre période de temps.',
             style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDatePickerButton(int count) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 5, 20, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 3,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const Gap(8),
-              const Text(
-                'LISTE DES VENTES',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1E293B),
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const Gap(6),
-              Text(
-                '(${count.toString().padLeft(2, '0')})',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: () => _selectDateRange(context),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _selectedDateRange == null
-                    ? Colors.white
-                    : AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _selectedDateRange == null
-                      ? const Color(0xFFE2E8F0)
-                      : AppColors.primary.withValues(alpha: 0.2),
-                ),
-                boxShadow: _selectedDateRange == null
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.calendar_month_rounded,
-                    size: 16,
-                    color: _selectedDateRange == null
-                        ? const Color(0xFF94A3B8)
-                        : AppColors.primary,
-                  ),
-                  const Gap(8),
-                  Text(
-                    _selectedDateRange == null
-                        ? 'Filtrer'
-                        : '${DateFormat('dd/MM').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM').format(_selectedDateRange!.end)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: _selectedDateRange == null
-                          ? const Color(0xFF64748B)
-                          : AppColors.primary,
-                    ),
-                  ),
-                  if (_selectedDateRange != null) ...[
-                    const Gap(8),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedDateRange = null;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 12,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
           ),
         ],
       ),

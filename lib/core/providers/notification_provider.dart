@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 
 import '../../features/booking/data/repositories/notification_repository.dart'; // Ajuste l'import
 
@@ -9,7 +8,7 @@ class NotificationProvider extends ChangeNotifier {
 
   // Injection du repo
   NotificationProvider({required NotificationRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   int get unreadCount => _unreadCount;
 

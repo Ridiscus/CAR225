@@ -345,8 +345,6 @@ class ProfileScreen extends StatelessWidget {
 
 }*/
 
-
-
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
@@ -360,6 +358,7 @@ import 'personal_info_screen.dart';
 import 'security_screen.dart';
 import 'wallet_screen.dart';
 import 'account_setting_screen.dart';
+import 'package:car225/core/utils/page_transitions.dart';
 
 // ⚠️ TRANSFORMATION EN STATEFUL WIDGET POUR GERER LE CHARGEMENT
 class ProfileScreen extends StatefulWidget {
@@ -415,7 +414,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // On attend le retour de la page de modification
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const PersonalInfoScreen()),
+      PageTransitions.create(
+        page: const PersonalInfoScreen(),
+        type: PageTransitionType.cupertino,
+      ),
     );
     // QUAND ON REVIENT ICI, ON RECHARGE LES DONNÉES !
     _fetchUserProfile();
@@ -431,7 +433,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Gestion du chargement
     if (_isLoading) {
-      return Scaffold(backgroundColor: scaffoldColor, body: const Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: scaffoldColor,
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
@@ -455,13 +460,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(
                       color: cardColor,
                       borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey.shade300, width: 3),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.grey[800]!
+                            : Colors.grey.shade300,
+                        width: 3,
+                      ),
                       image: DecorationImage(
                         fit: BoxFit.cover,
                         // LOGIQUE D'IMAGE :
-                        image: (_user?.photoUrl != null && _user!.photoUrl!.isNotEmpty)
+                        image:
+                            (_user?.photoUrl != null &&
+                                _user!.photoUrl!.isNotEmpty)
                             ? NetworkImage(_user!.photoUrl!) as ImageProvider
-                            : const AssetImage("assets/images/buse.png"), // Image par défaut
+                            : const AssetImage(
+                                "assets/images/buse.png",
+                              ), // Image par défaut
                       ),
                     ),
                   ),
@@ -472,17 +486,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: GestureDetector(
                       onTap: _navigateToEdit,
                       child: Container(
-                        height: 32, width: 32,
+                        height: 32,
+                        width: 32,
                         decoration: BoxDecoration(
-                            color: cardColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey.shade300),
-                            boxShadow: [BoxShadow(color: isDark ? Colors.black26 : Colors.black.withOpacity(0.1), blurRadius: 5)]
+                          color: cardColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.grey[700]!
+                                : Colors.grey.shade300,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isDark
+                                  ? Colors.black26
+                                  : Colors.black.withOpacity(0.1),
+                              blurRadius: 5,
+                            ),
+                          ],
                         ),
-                        child: Icon(Icons.edit, size: 16, color: textColor), // J'ai mis un crayon (edit) c'est plus logique
+                        child: Icon(
+                          Icons.edit,
+                          size: 16,
+                          color: textColor,
+                        ), // J'ai mis un crayon (edit) c'est plus logique
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -491,12 +521,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // --- 3. NOM DYNAMIQUE ---
             Text(
               _user != null ? "${_user!.prenom} ${_user!.name}" : "Utilisateur",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
             ),
             const Gap(5),
             Text(
               "MEMBRE CAR 225", // Tu pourras rendre ça dynamique plus tard si l'API renvoie le statut
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: secondaryTextColor, letterSpacing: 1.0),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: secondaryTextColor,
+                letterSpacing: 1.0,
+              ),
             ),
             const Gap(25),
 
@@ -505,7 +544,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Expanded(child: _buildStatCard(context, "12", "VOYAGES")),
                 const Gap(15),
-                Expanded(child: _buildStatCard(context, "2.25K", "POINTS", isPoints: true)),
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    "2.25K",
+                    "POINTS",
+                    isPoints: true,
+                  ),
+                ),
               ],
             ),
             const Gap(25),
@@ -515,7 +561,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               context,
               icon: Icons.person_outline,
               title: "Mes informations personnelles",
-              onTap: _navigateToEdit, // Utilise la fonction qui recharge au retour
+              onTap:
+                  _navigateToEdit, // Utilise la fonction qui recharge au retour
             ),
             const Gap(15),
 
@@ -523,7 +570,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               context,
               icon: Icons.account_balance_wallet_outlined,
               title: "Portefeuille Mobile Money",
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletScreen())),
+              onTap: () => Navigator.push(
+                context,
+                PageTransitions.create(
+                  page: const WalletScreen(),
+                  type: PageTransitionType.cupertino,
+                ),
+              ),
             ),
             const Gap(15),
 
@@ -531,7 +584,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               context,
               icon: Icons.settings_outlined,
               title: "Paramètre du compte",
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountSettingsScreen())),
+              onTap: () => Navigator.push(
+                context,
+                PageTransitions.create(
+                  page: const AccountSettingsScreen(),
+                  type: PageTransitionType.cupertino,
+                ),
+              ),
             ),
             const Gap(15),
 
@@ -539,7 +598,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               context,
               icon: Icons.shield_outlined,
               title: "Sécurité & Confidentialité",
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SecurityScreen())),
+              onTap: () => Navigator.push(
+                context,
+                PageTransitions.create(
+                  page: const SecurityScreen(),
+                  type: PageTransitionType.cupertino,
+                ),
+              ),
             ),
             const Gap(15),
 
@@ -561,7 +626,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // --- WIDGETS HELPER (Inchangés) ---
-  Widget _buildStatCard(BuildContext context, String value, String label, {bool isPoints = false}) {
+  Widget _buildStatCard(
+    BuildContext context,
+    String value,
+    String label, {
+    bool isPoints = false,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? Colors.white10 : const Color(0xFFFFF3E0);
     final borderColor = Colors.orange.withOpacity(0.1);
@@ -570,38 +640,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(15), border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: borderColor),
+      ),
       child: Column(
         children: [
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: valueColor)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+            ),
+          ),
           const Gap(5),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: labelColor)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: labelColor,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuOption(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap, Color? textColor, Color? iconColor}) {
+  Widget _buildMenuOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? textColor,
+    Color? iconColor,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey.shade200;
-    final finalTextColor = textColor ?? (isDark ? Colors.grey[300] : Colors.grey.shade600);
-    final finalIconColor = iconColor ?? (isDark ? Colors.grey[400] : Colors.grey);
+    final finalTextColor =
+        textColor ?? (isDark ? Colors.grey[300] : Colors.grey.shade600);
+    final finalIconColor =
+        iconColor ?? (isDark ? Colors.grey[400] : Colors.grey);
     final arrowColor = isDark ? Colors.grey[600] : Colors.grey.shade400;
 
     return Container(
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: isDark ? Colors.transparent : Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))], border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.transparent : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: borderColor),
+      ),
       child: Material(
-        color: Colors.transparent, borderRadius: BorderRadius.circular(15),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(15),
         child: InkWell(
-          onTap: onTap, borderRadius: BorderRadius.circular(15),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(15),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             child: Row(
               children: [
-                Icon(icon, color: finalIconColor, size: 22), const Gap(15),
-                Expanded(child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: finalTextColor))),
-                Icon(Icons.arrow_forward_ios_rounded, size: 16, color: arrowColor),
+                Icon(icon, color: finalIconColor, size: 22),
+                const Gap(15),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: finalTextColor,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: arrowColor,
+                ),
               ],
             ),
           ),
@@ -617,7 +741,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text("Déconnexion"),
         content: const Text("Voulez-vous vraiment vous déconnecter ?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Annuler", style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Annuler", style: TextStyle(color: Colors.grey)),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
@@ -625,13 +752,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Pas besoin de recréer le repo, on l'a déjà dans _authRepository
                 await _authRepository.logout();
                 if (!parentContext.mounted) return;
-                Navigator.pushAndRemoveUntil(parentContext, MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
+                Navigator.pushAndRemoveUntil(
+                  parentContext,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
               } catch (e) {
                 if (!parentContext.mounted) return;
-                Navigator.pushAndRemoveUntil(parentContext, MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
+                Navigator.pushAndRemoveUntil(
+                  parentContext,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
               }
             },
-            child: const Text("Déconnexion", style: TextStyle(color: Colors.red)),
+            child: const Text(
+              "Déconnexion",
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),

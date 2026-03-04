@@ -1,26 +1,17 @@
-class UserModel {
-  final int id;
-  final String name;
-  final String prenom;
-  final String email;
-  final String contact;
-  final String adresse;
-  final String? photoUrl; // "photo_profile_url"
-  // On ignore "nom_device" et "photo_profile_path" pour l'UI
+import '../../domain/entities/user_entity.dart';
 
+class UserModel extends UserEntity {
   UserModel({
-    required this.id,
-    required this.name,
-    required this.prenom,
-    required this.email,
-    required this.contact,
-    required this.adresse,
-    this.photoUrl,
+    required super.id,
+    required super.name,
+    required super.prenom,
+    required super.email,
+    required super.contact,
+    required super.adresse,
+    super.photoUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // Le JSON reçu est : { "success": true, "user": { ... } }
-    // Donc on s'attend à recevoir la map "user" directement ici
     return UserModel(
       id: json['id'],
       name: json['name'] ?? "",

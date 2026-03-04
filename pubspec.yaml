@@ -60,6 +60,10 @@ dependencies:
   printing: ^5.13.4
   pdf: ^3.11.1
 
+  # --- Localisation ---
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0
+
   # --- Gestion de fichiers ---
   path_provider: ^2.1.2
   open_filex: ^4.3.2

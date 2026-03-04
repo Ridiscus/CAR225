@@ -26,44 +26,59 @@ class Car225App extends StatelessWidget {
   }
 }*/
 
-
-
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+// Import de l'écran de démarrage (Splash)
+import 'features/onboarding/presentation/screens/splash_screen.dart';
 
 // Imports Core
 import 'core/providers/user_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/theme_provider.dart';
 
-// Import de l'écran de démarrage (Splash)
-import 'features/onboarding/presentation/screens/splash_screen.dart';
+// Providers des fonctionnalités (Hostess, Driver, Agent)
+import 'features/hostess/presentation/providers/hostess_profile_provider.dart';
+import 'features/driver/presentation/providers/driver_provider.dart';
+import 'features/agent/presentation/providers/profile_provider.dart' as agent;
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // Nécessaire pour initialiser les SharedPreferences avant le lancement de l'UI
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialisation des dates en français
+  await initializeDateFormatting('fr_FR', null);
+
   // Initialisation de Firebase
   await Firebase.initializeApp();
 
-
   runApp(
     // ✅ Utilisation de MultiProvider pour combiner User et Theme
-      MultiProvider(
-        providers: [
-          // 1. Le Provider pour l'Utilisateur
-          ChangeNotifierProvider(create: (_) => UserProvider()),
+    MultiProvider(
+      providers: [
+        // 1. Le Provider pour l'Utilisateur
+        ChangeNotifierProvider(create: (_) => UserProvider()),
 
-          // 2. Le Provider pour le Thème
-          ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ],
-        // L'enfant est ton application principale
-        child: const Car225App(),
-      ),
+        // 2. Le Provider pour le Thème
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+
+        // 3. Le Provider pour l'Hôtesse
+        ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
+
+        // 4. Le Provider pour le Chauffeur
+        ChangeNotifierProvider(create: (_) => DriverProvider()),
+
+        // 5. Le Provider pour l'Agent
+        ChangeNotifierProvider(create: (_) => agent.ProfileProvider()),
+      ],
+      // L'enfant est ton application principale
+      child: const Car225App(),
+    ),
   );
-
 }
 
 class Car225App extends StatelessWidget {
@@ -77,6 +92,7 @@ class Car225App extends StatelessWidget {
     return MaterialApp(
       title: 'CAR225',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
 
       // --- CONFIGURATION DU THÈME ---
       // On utilise nos thèmes définis dans app_theme.dart

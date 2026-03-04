@@ -1,4 +1,3 @@
-
 // -------------------------------------------------------------------------
 // ⚙️ MODAL DE CONFIGURATION MISE À JOUR (POUR ALL ITINERARIES)
 // -------------------------------------------------------------------------
@@ -23,7 +22,8 @@ class BookingConfigurationSheet extends StatefulWidget {
   });
 
   @override
-  State<BookingConfigurationSheet> createState() => _BookingConfigurationSheetState();
+  State<BookingConfigurationSheet> createState() =>
+      _BookingConfigurationSheetState();
 }
 
 class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
@@ -74,11 +74,16 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
 
       // On inverse ville départ et arrivée pour trouver le retour
       // Ajout de "Côte d'Ivoire" si manquant pour matcher ton API si besoin
-      String formatCity(String city) => city.contains("Côte d'Ivoire") ? city : "$city, Côte d'Ivoire";
+      String formatCity(String city) =>
+          city.contains("Côte d'Ivoire") ? city : "$city, Côte d'Ivoire";
 
       final results = await widget.repository.searchTrips(
-        formatCity(widget.program.villeArrivee), // Départ du retour = Arrivée de l'aller
-        formatCity(widget.program.villeDepart), // Arrivée du retour = Départ de l'aller
+        formatCity(
+          widget.program.arriveeVille,
+        ), // Départ du retour = Arrivée de l'aller
+        formatCity(
+          widget.program.departVille,
+        ), // Arrivée du retour = Départ de l'aller
         dateStr,
         false,
       );
@@ -107,7 +112,9 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
       firstDate: minDate,
       lastDate: now.add(const Duration(days: 90)),
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary)),
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
         child: child!,
       ),
     );
@@ -132,7 +139,9 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
       firstDate: dateAller,
       lastDate: DateTime.now().add(const Duration(days: 180)),
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary)),
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
         child: child!,
       ),
     );
@@ -146,11 +155,17 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
   void _validateAndGoToSeats() {
     if (isAllerRetour) {
       if (dateRetour == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Veuillez choisir une date de retour")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Veuillez choisir une date de retour")),
+        );
         return;
       }
       if (selectedReturnProgram == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Veuillez choisir un horaire de retour")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Veuillez choisir un horaire de retour"),
+          ),
+        );
         return;
       }
     }
@@ -159,8 +174,9 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
 
     // On prépare le modèle Aller avec la bonne date choisie
     final finalProgramAller = widget.program.copyWith(
-        dateDepart: "${DateFormat('yyyy-MM-dd').format(dateAller)} ${widget.program.heureDepart}",
-        isAllerRetour: isAllerRetour
+      dateDepart:
+          "${DateFormat('yyyy-MM-dd').format(dateAller)} ${widget.program.heureDepart}",
+      isAllerRetour: isAllerRetour,
     );
 
     // Navigation vers les sièges
@@ -171,7 +187,9 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
           program: finalProgramAller,
           returnProgram: isAllerRetour ? selectedReturnProgram : null,
           passengerCount: passengerCount,
-          dateRetourChoisie: isAllerRetour ? DateFormat('yyyy-MM-dd').format(dateRetour!) : null,
+          dateRetourChoisie: isAllerRetour
+              ? DateFormat('yyyy-MM-dd').format(dateRetour!)
+              : null,
         ),
       ),
     );
@@ -196,81 +214,170 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
           child: ListView(
             controller: controller,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               const Gap(20),
 
-              Text("Planifiez votre départ", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                "Planifiez votre départ",
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const Gap(20),
 
               // 1. SWITCH TYPE
               Container(
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: isDark ? Colors.grey.shade800 : Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Row(
                   children: [
-                    Expanded(child: _buildTabOption("Aller Simple", !isAllerRetour, () => setState(() { isAllerRetour = false; dateRetour = null; selectedReturnProgram = null; }))),
-                    Expanded(child: _buildTabOption("Aller-Retour", isAllerRetour, () => setState(() => isAllerRetour = true))),
+                    Expanded(
+                      child: _buildTabOption(
+                        "Aller Simple",
+                        !isAllerRetour,
+                        () => setState(() {
+                          isAllerRetour = false;
+                          dateRetour = null;
+                          selectedReturnProgram = null;
+                        }),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildTabOption(
+                        "Aller-Retour",
+                        isAllerRetour,
+                        () => setState(() => isAllerRetour = true),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const Gap(20),
 
               // 2. DATE ALLER (Avec règle 24h)
-              Text("Date Aller (min. 24h à l'avance)", style: theme.textTheme.bodySmall),
+              Text(
+                "Date Aller (min. 24h à l'avance)",
+                style: theme.textTheme.bodySmall,
+              ),
               const Gap(5),
-              _buildDateSelector("Date de départ", dateAller, _pickDateAller, true),
+              _buildDateSelector(
+                "Date de départ",
+                dateAller,
+                _pickDateAller,
+                true,
+              ),
               const Gap(20),
 
               // 3. RETOUR (Si activé)
               if (isAllerRetour) ...[
                 const Divider(),
-                Text("Retour", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  "Retour",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Gap(10),
-                _buildDateSelector("Date de retour", dateRetour, _pickDateRetour, dateRetour != null),
+                _buildDateSelector(
+                  "Date de retour",
+                  dateRetour,
+                  _pickDateRetour,
+                  dateRetour != null,
+                ),
 
                 const Gap(15),
                 // Liste des bus retour
                 if (isLoadingReturn)
                   const Center(child: CircularProgressIndicator())
                 else if (dateRetour != null && availableReturnTrips.isEmpty)
-                  const Text("Aucun bus disponible ce jour-là.", style: TextStyle(color: Colors.red))
+                  const Text(
+                    "Aucun bus disponible ce jour-là.",
+                    style: TextStyle(color: Colors.red),
+                  )
                 else if (availableReturnTrips.isNotEmpty) ...[
-                    const Text("Choisir l'heure de retour :"),
-                    const Gap(10),
-                    Wrap(
-                      spacing: 10, runSpacing: 10,
-                      children: availableReturnTrips.map((p) {
-                        bool isSelected = selectedReturnProgram?.id == p.id;
-                        return ChoiceChip(
-                          label: Text(p.heureDepart),
-                          selected: isSelected,
-                          onSelected: (v) => setState(() => selectedReturnProgram = v ? p : null),
-                          selectedColor: AppColors.primary,
-                          labelStyle: TextStyle(color: isSelected ? Colors.white : theme.textTheme.bodyLarge?.color),
-                        );
-                      }).toList(),
-                    )
-                  ]
+                  const Text("Choisir l'heure de retour :"),
+                  const Gap(10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: availableReturnTrips.map((p) {
+                      bool isSelected = selectedReturnProgram?.id == p.id;
+                      return ChoiceChip(
+                        label: Text(p.heureDepart),
+                        selected: isSelected,
+                        onSelected: (v) => setState(
+                          () => selectedReturnProgram = v ? p : null,
+                        ),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : theme.textTheme.bodyLarge?.color,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
 
               const Gap(20),
 
               // 4. PASSAGERS
-              Text("Passagers", style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
+              Text(
+                "Passagers",
+                style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey),
+              ),
               const Gap(10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(15)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("$passengerCount personne(s)", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      "$passengerCount personne(s)",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                     Row(
                       children: [
-                        IconButton(icon: const Icon(Icons.remove), onPressed: () { if (passengerCount > 1) setState(() => passengerCount--); }),
-                        IconButton(icon: const Icon(Icons.add), onPressed: () { if (passengerCount < widget.program.placesDisponibles) setState(() => passengerCount++); }),
+                        IconButton(
+                          icon: const Icon(Icons.remove),
+                          onPressed: () {
+                            if (passengerCount > 1)
+                              setState(() => passengerCount--);
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            if (passengerCount <
+                                widget.program.placesDisponibles)
+                              setState(() => passengerCount++);
+                          },
+                        ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -283,8 +390,20 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _validateAndGoToSeats,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                  child: const Text("Choisir les sièges", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  child: const Text(
+                    "Choisir les sièges",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
               const Gap(20),
@@ -305,31 +424,62 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
         decoration: BoxDecoration(
           color: isActive ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: isActive ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : [],
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                  ),
+                ]
+              : [],
         ),
-        child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isActive ? Colors.black : Colors.grey)),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isActive ? Colors.black : Colors.grey,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildDateSelector(String label, DateTime? date, VoidCallback onTap, bool isSelected) {
+  Widget _buildDateSelector(
+    String label,
+    DateTime? date,
+    VoidCallback onTap,
+    bool isSelected,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade300),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+          ),
           borderRadius: BorderRadius.circular(12),
-          color: isSelected ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
+          color: isSelected
+              ? AppColors.primary.withOpacity(0.05)
+              : Colors.transparent,
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, size: 18, color: isSelected ? AppColors.primary : Colors.grey),
+            Icon(
+              Icons.calendar_today,
+              size: 18,
+              color: isSelected ? AppColors.primary : Colors.grey,
+            ),
             const Gap(8),
             Text(
-              date != null ? DateFormat('dd MMM yyyy', 'fr_FR').format(date) : label,
-              style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? AppColors.primary : Colors.black),
+              date != null
+                  ? DateFormat('dd MMM yyyy', 'fr_FR').format(date)
+                  : label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppColors.primary : Colors.black,
+              ),
             ),
           ],
         ),

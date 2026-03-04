@@ -20,17 +20,18 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
       backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
+          // 1. HEADER FIXE
           const HostessHeader(),
-          const Divider(height: 1, color: Color(0xFFE0E0E0)),
-          _buildDashboardHeader(),
+          // 2. CONTENU SCROLLABLE
           Expanded(
             child: SingleChildScrollView(
-              key: const PageStorageKey('hostess_home_scroll'),
-              physics: const BouncingScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildDashboardHeader(),
+                  const Gap(10),
                   _buildMetricsGrid(),
                   const Gap(20),
                   _buildActionButton(),
@@ -38,6 +39,9 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   _buildSalesTableHeader(),
                   const Gap(12),
                   _buildSalesTable(),
+                  const Gap(
+                    120,
+                  ), // Espace pour ne pas être caché par le CurvedNavigationBar
                 ],
               ),
             ),
@@ -49,7 +53,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
 
   Widget _buildDashboardHeader() {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: EdgeInsets.fromLTRB(0, 20, 0, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -637,7 +641,8 @@ class _DigitalClockState extends State<_DigitalClock> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      width: 105, // Taille fixe pour éviter les micro-vibrations du layout
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),

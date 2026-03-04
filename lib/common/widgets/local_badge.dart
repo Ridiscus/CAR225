@@ -46,13 +46,13 @@ class _LocationBadgeState extends State<LocationBadge> {
 
       // 3. Obtenir la position actuelle
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       // 4. Convertir (Geocoding inverse)
       List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude
+        position.latitude,
+        position.longitude,
       );
 
       if (placemarks.isNotEmpty) {
@@ -85,22 +85,29 @@ class _LocationBadgeState extends State<LocationBadge> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset("assets/icons/pin.png", width: 16, color: AppColors.primary),
+            Image.asset(
+              "assets/icons/pin.png",
+              width: 16,
+              color: AppColors.primary,
+            ),
             const Gap(6),
             _isLoading
                 ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-            )
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : Text(
-                _currentAddress, // Affiche "Cocody", "Koumassi", etc.
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14
-                )
-            ),
+                    _currentAddress, // Affiche "Cocody", "Koumassi", etc.
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
           ],
         ),
       ),

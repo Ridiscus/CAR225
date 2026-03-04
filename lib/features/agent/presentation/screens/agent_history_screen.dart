@@ -3,7 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 import '../widgets/custom_app_bar.dart';
 
 class AgentHistoryScreen extends StatefulWidget {

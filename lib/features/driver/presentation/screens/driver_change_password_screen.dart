@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 
 class DriverChangePasswordScreen extends StatefulWidget {
   const DriverChangePasswordScreen({super.key});

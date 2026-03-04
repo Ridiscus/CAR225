@@ -1,5 +1,5 @@
 import 'package:fpdart/fpdart.dart';
-import '../../../../core/error/failures.dart';
+import 'package:car225/core/error/failures.dart';
 import '../entities/boarding_summary.dart';
 import '../repositories/agent_repository.dart';
 

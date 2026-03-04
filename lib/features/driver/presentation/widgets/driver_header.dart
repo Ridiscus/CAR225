@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:gap/gap.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/providers/user_provider.dart';
+import 'package:car225/core/theme/app_colors.dart';
+import 'package:car225/core/providers/user_provider.dart';
 import '../providers/driver_provider.dart';
 
 class DriverHeader extends StatelessWidget {

@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:gap/gap.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'hostess_scan_result_screen.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 
 class HostessScannerScreen extends StatefulWidget {
   const HostessScannerScreen({super.key});

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
 import '../widgets/driver_header.dart';
 

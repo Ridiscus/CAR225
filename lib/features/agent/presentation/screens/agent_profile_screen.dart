@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 import '../providers/profile_provider.dart';
 import 'agent_personal_info_screen.dart';
 import 'agent_change_password_screen.dart';

@@ -6,7 +6,7 @@ import 'package:car225/core/theme/app_colors.dart';
 import '../providers/hostess_profile_provider.dart';
 import 'hostess_personal_info_screen.dart';
 import 'hostess_change_password_screen.dart';
-import '../../../../core/utils/page_transitions.dart';
+import 'package:car225/core/utils/page_transitions.dart';
 
 class HostessProfileScreen extends StatefulWidget {
   const HostessProfileScreen({super.key});

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:gap/gap.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
 import '../../models/trip_model.dart';
 import '../widgets/driver_header.dart';

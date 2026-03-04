@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "406826051377",
+    "project_id": "car225-54daf",
+    "storage_bucket": "car225-54daf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406826051377:android:151a6c8a6f1bcf7710b210",
+        "android_client_info": {
+          "package_name": "com.Robinson.car225"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "406826051377-dfobir13dubjran8snumkf43ecvdq90v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Robinson.car225",
+            "certificate_hash": "720f1c48e5668000203cbe379c4a555ff682f9b5"
+          }
+        },
+        {
+          "client_id": "406826051377-1autumn326a90h1pk749hb0ju1513eej.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzakBOWg4SpjXjv3E-ETXAza2Z2RuZgaY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "406826051377-1autumn326a90h1pk749hb0ju1513eej.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

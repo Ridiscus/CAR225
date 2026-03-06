@@ -14,6 +14,39 @@ class HostessHomeScreen extends StatefulWidget {
 }
 
 class _HostessHomeScreenState extends State<HostessHomeScreen> {
+  final List<Map<String, dynamic>> _recentSales = [
+    {
+      'id': 'TK-001',
+      'passenger': 'Kouamé Yao',
+      'route': 'Abidjan → Bouaké',
+      'seat': 'A12',
+      'amount': '7,500',
+      'date': '04 Mar 2026',
+      'time': '07:00',
+      'status': 'confirmed',
+    },
+    {
+      'id': 'TK-002',
+      'passenger': 'Awa Traoré',
+      'route': 'Abidjan → Yamoussoukro',
+      'seat': 'B05',
+      'amount': '5,000',
+      'date': '04 Mar 2026',
+      'time': '09:30',
+      'status': 'confirmed',
+    },
+    {
+      'id': 'TK-003',
+      'passenger': 'Djibril Koné',
+      'route': 'Bouaké → Korhogo',
+      'seat': 'C08',
+      'amount': '4,500',
+      'date': '04 Mar 2026',
+      'time': '11:00',
+      'status': 'pending',
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,10 +71,8 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   const Gap(30),
                   _buildSalesTableHeader(),
                   const Gap(12),
-                  _buildSalesTable(),
-                  const Gap(
-                    120,
-                  ), // Espace pour ne pas être caché par le CurvedNavigationBar
+                  _buildRecentSales(),
+                  const Gap(120),
                 ],
               ),
             ),
@@ -275,176 +306,148 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
     );
   }
 
-  Widget _buildSalesTable() {
-    final List<Map<String, dynamic>> mockSales = [
-      {
-        'id': 'TK-001',
-        'passenger': 'Jean-Pierre Mbarga',
-        'route': 'Douala → Yaoundé',
-        'seat': 'A12',
-        'amount': '5,000',
-        'status': 'confirmed',
-      },
-      {
-        'id': 'TK-002',
-        'passenger': 'Marie-Claire Fotso',
-        'route': 'Yaoundé → Bafoussam',
-        'seat': 'B05',
-        'amount': '4,500',
-        'status': 'confirmed',
-      },
-      {
-        'id': 'TK-003',
-        'passenger': 'Paul Ndjock',
-        'route': 'Douala → Kribi',
-        'seat': 'C08',
-        'amount': '3,500',
-        'status': 'pending',
-      },
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-      ),
-      child: Column(
-        children: mockSales.asMap().entries.map((entry) {
-          final index = entry.key;
-          final sale = entry.value;
-          final isLast = index == mockSales.length - 1;
-
-          return _buildSaleRow(
-            id: sale['id'],
-            passenger: sale['passenger'],
-            route: sale['route'],
-            seat: sale['seat'],
-            amount: sale['amount'],
-            status: sale['status'],
-            isLast: isLast,
-          );
-        }).toList(),
-      ),
+  // ── Cartes individuelles style History Screen ──────────────────────────────
+  Widget _buildRecentSales() {
+    return Column(
+      children: _recentSales.map((sale) => _buildSaleCard(sale)).toList(),
     );
   }
 
-  Widget _buildSaleRow({
-    required String id,
-    required String passenger,
-    required String route,
-    required String seat,
-    required String amount,
-    required String status,
-    required bool isLast,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showSaleDetails(context, {
-          'id': id,
-          'passenger': passenger,
-          'route': route,
-          'seat': seat,
-          'amount': amount,
-          'status': status,
-        }),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: isLast
-                ? null
-                : const Border(
-                    bottom: BorderSide(color: Color(0xFFF0F0F0), width: 1),
-                  ),
+  Widget _buildSaleCard(Map<String, dynamic> sale) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    id,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  _buildStatusBadge(status),
-                ],
-              ),
-              const Gap(8),
-              Text(
-                passenger,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
-              const Gap(6),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.route_rounded,
-                    size: 14,
-                    color: Color(0xFF9E9E9E),
-                  ),
-                  const Gap(6),
-                  Expanded(
-                    child: Text(
-                      route,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showSaleDetails(context, sale),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── ID + badge statut ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      sale['id'],
                       style: const TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF757575),
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    _buildStatusBadge(sale['status']),
+                  ],
+                ),
+                const Gap(8),
+                // ── Nom du passager ──
+                Text(
+                  sale['passenger'],
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const Gap(6),
+                // ── Trajet ──
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.route_rounded,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    const Gap(6),
+                    Expanded(
+                      child: Text(
+                        sale['route'],
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(4),
+                // ── Date & heure ──
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_month_rounded,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    const Gap(6),
+                    Text(
+                      '${sale['date']} • ${sale['time']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const Gap(8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Place $seat',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF666666),
+                  ],
+                ),
+                const Gap(10),
+                // ── Place + montant ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Place ${sale['seat']}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    '$amount FCFA',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1A1A1A),
+                    Text(
+                      '${sale['amount']} FCFA',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1E293B),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  // ── Modal détails ──────────────────────────────────────────────────────────
   void _showSaleDetails(BuildContext context, Map<String, dynamic> sale) {
     showModalBottomSheet(
       context: context,
@@ -503,6 +506,12 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
             const Gap(16),
             _buildDetailRow('Trajet', sale['route']),
             const Gap(16),
+            if (sale['date'] != null) ...[
+              _buildDetailRow('Date', sale['date']),
+              const Gap(16),
+              _buildDetailRow('Heure', sale['time']),
+              const Gap(16),
+            ],
             _buildDetailRow('Place', sale['seat']),
             const Divider(height: 32, color: Color(0xFFEEEEEE)),
             Row(
@@ -533,7 +542,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A1A1A),
+                  backgroundColor: const Color.fromARGB(255, 168, 166, 166),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -541,7 +550,11 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                 ),
                 child: const Text(
                   'Fermer',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -601,9 +614,9 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   }
 }
 
+// ── Horloge digitale ───────────────────────────────────────────────────────
 class _DigitalClock extends StatefulWidget {
   const _DigitalClock();
-
   @override
   State<_DigitalClock> createState() => _DigitalClockState();
 }
@@ -618,11 +631,7 @@ class _DigitalClockState extends State<_DigitalClock> {
     super.initState();
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          _updateDateTime();
-        });
-      }
+      if (mounted) setState(() => _updateDateTime());
     });
   }
 
@@ -641,7 +650,7 @@ class _DigitalClockState extends State<_DigitalClock> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 105, // Taille fixe pour éviter les micro-vibrations du layout
+      width: 105,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,

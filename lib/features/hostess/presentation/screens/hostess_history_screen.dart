@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:car225/core/theme/app_colors.dart';
@@ -12,13 +13,16 @@ class HostessHistoryScreen extends StatefulWidget {
 }
 
 class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
-  DateTimeRange? _selectedDateRange;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _isFiltered = false;
+  bool _isLoading = false;
 
   final List<Map<String, dynamic>> _allHistorySales = [
     {
       'id': 'TK-001',
       'passenger': 'Jean-Pierre Mbarga',
-      'route': 'Douala → Yaoundé',
+      'route': 'Abidjan → Yamoussoukro',
       'seat': 'A12',
       'amount': '5,000',
       'date': '09 Fév 2026',
@@ -29,7 +33,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     {
       'id': 'TK-002',
       'passenger': 'Marie-Claire Fotso',
-      'route': 'Yaoundé → Bafoussam',
+      'route': 'Yamoussoukro → Bouaké',
       'seat': 'B05',
       'amount': '4,500',
       'date': '09 Fév 2026',
@@ -40,7 +44,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     {
       'id': 'TK-003',
       'passenger': 'Paul Ndjock',
-      'route': 'Douala → Kribi',
+      'route': 'Bouaké → Korhogo',
       'seat': 'C08',
       'amount': '3,500',
       'date': '08 Fév 2026',
@@ -51,7 +55,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     {
       'id': 'TK-004',
       'passenger': 'Awa Diop',
-      'route': 'Abidjan → Bouaké',
+      'route': 'Korhogo → Abidjan',
       'seat': 'D02',
       'amount': '15,000',
       'date': '08 Fév 2026',
@@ -73,52 +77,84 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
   ];
 
   List<Map<String, dynamic>> get _filteredSales {
-    if (_selectedDateRange == null) return _allHistorySales;
+    if (!_isFiltered || (_startDate == null && _endDate == null)) {
+      return _allHistorySales;
+    }
 
     return _allHistorySales.where((sale) {
       final saleDate = sale['dateTime'] as DateTime;
-      final start = DateTime(
-        _selectedDateRange!.start.year,
-        _selectedDateRange!.start.month,
-        _selectedDateRange!.start.day,
-      );
-      final end = DateTime(
-        _selectedDateRange!.end.year,
-        _selectedDateRange!.end.month,
-        _selectedDateRange!.end.day,
-        23,
-        59,
-        59,
-      );
+      final start = _startDate != null
+          ? DateTime(_startDate!.year, _startDate!.month, _startDate!.day)
+          : DateTime(2000);
+      final end = _endDate != null
+          ? DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59)
+          : DateTime(2100);
       return saleDate.isAfter(start) && saleDate.isBefore(end);
     }).toList();
   }
 
-  Future<void> _selectDateRange(BuildContext context) async {
-    final DateTimeRange? picked = await showDateRangePicker(
+  Future<void> _selectStartDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
       context: context,
+      initialDate: _startDate ?? DateTime.now(),
       firstDate: DateTime(2025),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDateRange: _selectedDateRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              onSurface: const Color(0xFF1E293B),
-            ),
+      lastDate: _endDate ?? DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+            onSurface: Color(0xFF1E293B),
           ),
-          child: child!,
-        );
-      },
+        ),
+        child: child!,
+      ),
     );
+    if (picked != null) setState(() => _startDate = picked);
+  }
 
-    if (picked != null && picked != _selectedDateRange) {
+  Future<void> _selectEndDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _endDate ?? (_startDate ?? DateTime.now()),
+      firstDate: _startDate ?? DateTime(2025),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+            onSurface: Color(0xFF1E293B),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _endDate = picked);
+  }
+
+  Future<void> _applyFilter() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulation d'un chargement réseau
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (mounted) {
       setState(() {
-        _selectedDateRange = picked;
+        _isFiltered = true;
+        _isLoading = false;
       });
     }
+  }
+
+  void _resetFilter() {
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+      _isFiltered = false;
+    });
   }
 
   @override
@@ -131,21 +167,23 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
         children: [
           _buildPremiumHeader(),
           Expanded(
-            child: filtered.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    key: const PageStorageKey('hostess_history_scroll'),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(
-                      20,
-                      10,
-                      20,
-                      120,
-                    ), // Padding bas pour CurvedNavigationBar
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) =>
-                        _buildHistoryItem(context, filtered[index]),
-                  ),
+            child: _isLoading
+                ? _buildLoadingState()
+                : (filtered.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          key: const PageStorageKey('hostess_history_scroll'),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(
+                            20,
+                            10,
+                            20,
+                            120,
+                          ), // Padding bas pour CurvedNavigationBar
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) =>
+                              _buildHistoryItem(context, filtered[index]),
+                        )),
           ),
         ],
       ),
@@ -153,21 +191,20 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
   }
 
   Widget _buildPremiumHeader() {
-    final String startDate = _selectedDateRange == null
-        ? 'Choisir'
-        : DateFormat('dd MMM yyyy', 'fr_FR').format(_selectedDateRange!.start);
-
-    final String endDate = _selectedDateRange == null
-        ? 'Choisir'
-        : DateFormat('dd MMM yyyy', 'fr_FR').format(_selectedDateRange!.end);
+    final fmt = DateFormat('dd/MM/yyyy');
+    final startLabel = _startDate != null
+        ? fmt.format(_startDate!)
+        : 'jj/mm/aaaa';
+    final endLabel = _endDate != null ? fmt.format(_endDate!) : 'jj/mm/aaaa';
+    final hasFilter = _startDate != null || _endDate != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: EdgeInsets.fromLTRB(
-        24,
-        MediaQuery.of(context).padding.top + 10,
-        24,
-        25,
+        20,
+        MediaQuery.of(context).padding.top + 5,
+        20,
+        22,
       ),
       decoration: BoxDecoration(
         color: AppColors.primary,
@@ -175,14 +212,15 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 0,
-            offset: const Offset(0, 0),
+            blurRadius: 12,
+            // offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Titre + bouton reset ──────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -192,10 +230,10 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                   Text(
                     'Historique des ventes',
                     style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
                       color: Colors.white,
-                      letterSpacing: -1,
+                      letterSpacing: -0.8,
                     ),
                   ),
                   Text(
@@ -208,9 +246,9 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                   ),
                 ],
               ),
-              if (_selectedDateRange != null)
+              if (hasFilter || _isFiltered)
                 GestureDetector(
-                  onTap: () => setState(() => _selectedDateRange = null),
+                  onTap: _resetFilter,
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
@@ -226,70 +264,147 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                 ),
             ],
           ),
-          const Gap(25),
-          // SÉLECTEUR DE DATE DESIGN
-          GestureDetector(
-            onTap: () => _selectDateRange(context),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          const Gap(20),
+          // ── Deux champs date + bouton recherche ───────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Champ Du
+              Expanded(
+                child: _buildDateField(
+                  label: 'Du',
+                  value: startLabel,
+                  isEmpty: _startDate == null,
+                  onTap: () => _selectStartDate(context),
+                ),
               ),
-              child: Row(
-                children: [
-                  _buildDateColumn(
-                    "DU",
-                    startDate,
-                    Icons.calendar_today_rounded,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    child: Container(
-                      width: 1,
-                      height: 35,
-                      color: const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  _buildDateColumn(
-                    "AU",
-                    endDate,
-                    Icons.event_available_rounded,
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFFFF8A65)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.search_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                ],
+              const Gap(10),
+              // Champ Au
+              Expanded(
+                child: _buildDateField(
+                  label: 'Au',
+                  value: endLabel,
+                  isEmpty: _endDate == null,
+                  onTap: () => _selectEndDate(context),
+                ),
               ),
+              const Gap(12),
+              // Bouton recherche
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    onTap: _isLoading
+                        ? null
+                        : () {
+                            HapticFeedback.mediumImpact();
+                            _applyFilter();
+                          },
+                    borderRadius: BorderRadius.circular(16),
+                    splashColor: AppColors.primary.withValues(alpha: 0.1),
+                    highlightColor: AppColors.primary.withValues(alpha: 0.05),
+                    child: SizedBox(
+                      height: 50,
+                      width: 50,
+                      child: _isLoading
+                          ? const Center(
+                              child: SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.search_rounded,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateField({
+    required String label,
+    required String value,
+    required bool isEmpty,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const Gap(6),
+          Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isEmpty
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : Colors.white,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 14,
+                  color: isEmpty ? const Color(0xFFB0BEC5) : AppColors.primary,
+                ),
+                const Gap(8),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isEmpty
+                          ? const Color.fromARGB(255, 103, 105, 106)
+                          : const Color(0xFF1E293B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -297,35 +412,36 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     );
   }
 
-  Widget _buildDateColumn(String label, String value, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 12, color: AppColors.primary),
-            const Gap(6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF94A3B8),
-                letterSpacing: 0.5,
-              ),
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Gap(100),
+          SizedBox(
+            height: 40,
+            width: 40,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
-          ],
-        ),
-        const Gap(4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1E293B),
           ),
-        ),
-      ],
+          Gap(24),
+          Text(
+            'Recherche en cours...',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          Gap(8),
+          Text(
+            'Nous récupérons vos ventes',
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
     );
   }
 

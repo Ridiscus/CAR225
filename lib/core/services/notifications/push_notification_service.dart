@@ -111,11 +111,6 @@ class PushNotificationService {
   }
 }*/
 
-
-
-
-
-
 import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -126,7 +121,6 @@ import 'package:flutter/material.dart';
 import '../../../features/home/presentation/screens/notification_screen.dart';
 import '../../../main.dart';
 
-
 // Handler Background (Doit rester en top-level)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -135,12 +129,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
     // 1. Permissions
     await _firebaseMessaging.requestPermission(
-      alert: true, badge: true, sound: true, provisional: false,
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
     );
 
     // 2. Init Local Notifications
@@ -164,7 +162,8 @@ class PushNotificationService {
 
     // CAS 3 : L'app est complètement fermée (Terminated) et l'utilisateur clique
     // On vérifie s'il y a un message initial au démarrage
-    final RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
+    final RemoteMessage? initialMessage = await _firebaseMessaging
+        .getInitialMessage();
     if (initialMessage != null) {
       print("Notification cliquée (App fermée) !");
       // On attend un peu que l'app se construise
@@ -175,12 +174,14 @@ class PushNotificationService {
   }
 
   Future<void> _initLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings();
 
     const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings
+      android: androidSettings,
+      iOS: iosSettings,
     );
 
     await _localNotificationsPlugin.initialize(
@@ -192,6 +193,7 @@ class PushNotificationService {
           // Note : Le payload doit être une string JSON envoyée lors de la création de la notif locale
           try {
             final data = jsonDecode(response.payload!);
+            print("Notification cliquée (Foreground) ! avec data: $data");
             // On navigue
             navigatorKey.currentState?.push(
               MaterialPageRoute(builder: (_) => const NotificationScreen()),
@@ -206,14 +208,16 @@ class PushNotificationService {
     // Channel Android
     if (Platform.isAndroid) {
       await _localNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'high_importance_channel',
-          'Notifications Importantes',
-          importance: Importance.max,
-        ),
-      );
+            const AndroidNotificationChannel(
+              'high_importance_channel',
+              'Notifications Importantes',
+              importance: Importance.max,
+            ),
+          );
     }
   }
 

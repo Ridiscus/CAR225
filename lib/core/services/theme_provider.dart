@@ -21,7 +21,6 @@ class ThemeProvider extends ChangeNotifier {
   void toggleTheme(bool isOn) async {
     _isDarkMode = isOn;
     notifyListeners(); // Dit à toute l'app de se redessiner
-
     // Sauvegarde
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('isDarkMode', _isDarkMode);
@@ -59,7 +58,6 @@ class ThemeProvider extends ChangeNotifier {
   void _loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-
     String savedSize = prefs.getString('fontSize') ?? "Moyenne";
     setFontSize(savedSize); // Cela va aussi notifier les listeners
   }

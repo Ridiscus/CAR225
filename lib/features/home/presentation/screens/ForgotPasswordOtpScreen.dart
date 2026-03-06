@@ -447,7 +447,9 @@ class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
       print("📡 [DEBUG] 3. Tentative d'appel au Repository (verifyOtp)...");
 
       // Appel API
-      await context.read<AuthRepository>().verifyOtp(widget.email, _code);
+      //await context.read<AuthRepository>().verifyOtp(widget.email, _code);
+      // Appel API (Nouveau)
+      await context.read<AuthRepository>().verifyPasswordOtp(widget.email, _code);
 
       print("✅ [DEBUG] 4. API SUCCÈS ! Le code est valide.");
 

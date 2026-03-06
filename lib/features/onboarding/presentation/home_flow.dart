@@ -1,793 +1,10 @@
-/*import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-
-// Tes imports (Assure-toi que AppColors.primary est une couleur qui passe bien sur le noir, comme un vert ou bleu vif)
-import '../../../../core/theme/app_colors.dart';
-import '../../auth/presentation/screens/login_screen.dart';
-import '../../booking/presentation/screens/search_results_screen.dart';
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  // Variables
-  String depart = "Abidjan";
-  String destination = "Bouaké";
-  bool isAllerRetour = false;
-
-
-    @override
-    Widget build(BuildContext context) {
-      // -----------------------------------------------------------
-      // 🌗 LOGIQUE DARK MODE / LIGHT MODE
-      // -----------------------------------------------------------
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-
-      // Couleurs dynamiques
-      final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-
-      final mainTextColor = isDark ? Colors.white : Colors.black;
-
-      // CORRECTION ICI : Ajout du '!' après [400]
-      final subTextColor = isDark ? Colors.grey[400]! : AppColors.grey;
-
-      // CORRECTION ICI : Ajout du '!' après [700]
-      final borderColor = isDark ? Colors.grey[700]! : Colors.grey.shade300;
-
-      // CORRECTION ICI : Ajout du '!' après [800]
-      final circleBtnColor = isDark ? Colors.grey[800]! : Colors.white;
-      // -----------------------------------------------------------
-
-
-    return Scaffold(
-      // MODIFICATION : On utilise la couleur du thème (défini dans ton main.dart)
-      // Si ton main.dart est bien configuré, ça sera noir/gris foncé auto.
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // --- 1. LE HEADER (IMAGE + BOUTONS) ---
-            Stack(
-              children: [
-                // Image de fond
-                Container(
-                  height: 280,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.black, // Le fond derrière l'image reste noir, c'est mieux pour l'image
-                    image: DecorationImage(
-                      image: AssetImage("assets/images/bus_header.jpg"),
-                      fit: BoxFit.cover,
-                      opacity: 0.8,
-                    ),
-                  ),
-                ),
-                // Boutons du haut
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // PROFIL -> Login
-                        _buildCircleBtn(
-                            "assets/images/user.png",
-                                () => _goToLogin(context),
-                            circleBtnColor // On passe la couleur dynamique
-                        ),
-
-                        // TICKET -> SearchResultsScreen
-                        InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SearchResultsScreen(
-                                  isGuestMode: true,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            height: 40, width: 40,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: circleBtnColor, // Couleur dynamique
-                                shape: BoxShape.circle
-                            ),
-                            child: Image.asset(
-                              "assets/images/paper.png",
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // --- 2. LA CARTE DE RECHERCHE ---
-            Transform.translate(
-              offset: const Offset(0, -60),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: cardColor, // <--- APPLICATION DE LA COULEUR DYNAMIQUE
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.1), // Ombre plus forte en dark pour le contraste
-                          blurRadius: 10,
-                          offset: const Offset(0, 5)
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Où souhaitez-vous voyager ?",
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: mainTextColor)), // Couleur texte dynamique
-
-                      Text("Réservez votre billet en quelques clics",
-                          style: TextStyle(color: subTextColor, fontSize: 12)), // Couleur sous-titre dynamique
-
-                      const Gap(20),
-
-                      // Champs Départ / Arrivée
-                      Row(
-                        children: [
-                          Expanded(
-                              child: _buildInputBox(
-                                  "assets/images/map.png", "Départ", "Abidjan",
-                                  mainTextColor, subTextColor, borderColor) // On passe les couleurs
-                          ),
-                          const Gap(10),
-                          Expanded(
-                              child: _buildInputBox(
-                                  "assets/images/map.png", "Arrivée", "Yamoussoukro",
-                                  mainTextColor, subTextColor, borderColor, isGreen: true)
-                          ),
-                        ],
-                      ),
-                      const Gap(15),
-
-                      // Date + Checkbox
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: _buildInputBox(
-                                "assets/images/agenda.png", "Date départ", "Ven. 30 Jan",
-                                mainTextColor, subTextColor, borderColor),
-                          ),
-
-                          const Gap(10),
-
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Checkbox(
-                                value: isAllerRetour,
-                                activeColor: AppColors.primary,
-                                // En dark mode, le checkColor (la coche) est blanc par défaut, c'est ok.
-                                side: BorderSide(color: isDark ? Colors.grey : Colors.black54), // Bordure checkbox visible en dark
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    isAllerRetour = value ?? false;
-                                  });
-                                },
-                              ),
-                              const Gap(4),
-                              Text("Aller-retour",
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: mainTextColor)),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      const Gap(20),
-
-                      // BOUTON RECHERCHER
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SearchResultsScreen(
-                                  isGuestMode: true,
-                                ),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text("Rechercher des trajets", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // --- 3. BANNIÈRE PRÊT À RÉSERVER ---
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  // En dark mode, 0xFF37474F est déjà sombre, mais on peut le garder
-                  // ou le rendre un tout petit peu plus clair que le fond noir pour ressortir.
-                  // Ici je le garde tel quel car c'est une couleur "Identité" gris/bleuté qui marche sur le noir.
-                  color: const Color(0xFF37474F),
-                  borderRadius: BorderRadius.circular(15),
-                  border: isDark ? Border.all(color: Colors.grey[800]!) : null, // Petite bordure subtile en dark mode
-                ),
-                child: Column(
-                  children: [
-                    const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    const Text("Trouvez votre voyage parfait.", style: TextStyle(color: Colors.white70)), // AppColors.grey risque d'être trop sombre ici
-                    const Gap(15),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () => _goToLogin(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
-                        ),
-                        child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ),
-
-            const Gap(20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Helper : Bouton Rond Header (Modifié pour accepter la couleur)
-  Widget _buildCircleBtn(String imagePath, VoidCallback onTap, Color bgColor) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        height: 40, width: 40,
-        decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-        child: Image.asset(
-          imagePath,
-          color: AppColors.primary,
-          fit: BoxFit.contain,
-        ),
-      ),
-    );
-  }
-
-  // Helper : Champ de saisie (Modifié pour accepter les couleurs dynamiques)
-  Widget _buildInputBox(
-      String imagePath,
-      String label,
-      String value,
-      Color textColor,
-      Color labelColor,
-      Color borderColor,
-      {bool isGreen = false}) {
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor), // Bordure dynamique
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            imagePath,
-            width: 20,
-            height: 20,
-            color: isGreen ? AppColors.secondary : AppColors.primary,
-          ),
-          const Gap(10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(fontSize: 10, color: labelColor)), // Label dynamique
-              Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textColor)), // Valeur dynamique
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  void _goToLogin(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-  }
-}*/
-
-
-
-
-
-/*import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-import 'package:intl/intl.dart'; // Pour le formatage date
-
-import '../../../../core/theme/app_colors.dart';
-import '../../auth/presentation/screens/login_screen.dart';
-import '../../booking/presentation/screens/search_results_screen.dart';
-
-// Imports de TA Clean Architecture
-import '../../booking/data/datasources/booking_remote_data_source.dart';
-import '../../booking/domain/repositories/booking_repository.dart';
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  // --- ETAT ---
-  String? villeDepart;
-  String? villeArrivee;
-  DateTime? dateDepart; // Changé en DateTime pour manipuler logicement
-  bool isAllerRetour = false;
-
-  // Liste chargée depuis l'API
-  List<String> villesDisponibles = [];
-  bool isLoadingCities = true;
-
-  late BookingRepositoryImpl _bookingRepository;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Initialisation "Manuelle" du repo (Idéalement via GetIt/Provider)
-    final dio = Dio(BaseOptions(baseUrl: 'https://car225.com/api/'));
-    _bookingRepository = BookingRepositoryImpl(remoteDataSource: BookingRemoteDataSourceImpl(dio: dio));
-
-    // Charger les villes
-    _loadCities();
-  }
-
-  Future<void> _loadCities() async {
-    final cities = await _bookingRepository.getCities();
-    setState(() {
-      villesDisponibles = cities;
-      isLoadingCities = false;
-      // Valeurs par défaut si dispo
-      if (cities.isNotEmpty) {
-        villeDepart = cities.first;
-        if (cities.length > 1) villeArrivee = cities[1];
-      }
-    });
-  }
-
-  // --- LOGIQUE DATE PICKER (Griser dates passées) ---
-  Future<void> _selectDate() async {
-    final DateTime now = DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: dateDepart ?? now,
-      firstDate: now, // ⚠️ EMPÊCHE DE CHOISIR AVANT AUJOURD'HUI
-      lastDate: DateTime(now.year + 1),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: AppColors.primary),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        dateDepart = picked;
-      });
-    }
-  }
-
-  // --- NAVIGATION VERS SEARCH ---
-  void _onSearchPressed() {
-    if (villeDepart == null || villeArrivee == null || dateDepart == null) {
-      // Petite alerte si champs vides
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Veuillez remplir tous les champs")));
-      return;
-    }
-
-    // Formatage date pour l'API (yyyy-MM-dd)
-    String dateApi = DateFormat('yyyy-MM-dd').format(dateDepart!);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SearchResultsScreen(
-          isGuestMode: true,
-          // On passe les paramètres de recherche
-          searchParams: {
-            "depart": villeDepart,
-            "arrivee": villeArrivee,
-            "date": dateApi,
-            "isAllerRetour": isAllerRetour
-          },
-        ),
-      ),
-    );
-  }
-
-  // --- UI ---
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final mainTextColor = isDark ? Colors.white : Colors.black;
-    final subTextColor = isDark ? Colors.grey[400]! : AppColors.grey;
-    final borderColor = isDark ? Colors.grey[700]! : Colors.grey.shade300;
-
-    // Formatage affichage date
-    String dateDisplay = dateDepart != null
-        ? DateFormat('EEE d MMM', 'fr_FR').format(dateDepart!)
-        : "Choisir date";
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-
-            // --- 1. LE HEADER (IMAGE + BOUTONS) ---
-            Stack(
-              children: [
-                // Image de fond
-                Container(
-                  height: 280,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.black, // Le fond derrière l'image reste noir, c'est mieux pour l'image
-                    image: DecorationImage(
-                      image: AssetImage("assets/images/bus_header.jpg"),
-                      fit: BoxFit.cover,
-                      opacity: 0.8,
-                    ),
-                  ),
-                ),
-                // Boutons du haut
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // PROFIL -> Login
-                        _buildCircleBtn(
-                            "assets/images/user.png",
-                                () => _goToLogin(context),
-                            circleBtnColor // On passe la couleur dynamique
-                        ),
-
-                        // TICKET -> SearchResultsScreen
-                        InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SearchResultsScreen(
-                                  isGuestMode: true,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            height: 40, width: 40,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: circleBtnColor, // Couleur dynamique
-                                shape: BoxShape.circle
-                            ),
-                            child: Image.asset(
-                              "assets/images/paper.png",
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-
-            // --- CARTE DE RECHERCHE ---
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-                          blurRadius: 10, offset: const Offset(0, 5)
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Où souhaitez-vous voyager ?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: mainTextColor)),
-                      Text("Réservez votre billet en quelques clics", style: TextStyle(color: subTextColor, fontSize: 12)),
-                      const Gap(20),
-
-                      // INPUTS VILLES (Dropdown ou Modal)
-                      isLoadingCities
-                          ? const Center(child: CircularProgressIndicator())
-                          : Row(
-                        children: [
-                          Expanded(
-                              child: _buildCitySelector(
-                                  label: "Départ",
-                                  value: villeDepart,
-                                  items: villesDisponibles,
-                                  onChanged: (val) => setState(() => villeDepart = val),
-                                  textColor: mainTextColor,
-                                  subTextColor: subTextColor,
-                                  borderColor: borderColor
-                              )
-                          ),
-                          const Gap(10),
-                          Expanded(
-                              child: _buildCitySelector(
-                                  label: "Arrivée",
-                                  value: villeArrivee,
-                                  items: villesDisponibles,
-                                  onChanged: (val) => setState(() => villeArrivee = val),
-                                  textColor: mainTextColor,
-                                  subTextColor: subTextColor,
-                                  borderColor: borderColor,
-                                  isGreen: true
-                              )
-                          ),
-                        ],
-                      ),
-                      const Gap(15),
-
-                      // DATE + CHECKBOX
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: _selectDate,
-                              child: _buildInputBoxUI(
-                                  "assets/images/agenda.png", "Date départ", dateDisplay,
-                                  mainTextColor, subTextColor, borderColor
-                              ),
-                            ),
-                          ),
-                          const Gap(10),
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: isAllerRetour,
-                                activeColor: AppColors.primary,
-                                side: BorderSide(color: isDark ? Colors.grey : Colors.black54),
-                                onChanged: (v) => setState(() => isAllerRetour = v ?? false),
-                              ),
-                              Text("Aller-retour", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: mainTextColor)),
-                            ],
-                          )
-                        ],
-                      ),
-                      const Gap(20),
-
-                      // BOUTON RECHERCHER
-                      SizedBox(
-                        width: double.infinity, height: 50,
-                        child: ElevatedButton(
-                          onPressed: _onSearchPressed,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text("Rechercher des trajets", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-
-            // --- 3. BANNIÈRE PRÊT À RÉSERVER ---
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  // En dark mode, 0xFF37474F est déjà sombre, mais on peut le garder
-                  // ou le rendre un tout petit peu plus clair que le fond noir pour ressortir.
-                  // Ici je le garde tel quel car c'est une couleur "Identité" gris/bleuté qui marche sur le noir.
-                  color: const Color(0xFF37474F),
-                  borderRadius: BorderRadius.circular(15),
-                  border: isDark ? Border.all(color: Colors.grey[800]!) : null, // Petite bordure subtile en dark mode
-                ),
-                child: Column(
-                  children: [
-                    const Text("Prêt à réserver ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    const Text("Trouvez votre voyage parfait.", style: TextStyle(color: Colors.white70)), // AppColors.grey risque d'être trop sombre ici
-                    const Gap(15),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () => _goToLogin(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
-                        ),
-                        child: const Text("Réserver maintenant", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ),
-
-            const Gap(20),
-
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Widget Sélecteur de ville simplifié (Dropdown)
-  Widget _buildCitySelector({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
-    required Color textColor, required Color subTextColor, required Color borderColor,
-    bool isGreen = false
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 10, color: subTextColor)),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: value,
-              isExpanded: true,
-              icon: Icon(Icons.keyboard_arrow_down, color: isGreen ? AppColors.secondary : AppColors.primary),
-              dropdownColor: Theme.of(context).cardColor,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textColor),
-              items: items.map((String ville) {
-                return DropdownMenuItem<String>(
-                  value: ville,
-                  child: Text(ville),
-                );
-              }).toList(),
-              onChanged: onChanged,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Widget UI simple pour la Date (reprend ton style)
-  Widget _buildInputBoxUI(String icon, String label, String value, Color textColor, Color subColor, Color borderColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            imagePath,
-            width: 20,
-            height: 20,
-            color: isGreen ? AppColors.secondary : AppColors.primary,
-          ),
-          const Gap(10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(fontSize: 10, color: labelColor)), // Label dynamique
-              Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textColor)), // Valeur dynamique
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-
-
-
-
-
-
-  // Helper : Bouton Rond Header (Modifié pour accepter la couleur)
-  Widget _buildCircleBtn(String imagePath, VoidCallback onTap, Color bgColor) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        height: 40, width: 40,
-        decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-        child: Image.asset(
-          imagePath,
-          color: AppColors.primary,
-          fit: BoxFit.contain,
-        ),
-      ),
-    );
-  }
-
-
-
-
-  void _goToLogin(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-  }
-}*/
-
-
-
-
-
-
-
-
-
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -838,6 +55,38 @@ class _HomeScreenState extends State<HomeScreen> {
     _bookingRepository = BookingRepositoryImpl(remoteDataSource: dataSource);
 
     _loadCities();
+  }
+
+
+
+// --- FONCTION UTILITAIRE POUR LA POSITION GPS ---
+  Future<Position?> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Vérifier si le service de localisation est activé.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Les services de localisation ne sont pas activés, on ne peut pas continuer.
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        // Les permissions sont refusées
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Les permissions sont refusées de façon permanente
+      return null;
+    }
+
+    // Quand on arrive ici, les permissions sont accordées et on peut récupérer la position.
+    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
   Future<void> _loadCities() async {
@@ -914,41 +163,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-
-  // --- NAVIGATION ---
-  /*void _onSearchPressed() {
-    if (villeDepart == null || villeArrivee == null || dateDepart == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Veuillez remplir tous les champs"),
-            backgroundColor: Colors.red,
-          )
-      );
-      return;
-    }
-
-    // Formatage date API (yyyy-MM-dd)
-    String dateApi = DateFormat('yyyy-MM-dd').format(dateDepart!);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SearchResultsScreen(
-          isGuestMode: true,
-          searchParams: {
-            "depart": villeDepart,
-            "arrivee": villeArrivee,
-            "date": dateApi,
-            "isAllerRetour": isAllerRetour
-          },
-        ),
-      ),
-    );
-  }*/
-
-
-
-
   // --- WIDGET NOTIFICATION TOP (Custom Toast) ---
   void _showTopNotification(BuildContext context, String message) {
     final overlay = Overlay.of(context);
@@ -1010,10 +224,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
   }
-
-
-
-
 
 
   @override
@@ -1202,6 +412,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            // --- NOUVEAU : 2.5 BANNIÈRE SIGNALEMENT URGENCE ---
+            Transform.translate(
+              offset: const Offset(0, -50), // Aligné avec le décalage actuel
+              child: _buildEmergencyBanner(context, isDark),
+            ),
+
+
+
             // --- 3. BANNIÈRE PRÊT À RÉSERVER ---
             Transform.translate(
               offset: const Offset(0, -40),
@@ -1244,8 +462,329 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- WIDGETS HELPERS CORRIGÉS ---
 
+  // ===========================================================================
+  // 🚨 UI : BANNIÈRE DE SIGNALEMENT D'ACCIDENT
+  // ===========================================================================
+  Widget _buildEmergencyBanner(BuildContext context, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF3A1C1C) : const Color(0xFFFFF0F0),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.redAccent.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15),
+          onTap: () => _showAccidentReportModal(context),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // Icône d'alerte
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                ),
+                const Gap(15),
+                // Textes
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Témoin d'un accident ?",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.red[900],
+                        ),
+                      ),
+                      const Gap(4),
+                      Text(
+                        "Alertez les secours rapidement, même sans compte.",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.red[200] : Colors.red[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Flèche
+                const Icon(Icons.arrow_forward_ios, color: Colors.redAccent, size: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+// ===========================================================================
+// 🚨 LOGIQUE : MODALE ET APPEL API SIGNALEMENT
+// ===========================================================================
+  // ===========================================================================
+// 🚨 LOGIQUE : MODALE ET APPEL API SIGNALEMENT (AVEC PHOTO)
+// ===========================================================================
+  void _showAccidentReportModal(BuildContext context) {
+    final TextEditingController descController = TextEditingController();
+    bool isSubmitting = false;
+    File? selectedPhoto; // 📸 Stockera la photo sélectionnée
+    final ImagePicker picker = ImagePicker();
+
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        builder: (ctx) {
+          return StatefulBuilder(
+              builder: (context, setStateModal) {
+
+                // --- FONCTION POUR CHOISIR LA PHOTO ---
+                Future<void> _pickImage(ImageSource source) async {
+                  try {
+                    final XFile? pickedFile = await picker.pickImage(
+                      source: source,
+                      imageQuality: 70, // Compresse légèrement l'image
+                    );
+                    if (pickedFile != null) {
+                      setStateModal(() {
+                        selectedPhoto = File(pickedFile.path);
+                      });
+                    }
+                  } catch (e) {
+                    _showTopNotification(context, "❌ Erreur lors de la sélection de l'image.");
+                  }
+                }
+
+                // --- MODALE DE CHOIX (CAMERA / GALERIE) ---
+                void _showImageSourceOptions() {
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (context) => SafeArea(
+                      child: Wrap(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                            title: const Text('Prendre une photo'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _pickImage(ImageSource.camera);
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                            title: const Text('Choisir depuis la galerie'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _pickImage(ImageSource.gallery);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Padding(
+                  // 1. Gère l'espace pris par le clavier
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
+                    child: SafeArea( // 🟢 NOUVEAU : Protège contre la barre de navigation système
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            left: 20, right: 20, top: 20, bottom: 10, // 🟢 Marge interne basique
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                      // --- HEADER MODALE ---
+                      Row(
+                        children: [
+                          const Icon(Icons.emergency_share, color: Colors.redAccent, size: 28),
+                          const Gap(10),
+                          const Expanded(
+                            child: Text("Signaler une urgence", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.grey),
+                            onPressed: () => Navigator.pop(context),
+                          )
+                        ],
+                      ),
+                      const Gap(15),
+
+                      // --- CHAMP TEXTE ---
+                      const Text("Décrivez la situation (gravité, lieu, véhicules) :", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      const Gap(10),
+                      TextField(
+                        controller: descController,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          hintText: "Ex: Accident grave au niveau du péage...",
+                          filled: true,
+                          fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
+                        ),
+                      ),
+                      const Gap(15),
+
+                      // --- APERÇU DE LA PHOTO (Si sélectionnée) ---
+                      if (selectedPhoto != null) ...[
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                selectedPhoto!,
+                                height: 100,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 5, right: 5,
+                              child: InkWell(
+                                onTap: () => setStateModal(() => selectedPhoto = null),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                        const Gap(15),
+                      ],
+
+                      // --- BOUTONS PIÈCES JOINTES ---
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _showImageSourceOptions, // 📸 Action activée
+                              icon: Icon(selectedPhoto == null ? Icons.camera_alt : Icons.check_circle, size: 18, color: selectedPhoto == null ? Colors.grey[700] : Colors.green),
+                              label: Text(selectedPhoto == null ? "Photo" : "Photo ajoutée", style: TextStyle(fontSize: 13, color: selectedPhoto == null ? Colors.grey[700] : Colors.green)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: selectedPhoto == null ? Colors.grey.shade300 : Colors.green),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const Gap(10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                _showTopNotification(context, "📍 Localisation automatique activée lors de l'envoi.");
+                              },
+                              icon: const Icon(Icons.location_on, size: 18, color: Colors.blueAccent),
+                              label: const Text("Position", style: TextStyle(fontSize: 13, color: Colors.blueAccent)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.blueAccent.withOpacity(0.5)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Gap(20),
+
+                      // --- BOUTON DE SOUMISSION API ---
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: isSubmitting ? null : () async {
+                            if (descController.text.trim().isEmpty) {
+                              _showTopNotification(context, "⚠️ Veuillez décrire l'accident.");
+                              return;
+                            }
+
+                            setStateModal(() => isSubmitting = true);
+
+                            try {
+                              // 1. Récupération de la position GPS
+                              Position? position = await _determinePosition();
+
+                              // 2. Préparation des données textuelles
+                              Map<String, dynamic> dataMap = {
+                                "type": "accident",
+                                "description": descController.text.trim(),
+                                "latitude": position?.latitude,
+                                "longitude": position?.longitude,
+                              };
+
+                              // 3. Préparation du FormData (avec la photo si elle existe)
+                              FormData formData = FormData.fromMap(dataMap);
+
+                              if (selectedPhoto != null) {
+                                formData.files.add(MapEntry(
+                                  "photo", // ⚠️ Vérifie que ton API attend bien ce nom (ex: "photo" ou "image")
+                                  await MultipartFile.fromFile(selectedPhoto!.path, filename: "accident_photo.jpg"),
+                                ));
+                              }
+
+                              // 4. Appel API
+                              final dio = Dio(BaseOptions(baseUrl: 'https://car225.com/api/'));
+                              final response = await dio.post('public/signalement-accident', data: formData);
+
+                              if (mounted) Navigator.pop(context); // Fermer la modale
+
+                              // Succès stylé
+                              _showTopNotification(context, "✅ Signalement envoyé aux secours. Merci de votre aide !");
+
+                            } catch (e) {
+                              setStateModal(() => isSubmitting = false);
+                              _showTopNotification(context, "❌ Erreur de réseau. Veuillez réessayer.");
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: isSubmitting
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text("Envoyer l'alerte", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const Gap(20),
+                    ],
+                  ),
+                ),
+                    ),
+                );
+              }
+          );
+        }
+    );
+  }
+
+
+  // --- WIDGETS HELPERS CORRIGÉS ---
   Widget _buildCitySelector({
     required String assetPath, // 1. NOUVEAU PARAMÈTRE
     required String label,

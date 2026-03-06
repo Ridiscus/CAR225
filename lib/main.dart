@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'core/providers/company_provider.dart';
 import 'core/providers/notification_provider.dart';
 import 'core/providers/user_provider.dart';
+import 'core/services/notifications/global_otp_service.dart';
 import 'core/services/notifications/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/theme_provider.dart';
@@ -38,6 +39,9 @@ void main() async {
     // options: DefaultFirebaseOptions.currentPlatform, // Décommente si nécessaire
   );
 
+  // 🟢 Ajoute cette ligne pour lancer l'écoute globale !
+  GlobalOtpService.startListening();
+
   // 3. Init Notifications
   await PushNotificationService().init();
 
@@ -55,35 +59,6 @@ void main() async {
       },
     ),
   );
-
-  // 5. Lancement de l'App avec les Providers
-  /*runApp(
-    MultiProvider(
-      providers: [
-        // --- A. Providers de base ---
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
-
-        // --- B. Repositories (Logique métier sans UI) ---
-        Provider<AuthRepository>(
-          create: (_) => AuthRepositoryImpl(
-            remoteDataSource: AuthRemoteDataSourceImpl(),
-            fcmService: FcmService(),
-            deviceService: DeviceService(),
-          ),
-        ),
-
-        // --- C. ✅ PROVIDER COMPANY (Connecté avec Dio) ---
-        ChangeNotifierProvider(
-          create: (_) => CompanyProvider(
-            repository: CompanyRepository(dio: dio),
-          ),
-        ),
-      ],
-      child: const Car225App(), // Ton point d'entrée principal
-    ),
-  );*/
 
   runApp(
     MultiProvider(

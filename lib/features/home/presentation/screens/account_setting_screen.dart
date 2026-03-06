@@ -225,23 +225,24 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> with Widg
   }
 
   // --- WIDGETS ET MODALS (Identiques à ton code précédent) ---
-
   void _showLanguageSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Choisir la langue", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const Gap(15),
-              _buildRadioItem("Français", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
-              _buildRadioItem("English", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
-            ],
+        return SafeArea( // 🟢 NOUVEAU : Protège le contenu de la barre de navigation
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Choisir la langue", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Gap(15),
+                _buildRadioItem("Français", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
+                _buildRadioItem("English", _currentLanguage, (val) => setState(() => _currentLanguage = val!)),
+              ],
+            ),
           ),
         );
       },

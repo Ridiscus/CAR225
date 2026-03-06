@@ -13,6 +13,8 @@ import '../models/user_model.dart';
 abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body);
 
+  // Ajoute ceci dans la classe abstraite AuthRemoteDataSource :
+  Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode);
   // ✅ CHANGEMENT ICI : On utilise AuthResponseModel au lieu de Map
   Future<AuthResponseModel> login(LoginRequestModel params);
   Future<AuthResponseModel> register(RegisterRequestModel params);
@@ -122,32 +124,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception(e.response?.data['message'] ?? "Erreur de connexion");
     }
   }
-
-  /*@override
-  Future<AuthResponseModel> register(RegisterRequestModel params) async {
-    try {
-      FormData formData = FormData.fromMap({
-        "name": params.nom,
-        "prenom": params.prenom,
-        "email": params.email,
-        "password": params.password,
-        "password_confirmation": params.passwordConfirmation,
-        "contact": params.contact,
-        "fcm_token": params.fcmToken,
-        "nom_device": params.deviceName,
-      });
-
-      if (params.photoPath != null) {
-        formData.files.add(MapEntry("photo_profile", await MultipartFile.fromFile(params.photoPath!)));
-      }
-
-      final response = await dio.post('/user/register', data: formData);
-      return AuthResponseModel.fromJson(response.data); // 🆕 Retourne le modèle complet
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? "Erreur inscription");
-    }
-  }*/
-
 
 
   @override
@@ -371,6 +347,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e, stacktrace) {
       print("🚨 [OTP PARSING ERROR] Erreur inattendue : $e");
       print("📜 [OTP STACKTRACE] $stacktrace");
+      rethrow;
+    }
+  }
+
+
+// Et ceci dans l'implémentation AuthRemoteDataSourceImpl :
+  @override
+  Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode) async {
+    try {
+      print("⏳ [PASSWORD OTP] Vérification pour l'email: $email, Code: $otpCode...");
+
+      final response = await dio.post('/user/password/verify-otp', data: {
+        'email': email,
+        'otp': otpCode,
+      });
+
+      print("✅ [PASSWORD OTP] Succès : ${response.data}");
+      return response.data;
+
+    } on DioException catch (e) {
+      print("❌ [PASSWORD OTP DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? "Code OTP invalide pour la réinitialisation");
+    } catch (e) {
+      print("🚨 [PASSWORD OTP ERROR] Erreur : $e");
       rethrow;
     }
   }

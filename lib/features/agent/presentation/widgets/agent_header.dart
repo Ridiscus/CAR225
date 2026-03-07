@@ -40,8 +40,10 @@ class _AgentHeaderState extends State<AgentHeader> {
     final profileProvider = Provider.of<ProfileProvider>(context);
     final pickedImage = profileProvider.profileImage;
 
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 25),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 5, 24, 25),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -51,13 +53,6 @@ class _AgentHeaderState extends State<AgentHeader> {
             AppColors.primary.withValues(alpha: 0.85),
           ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
       ),
       child: Row(
         children: [

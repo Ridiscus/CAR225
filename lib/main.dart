@@ -73,6 +73,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
         ChangeNotifierProvider(create: (_) => AgentProfileProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
+        //gitygttfftftftftftf
         // --- B. Repositories (Logique métier sans UI) ---
         Provider<AuthRepository>(
           create: (_) => AuthRepositoryImpl(

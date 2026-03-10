@@ -12,7 +12,7 @@ class TicketDetailScreen extends StatefulWidget {
   const TicketDetailScreen({
     Key? key,
     required this.initialTicket,
-    required this.repository
+    required this.repository,
   }) : super(key: key);
 
   @override
@@ -36,7 +36,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   // 🔄 CHARGEMENT INTELLIGENT (Fix des villes qui disparaissent)
   Future<void> _loadFullDetails() async {
     try {
-      final fullTicket = await widget.repository.getTicketDetails(widget.initialTicket.id.toString());
+      final fullTicket = await widget.repository.getTicketDetails(
+        widget.initialTicket.id.toString(),
+      );
 
       if (mounted) {
         setState(() {
@@ -44,19 +46,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           String finalDepart = fullTicket.departureCity;
           String finalArrive = fullTicket.arrivalCity;
 
-          if (finalDepart == "Départ" && widget.initialTicket.departureCity != "Départ") {
+          if (finalDepart == "Départ" &&
+              widget.initialTicket.departureCity != "Départ") {
             finalDepart = widget.initialTicket.departureCity;
           }
-          if (finalArrive == "Arrivée" && widget.initialTicket.arrivalCity != "Arrivée") {
+          if (finalArrive == "Arrivée" &&
+              widget.initialTicket.arrivalCity != "Arrivée") {
             finalArrive = widget.initialTicket.arrivalCity;
           }
 
           // On met à jour le ticket avec les meilleures infos des deux mondes
           ticket = fullTicket.copyWith(
-              departureCity: finalDepart,
-              arrivalCity: finalArrive,
-              // On force le statut si nécessaire pour qu'il soit propre
-              status: fullTicket.status.isEmpty ? widget.initialTicket.status : fullTicket.status
+            departureCity: finalDepart,
+            arrivalCity: finalArrive,
+            // On force le statut si nécessaire pour qu'il soit propre
+            status: fullTicket.status.isEmpty
+                ? widget.initialTicket.status
+                : fullTicket.status,
           );
 
           isLoading = false;
@@ -85,7 +91,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       final cleanTime = ticket.departureTimeRaw.trim();
       final timeParts = cleanTime.split(':');
 
-      if (timeParts.length < 2) return datePart.add(const Duration(hours: 23, minutes: 59));
+      if (timeParts.length < 2)
+        return datePart.add(const Duration(hours: 23, minutes: 59));
 
       return DateTime(
         datePart.year,
@@ -103,7 +110,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   bool get _isStatusValid {
     final s = ticket.status.toLowerCase().trim();
     // On utilise contains pour accepter "confirmé", "confirmée", "confirmed", etc.
-    return s.contains("confirm") || s.contains("valid") || s.contains("pay") || s.contains("success");
+    return s.contains("confirm") ||
+        s.contains("valid") ||
+        s.contains("pay") ||
+        s.contains("success");
   }
 
   // 3. LA LOGIQUE FINALE pour afficher les boutons
@@ -123,13 +133,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return departure.difference(now).inMinutes > 15;
   }
 
-
-
   // ------------------------------------------------------------------------
-// 💰 CALCUL REMBOURSEMENT (CORRIGÉ POUR GÉRER LES DÉCIMALES)
-// ------------------------------------------------------------------------
+  // 💰 CALCUL REMBOURSEMENT (CORRIGÉ POUR GÉRER LES DÉCIMALES)
+  // ------------------------------------------------------------------------
   Map<String, dynamic> _calculateRefundInfo() {
-    final departure = _departureDateTime; // Assure-toi que cette variable est bien définie dans ta classe
+    final departure =
+        _departureDateTime; // Assure-toi que cette variable est bien définie dans ta classe
     final now = DateTime.now();
 
     // 1. Récupération et Nettoyage Intelligent du Prix
@@ -158,7 +167,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
 
       debugPrint("✅ PRIX NETTOYÉ UTILISÉ : $price");
-
     } catch (e) {
       debugPrint("🔴 Erreur parsing prix: $e");
       price = 0.0;
@@ -170,7 +178,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         'refund': 0,
         'penalty': price.toInt(),
         'label': 'Départ passé (Non remboursable)',
-        'total_price': price.toInt()
+        'total_price': price.toInt(),
       };
     }
 
@@ -182,15 +190,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     String label = "";
 
     // --- RÈGLES DE REMBOURSEMENT ---
-    if (minutesBefore >= 180) { // Plus de 3h avant
+    if (minutesBefore >= 180) {
+      // Plus de 3h avant
       penalty = 0;
       label = "Annulation gratuite (> 3h avant)";
-    } else if (minutesBefore >= 120) { // Entre 2h et 3h
+    } else if (minutesBefore >= 120) {
+      // Entre 2h et 3h
       int fraisFixes = 250;
       // Sécurité : Si le billet coûte 100F, on ne peut pas retenir 250F
       penalty = (price < fraisFixes) ? price.toInt() : fraisFixes;
       label = "Frais d'annulation : $penalty F (< 3h)";
-    } else { // Moins de 2h
+    } else {
+      // Moins de 2h
       int fraisFixes = 500;
       penalty = (price < fraisFixes) ? price.toInt() : fraisFixes;
       label = "Frais d'annulation : $penalty F (< 2h)";
@@ -204,7 +215,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       'refund': refund.toInt(),
       'penalty': penalty,
       'label': label,
-      'total_price': price.toInt()
+      'total_price': price.toInt(),
     };
   }
 
@@ -225,32 +236,34 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
             decoration: BoxDecoration(
-              color: isError ? const Color(0xFFD32F2F) : const Color(0xFF388E3C), // Rouge erreur / Vert succès
+              color: isError
+                  ? const Color(0xFFD32F2F)
+                  : const Color(0xFF388E3C), // Rouge erreur / Vert succès
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4)
-                )
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                    isError ? Icons.error_outline : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 24
+                  isError ? Icons.error_outline : Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 24,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     message,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,
@@ -304,7 +317,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           children: [
             const Text(
               "Détail du remboursement :",
-              style: TextStyle(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+              ),
             ),
             const SizedBox(height: 15),
 
@@ -312,7 +328,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("Prix du billet :"),
-                Text("$totalPrice F", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  "$totalPrice F",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -321,7 +340,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("Frais / Pénalité :"),
-                Text("- $penalty F", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                Text(
+                  "- $penalty F",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
 
@@ -330,8 +355,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Net à rembourser :", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text("$refundAmount F", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                const Text(
+                  "Net à rembourser :",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "$refundAmount F",
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
               ],
             ),
 
@@ -339,12 +374,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(5)
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
                 "Condition appliquée : $labelCondition",
-                style: const TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -359,9 +398,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text("Confirmer l'annulation", style: TextStyle(color: Colors.white)),
+            child: const Text(
+              "Confirmer l'annulation",
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -381,15 +425,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (result['success'] == true) {
         // ✅ SUCCÈS : Top Notification VERTE
         _showTopNotification(
-            "Billet annulé. ${result['refund_amount']} F remboursés.",
-            isError: false
+          "Billet annulé. ${result['refund_amount']} F remboursés.",
+          isError: false,
         );
         Navigator.pop(context, true);
       } else {
         // ❌ ERREUR API : Top Notification ROUGE
         _showTopNotification(
-            result['message'] ?? "Erreur lors de l'annulation",
-            isError: true
+          result['message'] ?? "Erreur lors de l'annulation",
+          isError: true,
         );
       }
     } catch (e) {
@@ -402,8 +446,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-
-
   // ------------------------------------------------------------------------
   // ✏️ ACTION DE MODIFICATION
   // ------------------------------------------------------------------------
@@ -413,7 +455,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       _showTopNotification("Modification impossible...", isError: true);
       return;
     }
-
 
     // 🟢 2. NOUVEAU : On demande confirmation avant de partir
     bool confirm = await _showModificationDialog();
@@ -429,7 +470,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     // 4. Navigation vers l'écran de recherche
     if (!mounted) return; // Sécurité si le widget est fermé entre temps
 
-
     // 2. 🚀 NAVIGATION VERS LE CHOIX DU NOUVEAU VOYAGE
     // On ouvre l'écran de recherche de bus (ou directement la liste des programmes)
     // On passe un argument 'isModificationMode: anntrue' pour dire à l'écran :
@@ -438,7 +478,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => HomeTabScreen( // ⚠️ Mets le nom de ton écran de recherche ici
+        builder: (context) => HomeTabScreen(
+          // ⚠️ Mets le nom de ton écran de recherche ici
           isModificationMode: true,
           // Tu peux aussi pré-remplir la ville de départ/arrivée si tu veux restreindre
           initialDepart: ticket.departureCity,
@@ -466,8 +507,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-
-
   Future<void> _submitModification(Map<String, dynamic> newBusData) async {
     setState(() => isLoading = true);
 
@@ -493,7 +532,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
       // Appel API
       // N'oublie pas le .toString() qu'on a vu tout à l'heure ;)
-      final result = await widget.repository.modifyTicket(ticket.id.toString(), apiBody);
+      final result = await widget.repository.modifyTicket(
+        ticket.id.toString(),
+        apiBody,
+      );
 
       debugPrint("📥 Résultat API reçu : $result");
 
@@ -504,7 +546,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
         // 1. Récupération de la liste des tickets retournés par l'API
         // L'API renvoie souvent { "success": true, "data": [ ...tickets... ] }
-        final List<dynamic> resultsList = (result['data'] is List) ? result['data'] : [];
+        final List<dynamic> resultsList = (result['data'] is List)
+            ? result['data']
+            : [];
 
         if (resultsList.isNotEmpty) {
           // --- DÉBUT DE LA LOGIQUE INTELLIGENTE ---
@@ -520,7 +564,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           for (var r in resultsList) {
             // On essaie de deviner si c'est le retour via un flag ou 'is_retour'
             // Si ton API ne renvoie pas 'is_retour', adapte ici.
-            bool isThisRetour = r['is_retour'] == true || (r['reference'].toString().toLowerCase().contains("retour"));
+            bool isThisRetour =
+                r['is_retour'] == true ||
+                (r['reference'].toString().toLowerCase().contains("retour"));
 
             if (isThisRetour) {
               dateRetourGlobal = DateTime.tryParse(r['date_voyage']);
@@ -542,38 +588,41 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           List<TicketModel> newTickets = [];
 
           for (var r in resultsList) {
-            bool isRetourItem = r['is_retour'] == true || (r['reference'].toString().toLowerCase().contains("retour"));
+            bool isRetourItem =
+                r['is_retour'] == true ||
+                (r['reference'].toString().toLowerCase().contains("retour"));
 
-            newTickets.add(TicketModel(
-              id: int.tryParse(r['id'].toString()) ?? 0,
-              transactionId: r['reference'] ?? "",
-              ticketNumber: "${r['reference']}",
-              passengerName: "${r['passager_prenom']} ${r['passager_nom']}",
+            newTickets.add(
+              TicketModel(
+                id: int.tryParse(r['id'].toString()) ?? 0,
+                transactionId: r['reference'] ?? "",
+                ticketNumber: "${r['reference']}",
+                passengerName: "${r['passager_prenom']} ${r['passager_nom']}",
 
-              // ⚡️ LA FUSION MAGIQUE ⚡️
-              // 1. Infos Aller (Colonne Gauche) -> Toujours l'aller
-              date: dateAllerGlobal ?? DateTime.now(),
-              departureTimeRaw: heureAllerGlobal ?? "00:00",
-              seatNumber: siegeAllerGlobal ?? "??",
+                // ⚡️ LA FUSION MAGIQUE ⚡️
+                // 1. Infos Aller (Colonne Gauche) -> Toujours l'aller
+                date: dateAllerGlobal ?? DateTime.now(),
+                departureTimeRaw: heureAllerGlobal ?? "00:00",
+                seatNumber: siegeAllerGlobal ?? "??",
 
-              // 2. Infos Retour (Colonne Droite) -> Toujours le retour
-              // C'est ça qui force l'affichage de la colonne retour !
-              returnDate: dateRetourGlobal,
-              returnTimeRaw: heureRetourGlobal,
-              returnSeatNumber: siegeRetourGlobal,
+                // 2. Infos Retour (Colonne Droite) -> Toujours le retour
+                // C'est ça qui force l'affichage de la colonne retour !
+                returnDate: dateRetourGlobal,
+                returnTimeRaw: heureRetourGlobal,
+                returnSeatNumber: siegeRetourGlobal,
 
-              // 3. Flags
-              isAllerRetour: true, // On sait que c'est un A/R modifié
-              isReturnLeg: isRetourItem, // Pour le badge "RETOUR"
-
-              // Reste des données
-              departureCity: r['point_depart'] ?? "Départ",
-              arrivalCity: r['point_arrive'] ?? "Arrivée",
-              companyName: r['company_name'] ?? "Compagnie",
-              status: r['statut'] ?? "Confirmé",
-              qrCodeUrl: r['qr_code'],
-              price: r['montant']?.toString() ?? "0",
-            ));
+                // 3. Flags
+                isAllerRetour: true, // On sait que c'est un A/R modifié
+                isReturnLeg: isRetourItem, // Pour le badge "RETOUR"
+                // Reste des données
+                departureCity: r['point_depart'] ?? "Départ",
+                arrivalCity: r['point_arrive'] ?? "Arrivée",
+                companyName: r['company_name'] ?? "Compagnie",
+                status: r['statut'] ?? "Confirmé",
+                qrCodeUrl: r['qr_code'],
+                price: r['montant']?.toString() ?? "0",
+              ),
+            );
           }
 
           // --- FIN DE LA LOGIQUE INTELLIGENTE ---
@@ -582,24 +631,30 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           if (mounted) {
             setState(() {
               // On affiche le ticket Aller par défaut (celui qui n'est pas le retour)
-              ticket = newTickets.firstWhere((t) => !t.isReturnLeg, orElse: () => newTickets.first);
+              ticket = newTickets.firstWhere(
+                (t) => !t.isReturnLeg,
+                orElse: () => newTickets.first,
+              );
               isLoading = false;
             });
 
-            _showTopNotification("Billet modifié avec succès ! 🎉", isError: false);
+            _showTopNotification(
+              "Billet modifié avec succès ! 🎉",
+              isError: false,
+            );
           }
-
         } else {
           // Cas rare : succès mais pas de données renvoyées ? On recharge tout au cas où
           _loadFullDetails();
         }
-
       } else {
         // ECHEC API
-        _showTopNotification(result['message'] ?? "Échec modification", isError: true);
+        _showTopNotification(
+          result['message'] ?? "Échec modification",
+          isError: true,
+        );
         setState(() => isLoading = false);
       }
-
     } catch (e) {
       debugPrint("🔴 CRASH DANS _submitModification : $e");
       if (mounted) {
@@ -609,249 +664,337 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-
   Future<bool> _showModificationDialog() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Row(
-          children: const [
-            Icon(Icons.edit_calendar_rounded, color: Colors.blueAccent), // Icône modif
-            SizedBox(width: 10),
-            Text("Modifier le voyage", style: TextStyle(fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Procédure de modification :",
-              style: TextStyle(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
             ),
-            const SizedBox(height: 15),
+            title: Row(
+              children: const [
+                Icon(
+                  Icons.edit_calendar_rounded,
+                  color: Colors.blueAccent,
+                ), // Icône modif
+                SizedBox(width: 10),
+                Text("Modifier le voyage", style: TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Procédure de modification :",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+                const SizedBox(height: 15),
 
-            const Text("Vous allez être redirigé pour choisir un nouveau trajet (Date ou Horaire)."),
-            const SizedBox(height: 10),
+                const Text(
+                  "Vous allez être redirigé pour choisir un nouveau trajet (Date ou Horaire).",
+                ),
+                const SizedBox(height: 10),
 
-            // Petit récapitulatif du billet actuel
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3))
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Petit récapitulatif du billet actuel
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Column(
                     children: [
-                      const Text("Valeur actuelle :", style: TextStyle(fontSize: 12)),
-                      Text("${ticket.price} F", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Valeur actuelle :",
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            "${ticket.price} F",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
+
+                const SizedBox(height: 15),
+                const Text(
+                  "⚠️ Des frais de modification peuvent s'appliquer selon le nouveau trajet choisi.",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false), // Annuler
+                child: const Text(
+                  "Retour",
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
-            ),
-
-            const SizedBox(height: 15),
-            const Text(
-              "⚠️ Des frais de modification peuvent s'appliquer selon le nouveau trajet choisi.",
-              style: TextStyle(fontSize: 12, color: Colors.orange, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false), // Annuler
-            child: const Text("Retour", style: TextStyle(color: Colors.grey)),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true), // Confirmer
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  "Choisir un nouveau trajet",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true), // Confirmer
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text("Choisir un nouveau trajet", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    ) ?? false; // Retourne false si on clique à côté
+        ) ??
+        false; // Retourne false si on clique à côté
   }
-
-
 
   // ------------------------------------------------------------------------
   // 🖥 UI BUILD
   // ------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    String formatDate(DateTime d) => "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
+    String formatDate(DateTime d) =>
+        "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
 
     // Calcul sécurité pour QR Code
-    final bool isDepartPasse = _departureDateTime != null && DateTime.now().isAfter(_departureDateTime!);
+    final bool isDepartPasse =
+        _departureDateTime != null &&
+        DateTime.now().isAfter(_departureDateTime!);
 
     return WillPopScope(
-        onWillPop: () async {
-          // On quitte l'écran en renvoyant l'info : "Est-ce que ça a changé ?"
-          Navigator.pop(context, hasChanged);
-          return false; // false car on a géré le pop manuellement juste au-dessus
-        },
-    child: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
+      onWillPop: () async {
+        // On quitte l'écran en renvoyant l'info : "Est-ce que ça a changé ?"
+        Navigator.pop(context, hasChanged);
+        return false; // false car on a géré le pop manuellement juste au-dessus
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(
           title: const Text("Détails du Billet"),
           elevation: 0,
           backgroundColor: Colors.white,
-          foregroundColor: Colors.black
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            if (isLoading) const LinearProgressIndicator(),
+          foregroundColor: Colors.black,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              if (isLoading) const LinearProgressIndicator(),
 
-            // ---------------------------------------------------------
-            // 🎫 LA CARTE PRINCIPALE (Détails + Boutons intégrés)
-            // ---------------------------------------------------------
-            Card(
-              elevation: 4,
-              // ✅ IMPORTANT : Coupe tout ce qui dépasse des bords arrondis
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Column(
-                children: [
-                  // --- PARTIE HAUTE : CONTENU DU TICKET ---
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                ticket.companyName.toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
+              // ---------------------------------------------------------
+              // 🎫 LA CARTE PRINCIPALE (Détails + Boutons intégrés)
+              // ---------------------------------------------------------
+              Card(
+                elevation: 4,
+                // ✅ IMPORTANT : Coupe tout ce qui dépasse des bords arrondis
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    // --- PARTIE HAUTE : CONTENU DU TICKET ---
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  ticket.companyName.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildStatusChip(ticket.status),
-                          ],
-                        ),
-                        const Divider(height: 25),
+                              const SizedBox(width: 8),
+                              _buildStatusChip(ticket.status),
+                            ],
+                          ),
+                          const Divider(height: 25),
 
-                        _buildTripDetails(ticket, formatDate),
+                          _buildTripDetails(ticket, formatDate),
 
-                        const Divider(height: 30),
-                        Row(
+                          const Divider(height: 30),
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(child: _buildCityInfo(ticket.departureCity, "Départ")),
-                              const Icon(Icons.arrow_forward, color: Colors.blue, size: 24),
-                              Expanded(child: _buildCityInfo(ticket.arrivalCity, "Arrivée"))
-                            ]
-                        ),
-                        const Divider(height: 30),
-                        _buildRow("Passager", ticket.passengerName),
-                        _buildRow("Siège", ticket.isAllerRetour && ticket.returnSeatNumber != null ? "${ticket.seatNumber} / ${ticket.returnSeatNumber}" : ticket.seatNumber),
-                        _buildRow("Prix", "${ticket.price} F"),
-                        _buildRow("Réf", ticket.ticketNumber),
-                      ],
-                    ),
-                  ),
-
-                  // --- PARTIE BASSE : LES BOUTONS "PINCEAUX" ---
-                  if (_isActionPossible) ...[
-                    // Une ligne de séparation fine
-                    const Divider(height: 1, thickness: 1),
-
-                    SizedBox(
-                      height: 55, // Hauteur fixe pour les boutons
-                      child: Row(
-                        children: [
-                          // 🔴 BOUTON ANNULER (Gauche)
-                          Expanded(
-                            child: InkWell(
-                              onTap: _cancelTicket,
-                              // Effet visuel au clic
-                              splashColor: Colors.red.withOpacity(0.2),
-                              child: Container(
-                                color: Colors.red.withOpacity(0.05), // Fond très léger rouge
-                                alignment: Alignment.center,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
-                                    SizedBox(width: 8),
-                                    Text("Annuler", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                                  ],
+                              Expanded(
+                                child: _buildCityInfo(
+                                  ticket.departureCity,
+                                  "Départ",
                                 ),
                               ),
-                            ),
-                          ),
-
-                          // Petit trait vertical entre les deux
-                          Container(width: 1, color: Colors.grey.shade300),
-
-                          // 🔵 BOUTON MODIFIER (Droite)
-                          Expanded(
-                            child: InkWell(
-                              onTap: _startModificationProcess,
-                              splashColor: Colors.blue.withOpacity(0.2),
-                              child: Container(
-                                // On peut mettre un fond bleu plein ou léger, ici léger pour l'harmonie
-                                color: Colors.blue.withOpacity(0.05),
-                                alignment: Alignment.center,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.edit_outlined, color: Colors.blue.shade700, size: 20),
-                                    const SizedBox(width: 8),
-                                    Text("Modifier", style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
-                                  ],
+                              const Icon(
+                                Icons.arrow_forward,
+                                color: Colors.blue,
+                                size: 24,
+                              ),
+                              Expanded(
+                                child: _buildCityInfo(
+                                  ticket.arrivalCity,
+                                  "Arrivée",
                                 ),
                               ),
-                            ),
+                            ],
                           ),
+                          const Divider(height: 30),
+                          _buildRow("Passager", ticket.passengerName),
+                          _buildRow(
+                            "Siège",
+                            ticket.isAllerRetour &&
+                                    ticket.returnSeatNumber != null
+                                ? "${ticket.seatNumber} / ${ticket.returnSeatNumber}"
+                                : ticket.seatNumber,
+                          ),
+                          _buildRow("Prix", "${ticket.price} F"),
+                          _buildRow("Réf", ticket.ticketNumber),
                         ],
                       ),
-                    )
-                  ]
-                ],
-              ),
-            ),
+                    ),
 
-            const SizedBox(height: 20),
+                    // --- PARTIE BASSE : LES BOUTONS "PINCEAUX" ---
+                    if (_isActionPossible) ...[
+                      // Une ligne de séparation fine
+                      const Divider(height: 1, thickness: 1),
 
-            // --- CAS OU MODIFICATION IMPOSSIBLE (Message d'info) ---
-            if (!_isActionPossible && _isStatusValid && !isDepartPasse) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.orange.shade200)),
-                child: Row(children: const [Icon(Icons.lock_clock, color: Colors.orange, size: 20), SizedBox(width: 10), Expanded(child: Text("Modifications verrouillées (-15 min).", style: TextStyle(color: Colors.orange, fontSize: 12)))]),
+                      SizedBox(
+                        height: 55, // Hauteur fixe pour les boutons
+                        child: Row(
+                          children: [
+                            // 🔴 BOUTON ANNULER (Gauche)
+                            Expanded(
+                              child: InkWell(
+                                onTap: _cancelTicket,
+                                // Effet visuel au clic
+                                splashColor: Colors.red.withOpacity(0.2),
+                                child: Container(
+                                  color: Colors.red.withOpacity(
+                                    0.05,
+                                  ), // Fond très léger rouge
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(
+                                        Icons.cancel_outlined,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        "Annuler",
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Petit trait vertical entre les deux
+                            Container(width: 1, color: Colors.grey.shade300),
+
+                            // 🔵 BOUTON MODIFIER (Droite)
+                            Expanded(
+                              child: InkWell(
+                                onTap: _startModificationProcess,
+                                splashColor: Colors.blue.withOpacity(0.2),
+                                child: Container(
+                                  // On peut mettre un fond bleu plein ou léger, ici léger pour l'harmonie
+                                  color: Colors.blue.withOpacity(0.05),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        color: Colors.blue.shade700,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "Modifier",
+                                        style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 30),
+
+              const SizedBox(height: 20),
+
+              // --- CAS OU MODIFICATION IMPOSSIBLE (Message d'info) ---
+              if (!_isActionPossible && _isStatusValid && !isDepartPasse) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.lock_clock, color: Colors.orange, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Modifications verrouillées (-15 min).",
+                          style: TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+
+              // --- QR CODE ---
+              if (_isStatusValid && !isDepartPasse)
+                _buildActiveQRCodeView(context)
+              else
+                _buildExpiredOrUsedView(),
+
+              const SizedBox(height: 40),
             ],
-
-            // --- QR CODE ---
-            if (_isStatusValid && !isDepartPasse)
-              _buildActiveQRCodeView(context)
-            else
-              _buildExpiredOrUsedView(),
-
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -860,67 +1003,177 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Widget _buildStatusChip(String status) {
     String s = status.toLowerCase();
     Color color = Colors.blue;
-    if (s.contains("valid") || s.contains("confirm") || s.contains("pay") || s.contains("success")) color = Colors.green;
-    else if (s.contains("annul")) color = Colors.red;
-    else if (s.contains("termin") || s.contains("util")) color = Colors.grey;
+    if (s.contains("valid") ||
+        s.contains("confirm") ||
+        s.contains("pay") ||
+        s.contains("success"))
+      color = Colors.green;
+    else if (s.contains("annul"))
+      color = Colors.red;
+    else if (s.contains("termin") || s.contains("util"))
+      color = Colors.grey;
 
     return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-        child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12))
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
   Widget _buildActiveQRCodeView(BuildContext context) {
-    return Column(children: [
-      const Text("Présentez ce code à l'embarquement", style: TextStyle(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 10),
-      if (ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty)
-        GestureDetector(
-            onTap: () => showModalBottomSheet(context: context, builder: (_) => Center(child: Image.memory(base64Decode(ticket.qrCodeUrl!), width: 300))),
+    return Column(
+      children: [
+        const Text(
+          "Présentez ce code à l'embarquement",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        if (ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty)
+          GestureDetector(
+            onTap: () => showModalBottomSheet(
+              context: context,
+              builder: (_) => Center(
+                child: Image.memory(
+                  base64Decode(ticket.qrCodeUrl!),
+                  width: 300,
+                ),
+              ),
+            ),
             child: Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.blue.withOpacity(0.3)), borderRadius: BorderRadius.circular(15)),
-                child: Column(children: [
-                  Image.memory(base64Decode(ticket.qrCodeUrl!), height: 180, width: 180, errorBuilder: (c,e,s) => const Icon(Icons.qr_code, size: 100)),
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                children: [
+                  Image.memory(
+                    base64Decode(ticket.qrCodeUrl!),
+                    height: 180,
+                    width: 180,
+                    errorBuilder: (c, e, s) =>
+                        const Icon(Icons.qr_code, size: 100),
+                  ),
                   const SizedBox(height: 10),
-                  const Text("Cliquez pour agrandir", style: TextStyle(color: Colors.blue, fontSize: 12))
-                ])
-            )
-        )
-      else
-        const Text("QR code indisponible")
-    ]);
+                  const Text(
+                    "Cliquez pour agrandir",
+                    style: TextStyle(color: Colors.blue, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          const Text("QR code indisponible"),
+      ],
+    );
   }
 
   Widget _buildExpiredOrUsedView() {
     return Container(
-        width: double.infinity, padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
-        child: Column(children: const [Icon(Icons.event_busy, size: 60, color: Colors.grey), SizedBox(height: 15), Text("Billet non valide (Expiré/Annulé)", style: TextStyle(fontSize: 16, color: Colors.grey))])
+      width: double.infinity,
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: const [
+          Icon(Icons.event_busy, size: 60, color: Colors.grey),
+          SizedBox(height: 15),
+          Text(
+            "Billet non valide (Expiré/Annulé)",
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTripDetails(TicketModel t, Function(DateTime) fmt) {
     return Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          Expanded(child: Column(children: [const Text("ALLER", style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)), Text(fmt(t.date), style: const TextStyle(fontWeight: FontWeight.bold)), Text(t.departureTimeRaw)])),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                const Text(
+                  "ALLER",
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  fmt(t.date),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(t.departureTimeRaw),
+              ],
+            ),
+          ),
           if (t.isAllerRetour && t.returnDate != null) ...[
-            Container(width: 1, height: 40, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 10)),
-            Expanded(child: Column(children: [const Text("RETOUR", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)), Text(fmt(t.returnDate!), style: const TextStyle(fontWeight: FontWeight.bold)), Text(t.returnTimeRaw ?? "--:--")]))
-          ]
-        ])
+            Container(
+              width: 1,
+              height: 40,
+              color: Colors.grey.shade300,
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  const Text(
+                    "RETOUR",
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    fmt(t.returnDate!),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(t.returnTimeRaw ?? "--:--"),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildCityInfo(String city, String label) {
-    return Column(children: [
-      Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      const SizedBox(height: 4),
-      Text(city.isEmpty ? "--" : city.replaceAll(", Côte d'Ivoire", ""), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)
-    ]);
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 4),
+        Text(
+          city.isEmpty ? "--" : city.replaceAll(", Côte d'Ivoire", ""),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
   }
 
   /*Widget _buildRow(String label, String value) {
@@ -932,18 +1185,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start, // ✅ Important pour l'alignement vertical si ça passe à la ligne
+        crossAxisAlignment: CrossAxisAlignment
+            .start, // ✅ Important pour l'alignement vertical si ça passe à la ligne
         children: [
           // Le Label (à gauche)
-          Text(
-              label,
-              style: const TextStyle(color: Colors.grey)
-          ),
+          Text(label, style: const TextStyle(color: Colors.grey)),
 
           const SizedBox(width: 10), // ✅ Petit espace de sécurité
-
           // La Valeur (à droite)
-          Expanded( // ✅ Expanded force le texte à prendre la place restante sans déborder
+          Expanded(
+            // ✅ Expanded force le texte à prendre la place restante sans déborder
             child: Text(
               value,
               textAlign: TextAlign.end, // ✅ On aligne à droite comme avant

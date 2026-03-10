@@ -54,5 +54,16 @@
         <key>NSMicrophoneUsageDescription</key>
         <string>Nous avons besoin d'accéder au micro pour les vidéos.</string>
 
+    <key>NSCameraUsageDescription</key>
+    <string>L'application a besoin de l'appareil photo pour documenter l'accident.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>L'application a besoin d'accéder à vos photos pour sélectionner une image de l'accident.</string>
+
+
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Cette application a besoin de votre position pour signaler le lieu exact de l'accident aux secours.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Cette application a besoin de votre position pour signaler le lieu exact de l'accident aux secours.</string>
+
 </dict>
 </plist>

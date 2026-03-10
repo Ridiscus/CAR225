@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:provider/provider.dart'; // ✅ Pour le Repo
+
+import '../../../auth/domain/repositories/auth_repository.dart';
 
 class ForgotPasswordResetScreen extends StatefulWidget {
-  const ForgotPasswordResetScreen({super.key});
+  // ✅ ON RÉCUPÈRE LES INFOS NÉCESSAIRES À L'API
+  final String email;
+  final String otpCode;
+
+  const ForgotPasswordResetScreen({
+    super.key,
+    required this.email,
+    required this.otpCode,
+  });
 
   @override
-  State<ForgotPasswordResetScreen> createState() => _ForgotPasswordResetScreenState();
+  State<ForgotPasswordResetScreen> createState() =>
+      _ForgotPasswordResetScreenState();
 }
 
 class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
-  // 1. AJOUT DES CONTRÔLEURS POUR RÉCUPÉRER LE TEXTE
   final TextEditingController _passController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
 
@@ -24,45 +35,64 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
     super.dispose();
   }
 
-  // --- LOGIQUE DE VALIDATION (Inchangée) ---
+  // --- LOGIQUE DE VALIDATION & API ---
   void _attemptReset() async {
-    // Fermer le clavier avant de valider
     FocusScope.of(context).unfocus();
 
     String pass = _passController.text.trim();
     String confirm = _confirmController.text.trim();
 
-    // CAS D'ECHEC 1 : Champs vides
+    // 1. Validations Locales
     if (pass.isEmpty || confirm.isEmpty) {
       _showTopNotification("Veuillez remplir tous les champs", isError: true);
       return;
     }
-
-    // CAS D'ECHEC 2 : Mots de passe différents
     if (pass != confirm) {
-      _showTopNotification("Les mots de passe ne correspondent pas", isError: true);
+      _showTopNotification(
+        "Les mots de passe ne correspondent pas",
+        isError: true,
+      );
       return;
     }
-
-    // CAS D'ECHEC 3 : Mot de passe trop court
     if (pass.length < 6) {
-      _showTopNotification("Le mot de passe est trop court (min 6)", isError: true);
+      _showTopNotification(
+        "Le mot de passe est trop court (min 6)",
+        isError: true,
+      );
       return;
     }
 
-    // --- TOUT EST BON : SIMULATION SUCCÈS ---
+    // 2. Appel API
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // ✅ APPEL DU REPOSITORY
+      await context.read<AuthRepository>().resetPassword(
+        email: widget.email,
+        otpCode: widget.otpCode,
+        password: pass,
+        passwordConfirmation: confirm,
+      );
 
-    if (mounted) {
+      if (!mounted) return;
+
       setState(() => _isLoading = false);
+
+      // ✅ SUCCÈS : Affiche la boite de dialogue
       _showSuccessDialog();
+    } catch (e) {
+      // ❌ ERREUR
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showTopNotification(
+          e.toString().replaceAll("Exception: ", ""),
+          isError: true,
+        );
+      }
     }
   }
 
-  // --- FONCTION UNIFIÉE : Notification Top ---
-  // (Le style Noir/Blanc marche très bien sur les deux modes, je le garde tel quel)
+  // --- NOTIFICATION STYLE IPHONE (Inchangée) ---
   void _showTopNotification(String message, {bool isError = false}) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
@@ -84,7 +114,10 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
                 child: Opacity(
                   opacity: value,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 15,
+                    ),
                     decoration: BoxDecoration(
                       color: isError
                           ? Colors.redAccent.withOpacity(0.95)
@@ -95,7 +128,7 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
                           color: Colors.black.withOpacity(0.2),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
-                        )
+                        ),
                       ],
                     ),
                     child: Row(
@@ -103,7 +136,9 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          isError ? Icons.error_outline : Icons.check_circle_outline,
+                          isError
+                              ? Icons.error_outline
+                              : Icons.check_circle_outline,
                           color: Colors.white,
                           size: 22,
                         ),
@@ -112,9 +147,9 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
                           child: Text(
                             message,
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 2,
@@ -131,63 +166,84 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
         ),
       ),
     );
-
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 3), () {
       if (overlayEntry.mounted) overlayEntry.remove();
     });
   }
 
-  // Affiche le succès (Adapté Dark Mode)
+  // --- DIALOGUE DE SUCCÈS ---
   void _showSuccessDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        // Variables locales au Dialog pour le thème
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final cardColor = Theme.of(context).cardColor;
         final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
         return AlertDialog(
-          backgroundColor: isDark ? cardColor : Colors.white, // <--- FOND DIALOG
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: isDark ? cardColor : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           contentPadding: const EdgeInsets.all(20),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Colors.green, size: 40),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.green,
+                  size: 40,
+                ),
               ),
               const Gap(20),
               Text(
-                  "Félicitations !",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor)
+                "Félicitations !",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
               const Gap(10),
               Text(
                 "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey),
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey,
+                ),
               ),
               const Gap(30),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Retour à l'écran de connexion
+                    // ✅ RETOUR AU LOGIN (On vide la pile de navigation)
                     Navigator.popUntil(context, (route) => route.isFirst);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  child: const Text("Se connecter", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "Se connecter",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              )
+              ),
             ],
           ),
         );
@@ -197,18 +253,17 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // --- VARIABLES DE THEME ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final secondaryTextColor = isDark ? Colors.grey[400] : Colors.grey;
 
     return Scaffold(
-      backgroundColor: scaffoldColor, // <--- FOND DYNAMIQUE
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: textColor), // <--- ICONE DYNAMIQUE
+        iconTheme: IconThemeData(color: textColor),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(25),
@@ -216,8 +271,12 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-                "Réinitialisation",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textColor)
+              "Réinitialisation",
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
             ),
             const Gap(10),
             Text(
@@ -226,13 +285,24 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
             ),
             const Gap(40),
 
-            _buildPasswordField(context, "Nouveau mot de passe", _passController, _obscure1, () => setState(() => _obscure1 = !_obscure1)),
+            _buildPasswordField(
+              context,
+              "Nouveau mot de passe",
+              _passController,
+              _obscure1,
+              () => setState(() => _obscure1 = !_obscure1),
+            ),
             const Gap(20),
-            _buildPasswordField(context, "Confirmer le mot de passe", _confirmController, _obscure2, () => setState(() => _obscure2 = !_obscure2)),
+            _buildPasswordField(
+              context,
+              "Confirmer le mot de passe",
+              _confirmController,
+              _obscure2,
+              () => setState(() => _obscure2 = !_obscure2),
+            ),
 
             const Gap(40),
 
-            // Bouton Final
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -240,12 +310,28 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
                 onPressed: _isLoading ? null : _attemptReset,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   disabledBackgroundColor: Colors.green.withOpacity(0.5),
                 ),
                 child: _isLoading
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text("Terminer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        "Terminer",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -254,8 +340,13 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
     );
   }
 
-  // Widget mis à jour avec Context pour le thème
-  Widget _buildPasswordField(BuildContext context, String label, TextEditingController controller, bool obscure, VoidCallback onToggle) {
+  Widget _buildPasswordField(
+    BuildContext context,
+    String label,
+    TextEditingController controller,
+    bool obscure,
+    VoidCallback onToggle,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -264,28 +355,37 @@ class _ForgotPasswordResetScreenState extends State<ForgotPasswordResetScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: textColor,
+          ),
         ),
         const Gap(8),
         Container(
           decoration: BoxDecoration(
-            color: cardColor, // <--- FOND CHAMP
+            color: cardColor,
             borderRadius: BorderRadius.circular(12),
-            // Petite bordure en mode sombre
             border: isDark ? Border.all(color: Colors.grey[800]!) : null,
           ),
           child: TextField(
             controller: controller,
             obscureText: obscure,
-            style: TextStyle(color: textColor), // <--- COULEUR TEXTE SAISI
+            style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: "••••••••",
               hintStyle: TextStyle(color: Colors.grey.shade400),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
               suffixIcon: IconButton(
-                icon: Icon(obscure ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                icon: Icon(
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                ),
                 onPressed: onToggle,
               ),
             ),

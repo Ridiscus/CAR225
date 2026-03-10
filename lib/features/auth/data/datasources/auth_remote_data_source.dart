@@ -1,174 +1,154 @@
 import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/networking/api_config.dart';
+import '../../../booking/data/models/user_stats_model.dart';
+import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<Map<String, dynamic>> login(LoginRequestModel params);
-  Future<Map<String, dynamic>> register(RegisterRequestModel params); // Ajout
+  Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body);
 
+  // Ajoute ceci dans la classe abstraite AuthRemoteDataSource :
+  Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode);
+  // ✅ CHANGEMENT ICI : On utilise AuthResponseModel au lieu de Map
+  Future<AuthResponseModel> login(LoginRequestModel params);
+  Future<AuthResponseModel> register(RegisterRequestModel params);
 
+  Future<void> deactivateAccount(String password);
+  Future<void> sendOtp(String email);
+  // DANS L'INTERFACE (AuthRemoteDataSource)
+  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode);
+  Future<void> resetPassword(
+    String email,
+    String otpCode,
+    String password,
+    String passwordConfirmation,
+  );
   Future<UserModel> getUserProfile();
   Future<UserModel> updateUserProfile({
     required String name,
     required String prenom,
     required String email,
     required String contact,
-    required String adresse,
-    String? photoPath, // Optionnel (fichier local)
+    required String nomUrgence,
+    required String lienParenteUrgence,
+    required String contactUrgence,
+    String? photoPath,
   });
-
-
-// 👇 AJOUTE CETTE LIGNE OBLIGATOIREMENT ICI 👇
   Future<void> logout();
-
-  // ✅ AJOUTE CECI :
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
     required String confirmPassword,
   });
 
+  Future<UserStatsModel> getUserStats();
+  Future<TripDetailsModel> getTripDetails();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  final Dio dio = Dio(BaseOptions(
-    // ⚠️ L'URL fournie par ton dev
-    //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev',
+  late final Dio dio;
 
-    baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-  ));
+  AuthRemoteDataSourceImpl() {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        //baseUrl: ApiConfig.baseUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
 
-  // ✅ Constructeur vide (plus besoin de passer dio)
-  AuthRemoteDataSourceImpl();
+    // INTERCEPTOR : Injecte le token automatiquement
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final prefs = await SharedPreferences.getInstance();
+          final token = prefs.getString('auth_token');
 
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+            print("🔑 [Interceptor] Token injecté");
+          }
+          return handler.next(options);
+        },
+        onError: (DioException e, handler) {
+          if (e.response?.statusCode == 401) {
+            print("⛔ [Interceptor] Erreur 401: Non autorisé");
+          }
+          return handler.next(e);
+        },
+      ),
+    );
+  }
 
   @override
-  Future<Map<String, dynamic>> login(LoginRequestModel params) async {
+  Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body) async {
     try {
-      print("📡 ENVOI API: ${params.toJson()}");
+      // 1. On utilise 'dio' au lieu de 'client'
+      // 2. Pas besoin de Uri.parse, juste le chemin (le baseUrl est déjà configuré plus haut)
+      // 3. Pas besoin de jsonEncode, on passe la Map 'body' directement dans 'data'
 
-      // On suppose que l'endpoint est /api/login ou /api/v1/auth/login
-      // Demande à ton dev le chemin EXACT après l'URL de base.
-      // Ici je mets '/api/login' par défaut standard Laravel/Node.
-      final response = await dio.post(
-        '/user/login',
-        data: params.toJson(),
-      );
+      // ATTENTION : Vérifie avec ton dev backend si l'URL est '/auth/social_login' ou '/user/social_login'
+      final response = await dio.post('/user/google-auth', data: body);
 
-      print("✅ REPONSE API: ${response.statusCode} - ${response.data}");
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // On retourne la réponse (qui contient surement le token)
-        return response.data;
-      } else {
-        throw Exception("Erreur serveur: ${response.statusCode}");
-      }
+      // Dio renvoie déjà du JSON décodé dans response.data
+      return response.data;
     } on DioException catch (e) {
-      print("❌ ERREUR API: ${e.response?.data ?? e.message}");
-      // Tu peux affiner ici pour renvoyer un message d'erreur précis (ex: "Email incorrect")
-      throw Exception(e.response?.data['message'] ?? "Erreur de connexion");
+      // Gestion d'erreur propre à Dio
+      print("❌ Erreur API Google: ${e.response?.data}");
+      throw Exception(
+        e.response?.data['message'] ?? "Erreur lors de la connexion Google",
+      );
     }
   }
 
-
-
-
   @override
-  Future<Map<String, dynamic>> register(RegisterRequestModel params) async {
+  Future<AuthResponseModel> login(LoginRequestModel params) async {
     try {
-      // 1. On prépare les données texte
-      Map<String, dynamic> mapData = {
-        "name": params.nom,
-        "prenom": params.prenom,
-        "email": params.email,
+      final Map<String, dynamic> body = {
+        "login": params.email,
         "password": params.password,
-        "password_confirmation": params.passwordConfirmation,
-        "adresse": params.adresse,
-        "contact": params.contact,
         "fcm_token": params.fcmToken,
         "nom_device": params.deviceName,
       };
 
-      // 2. Conversion en FormData (pour l'upload)
-      FormData formData = FormData.fromMap(mapData);
-
-      // 3. Si une photo est présente, on l'ajoute au FormData
-      // ATTENTION : Demande au dev si le champ s'appelle "photo", "image" ou "avatar"
-      // Je mets "photo" par défaut (standard Laravel)
-      if (params.photoPath != null) {
-        formData.files.add(MapEntry(
-          "photo_profile", // <--- NOM DU CHAMP CÔTÉ LARAVEL
-          await MultipartFile.fromFile(params.photoPath!),
-        ));
-      }
-
-      print("📡 INSCRIPTION (MULTIPART) ENVOI...");
-
-      final response = await dio.post(
-        '/user/register',
-        data: formData, // On envoie le FormData, pas le JSON
-      );
-
-      print("✅ INSCRIPTION SUCCÈS: ${response.statusCode}");
-      return response.data;
-
+      final response = await dio.post('/user/login', data: body);
+      return AuthResponseModel.fromJson(
+        response.data,
+      ); // 🆕 Retourne le modèle complet
     } on DioException catch (e) {
-      print("❌ ERREUR INSCRIPTION: ${e.response?.data}");
-      throw Exception(e.response?.data['message'] ?? "Erreur lors de l'inscription");
+      throw Exception(e.response?.data['message'] ?? "Erreur de connexion");
     }
   }
 
-
-
-
-  // 👇 C'EST ICI LA CORRECTION 👇
   @override
   Future<void> logout() async {
-    try {
-      // 1. On récupère le TOKEN stocké
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('auth_token');
-
-      if (token != null) {
-        // 2. On l'injecte dans le Header "Authorization"
-        dio.options.headers["Authorization"] = "Bearer $token";
-      }
-
-      print("📡 DECONNEXION SERVER (Token: ${token != null ? 'OK' : 'MANQUANT'})...");
-
-      // 3. Appel API
-      await dio.post('/user/logout');
-
-      print("✅ LOGOUT SERVER SUCCÈS");
-
-    } catch (e) {
-      // Si le serveur refuse (ex: token expiré), ce n'est pas grave
-      // on veut quand même que l'app se déconnecte localement.
-      print("⚠️ Erreur Logout Serveur (non bloquant): $e");
-      throw Exception("Erreur serveur logout");
-    }
+    await dio.post('/user/logout');
   }
-
 
   @override
   Future<UserModel> getUserProfile() async {
     try {
-      await _addTokenHeader();
       final response = await dio.get('/user/profile');
-      // On parse la partie "user" de la réponse JSON
-      return UserModel.fromJson(response.data['user']);
+
+      // Gestion robuste de la réponse JSON
+      if (response.data is Map<String, dynamic> &&
+          response.data.containsKey('user')) {
+        return UserModel.fromJson(response.data['user']);
+      } else {
+        return UserModel.fromJson(response.data);
+      }
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? "Erreur chargement profil");
+      throw Exception(e.response?.data['message'] ?? "Erreur profil");
     }
   }
 
@@ -178,78 +158,54 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String prenom,
     required String email,
     required String contact,
-    required String adresse,
+    required String nomUrgence,
+    required String lienParenteUrgence, // <-- Remplacé
+    required String contactUrgence,
     String? photoPath,
   }) async {
     try {
-      await _addTokenHeader();
-
-      // Préparation des données
       Map<String, dynamic> mapData = {
         "name": name,
         "prenom": prenom,
         "email": email,
         "contact": contact,
-        "adresse": adresse,
-        // Astuce Laravel/PHP : Parfois PUT ne gère pas bien le Multipart.
-        // Si ça bug, on utilise POST avec "_method": "PUT".
+        "nom_urgence": nomUrgence,
+        "lien_parente_urgence":
+            lienParenteUrgence, // <-- La clé exacte attendue par Laravel
+        "contact_urgence": contactUrgence,
         "_method": "PUT",
       };
 
       FormData formData = FormData.fromMap(mapData);
 
       if (photoPath != null) {
-        formData.files.add(MapEntry(
-          "photo_profile", // Vérifie ce nom avec ton backend (parfois "photo", "avatar")
-          await MultipartFile.fromFile(photoPath),
-        ));
+        formData.files.add(
+          MapEntry("photo_profile", await MultipartFile.fromFile(photoPath)),
+        );
       }
 
-      // On utilise POST à cause du FormData (avec _method: PUT dedans)
-      // Si ton backend gère le PUT multipart natif, change en dio.put
       final response = await dio.post('/user/profile', data: formData);
 
-      return UserModel.fromJson(response.data['user']);
+      if (response.data is Map<String, dynamic> &&
+          response.data.containsKey('user')) {
+        return UserModel.fromJson(response.data['user']);
+      } else {
+        return UserModel.fromJson(response.data);
+      }
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Erreur mise à jour");
     }
   }
 
-  // Méthode utilitaire pour ajouter le token (comme vu précédemment)
- /* Future<void> _addTokenHeader() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    if (token != null) {
-      dio.options.headers["Authorization"] = "Bearer $token";
-    }
-  }*/
-
-  // Ta méthode utilitaire existante (à garder dans la classe)
-  /*Future<void> _addTokenHeader() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    if (token != null) {
-      dio.options.headers["Authorization"] = "Bearer $token";
-      // Dio met automatiquement le Content-Type à application/json pour les Maps,
-      // mais on peut le forcer si besoin :
-      dio.options.headers["Accept"] = "application/json";
-    }
-  }*/
-
-
-  // Ta méthode utilitaire pour le token
-  Future<void> _addTokenHeader() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    if (token != null) {
-      dio.options.headers["Authorization"] = "Bearer $token";
+  @override
+  Future<void> deactivateAccount(String password) async {
+    try {
+      await dio.post('/user/deactivate', data: {"password": password});
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? "Erreur suppression");
     }
   }
 
-
-
-
-  // ✅ NOUVELLE MÉTHODE : CHANGE PASSWORD
   @override
   Future<void> changePassword({
     required String currentPassword,
@@ -257,31 +213,194 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String confirmPassword,
   }) async {
     try {
-      await _addTokenHeader(); // On ajoute le token
-
-      // Pas besoin de baseUrl ici car il est déjà dans BaseOptions
-      final response = await dio.post(
-        'user/change-password', // juste le endpoint
+      await dio.post(
+        '/user/change-password',
         data: {
           "current_password": currentPassword,
           "password": newPassword,
           "password_confirmation": confirmPassword,
         },
       );
-
-      // Succès (pas d'exception levée)
     } on DioException catch (e) {
-      // Gestion erreur API
-      throw Exception(e.response?.data['message'] ?? "Erreur changement mot de passe");
+      throw Exception(e.response?.data['message'] ?? "Erreur password");
     }
   }
 
+  @override
+  Future<void> sendOtp(String email) async {
+    try {
+      await dio.post('/user/password/send-otp', data: {'email': email});
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? "Erreur envoi OTP");
+    }
+  }
 
+  @override
+  Future<void> resetPassword(
+    String email,
+    String otpCode,
+    String password,
+    String passwordConfirmation,
+  ) async {
+    try {
+      await dio.post(
+        '/user/password/reset',
+        data: {
+          'email': email,
+          'otp': otpCode,
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? "Erreur reset");
+    }
+  }
+
+  // 🟢 1. Récupérer les stats globales
+  Future<UserStatsModel> getUserStats() async {
+    try {
+      final response = await dio.get(
+        '/user/stats',
+      ); // ⚠️ Vérifie que ton token est bien passé dans tes intercepteurs Dio !
+      return UserStatsModel.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ??
+            "Erreur lors du chargement des statistiques",
+      );
+    }
+  }
+
+  // 🟢 2. Récupérer les détails des voyages
+  Future<TripDetailsModel> getTripDetails() async {
+    try {
+      final response = await dio.get('/user/stats/trips');
+      return TripDetailsModel.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? "Erreur lors du chargement des détails",
+      );
+    }
+  }
+
+  @override
+  Future<AuthResponseModel> register(RegisterRequestModel params) async {
+    try {
+      print("⏳ [REGISTER] Préparation des données pour : ${params.email}...");
+
+      FormData formData = FormData.fromMap({
+        "name": params.nom,
+        "prenom": params.prenom,
+        "email": params.email,
+        "password": params.password,
+        "password_confirmation": params.passwordConfirmation,
+        "contact": params.contact,
+        "fcm_token": params.fcmToken,
+        "nom_device": params.deviceName,
+      });
+
+      if (params.photoPath != null) {
+        print(
+          "📸 [REGISTER] Ajout de la photo de profil depuis : ${params.photoPath}",
+        );
+        formData.files.add(
+          MapEntry(
+            "photo_profile",
+            await MultipartFile.fromFile(params.photoPath!),
+          ),
+        );
+      }
+
+      print("🚀 [REGISTER] Envoi de la requête à /user/register...");
+      final response = await dio.post('/user/register', data: formData);
+
+      // --- NOUVEAUX LOGS DE DÉBOGAGE ---
+      print("✅ [REGISTER] Statut de la réponse : ${response.statusCode}");
+      print(
+        "📦 [REGISTER] Données brutes reçues (response.data) : ${response.data}",
+      );
+      print(
+        "🔍 [REGISTER] Type des données reçues : ${response.data.runtimeType}",
+      );
+      // ---------------------------------
+
+      return AuthResponseModel.fromJson(response.data);
+    } on DioException catch (e) {
+      print(
+        "❌ [REGISTER DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}",
+      );
+      throw Exception(e.response?.data['message'] ?? "Erreur inscription");
+    } catch (e, stacktrace) {
+      // Capture l'erreur de parsing JSON (celle du 'String' is not subtype of 'int')
+      print("🚨 [REGISTER PARSING ERROR] Erreur inattendue : $e");
+      print("📜 [REGISTER STACKTRACE] $stacktrace");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode) async {
+    try {
+      print(
+        "⏳ [OTP] Début de la vérification pour le contact: $contact, Code: $otpCode...",
+      );
+
+      final response = await dio.post(
+        '/user/verify-phone-otp',
+        data: {'contact': contact, 'otp': otpCode},
+      );
+
+      // --- NOUVEAUX LOGS DE DÉBOGAGE ---
+      print("✅ [OTP] Statut de la réponse : ${response.statusCode}");
+      print(
+        "📦 [OTP] Données brutes reçues (response.data) : ${response.data}",
+      );
+      print("🔍 [OTP] Type des données reçues : ${response.data.runtimeType}");
+      // ---------------------------------
+
+      return response.data;
+    } on DioException catch (e) {
+      print(
+        "❌ [OTP DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}",
+      );
+      throw Exception(e.response?.data['message'] ?? "Code invalide");
+    } catch (e, stacktrace) {
+      print("🚨 [OTP PARSING ERROR] Erreur inattendue : $e");
+      print("📜 [OTP STACKTRACE] $stacktrace");
+      rethrow;
+    }
+  }
+
+  // Et ceci dans l'implémentation AuthRemoteDataSourceImpl :
+  @override
+  Future<Map<String, dynamic>> verifyPasswordOtp(
+    String email,
+    String otpCode,
+  ) async {
+    try {
+      print(
+        "⏳ [PASSWORD OTP] Vérification pour l'email: $email, Code: $otpCode...",
+      );
+
+      final response = await dio.post(
+        '/user/password/verify-otp',
+        data: {'email': email, 'otp': otpCode},
+      );
+
+      print("✅ [PASSWORD OTP] Succès : ${response.data}");
+      return response.data;
+    } on DioException catch (e) {
+      print(
+        "❌ [PASSWORD OTP DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}",
+      );
+      throw Exception(
+        e.response?.data['message'] ??
+            "Code OTP invalide pour la réinitialisation",
+      );
+    } catch (e) {
+      print("🚨 [PASSWORD OTP ERROR] Erreur : $e");
+      rethrow;
+    }
+  }
 }
-
-
-
-
-
-
-

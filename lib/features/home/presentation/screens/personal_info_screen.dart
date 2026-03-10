@@ -12,7 +12,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/services/device/device_service.dart';
 
-
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -81,38 +80,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-  // 3. MISE À JOUR (PUT)
- /* Future<void> _updateProfile() async {
-    setState(() => _isSaving = true);
-
-    try {
-      // Appel Repository
-      await _repo.remoteDataSource.updateUserProfile(
-        name: _nameController.text.trim(),
-        prenom: _prenomController.text.trim(),
-        email: _emailController.text.trim(),
-        contact: _phoneController.text.trim(),
-        adresse: _addressController.text.trim(),
-        photoPath: _selectedImage?.path, // Null si pas changée
-      );
-
-      if (!mounted) return;
-      _showSnack("Profil mis à jour avec succès !");
-
-      // Optionnel : Recharger pour être sûr ou juste rester comme ça
-      // _loadUserData();
-
-    } catch (e) {
-      if (!mounted) return;
-      _showSnack("Erreur update: $e", isError: true);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }*/
-
-
-
-
   Future<void> _updateProfile() async {
     setState(() => _isSaving = true);
     try {
@@ -135,7 +102,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (!mounted) return;
       _showSnack("Profil mis à jour !");
       Navigator.pop(context);
-
     } catch (e) {
       if (!mounted) return;
       _showSnack("Erreur update: $e", isError: true);
@@ -143,9 +109,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
-
-
-
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -189,10 +152,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             child: Stack(
               children: [
                 GestureDetector(
-                  onTap: _pickImage, // Cliquer sur l'image ouvre aussi la galerie
+                  onTap:
+                      _pickImage, // Cliquer sur l'image ouvre aussi la galerie
                   child: CircleAvatar(
                     radius: 50,
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                    backgroundColor: isDark
+                        ? Colors.grey[800]
+                        : Colors.grey[200],
                     // Logique d'affichage de l'image (Locale > Réseau > Asset)
                     backgroundImage: _getProfileImage(),
                   ),
@@ -208,7 +174,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       child: CircleAvatar(
                         radius: 15,
                         backgroundColor: primaryColor,
-                        child: const Icon(Icons.camera_alt, size: 15, color: Colors.white),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 15,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -224,9 +194,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           const Gap(15),
           _buildInfoField(context, "Prénom", _prenomController),
           const Gap(15),
-          _buildInfoField(context, "Email", _emailController, isEmail: true), // Souvent readOnly
+          _buildInfoField(
+            context,
+            "Email",
+            _emailController,
+            isEmail: true,
+          ), // Souvent readOnly
           const Gap(15),
-          _buildInfoField(context, "Téléphone", _phoneController, isNumber: true),
+          _buildInfoField(
+            context,
+            "Téléphone",
+            _phoneController,
+            isNumber: true,
+          ),
           const Gap(15),
           _buildInfoField(context, "Adresse / Ville", _addressController),
 
@@ -240,17 +220,30 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               onPressed: _isSaving ? null : _updateProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 elevation: 0,
               ),
               child: _isSaving
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : const Text(
-                "Enregistrer les modifications",
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+                      "Enregistrer les modifications",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -268,7 +261,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   // Widget Champ mis à jour pour accepter un Controller
-  Widget _buildInfoField(BuildContext context, String label, TextEditingController controller, {bool isNumber = false, bool isEmail = false}) {
+  Widget _buildInfoField(
+    BuildContext context,
+    String label,
+    TextEditingController controller, {
+    bool isNumber = false,
+    bool isEmail = false,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -278,7 +277,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: labelColor)),
+        Text(
+          label,
+          style: TextStyle(fontWeight: FontWeight.bold, color: labelColor),
+        ),
         const Gap(8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -289,7 +291,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
           child: TextFormField(
             controller: controller, // Utilisation du controller
-            keyboardType: isNumber ? TextInputType.phone : (isEmail ? TextInputType.emailAddress : TextInputType.text),
+            keyboardType: isNumber
+                ? TextInputType.phone
+                : (isEmail ? TextInputType.emailAddress : TextInputType.text),
             style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
             decoration: const InputDecoration(
               border: InputBorder.none,
@@ -297,7 +301,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               contentPadding: EdgeInsets.symmetric(vertical: 14),
             ),
           ),
-        )
+        ),
       ],
     );
   }

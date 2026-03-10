@@ -53,7 +53,6 @@ dependencies:
   io: ^1.0.5
 
   # --- Scanneur & QR Code ---
-  mobile_scanner: ^7.1.4
   qr_flutter: ^4.1.0
 
   # --- Impression & PDF ---
@@ -64,6 +63,13 @@ dependencies:
   path_provider: ^2.1.2
   open_filex: ^4.3.2
   permission_handler: ^11.3.0
+  screenshot: ^3.0.0
+
+  google_sign_in: ^6.1.0 
+  mobile_scanner: ^7.2.0 
+  url_launcher: ^6.2.0
+  geolocator: ^14.0.2
+  geocoding: ^2.1.1
 
 dev_dependencies:
   flutter_test:

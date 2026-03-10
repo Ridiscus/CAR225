@@ -157,7 +157,7 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
 
     Navigator.pop(context); // Fermer la modal
 
-    // On prépare le modèle Aller avec la bonne date choisie
+    // On prépare le modèle Aller avec une trou truoo^po
     final finalProgramAller = widget.program.copyWith(
         dateDepart: "${DateFormat('yyyy-MM-dd').format(dateAller)} ${widget.program.heureDepart}",
         isAllerRetour: isAllerRetour
@@ -325,7 +325,7 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, size: 18, color: isSelected ? AppColors.primary : Colors.grey),
+            Icon(Icons.calendar_today, size: 19, color: isSelected ? AppColors.primary : Colors.grey),
             const Gap(8),
             Text(
               date != null ? DateFormat('dd MMM yyyy', 'fr_FR').format(date) : label,

@@ -1,9 +1,10 @@
-
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // 🟢 NOUVEAU : Import FCM
+
+import '../../../../core/services/notifications/global_otp_service.dart';
 import '../../../auth/data/datasources/auth_remote_data_source.dart';
 import '../../../auth/data/repositories/auth_repository_impl.dart';
 import '../../../../core/services/device/device_service.dart';
@@ -27,16 +28,67 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
   bool _isLoading = false;
   bool _canResend = false;
 
-  // On synchronise les deux sur 10 minutes (600 secondes)
   int _validitySeconds = 600;
   int _resendSeconds = 600;
   Timer? _timer;
+
+  // 1. Remplace l'abonnement FCM par un abonnement String
+  StreamSubscription<String>? _otpSubscription;
 
   @override
   void initState() {
     super.initState();
     _startCountdown();
+    _listenForOtpNotification(); // 🟢 NOUVEAU : On lance l'écoute au démarrage de l'écran
   }
+
+  // --- 🟢 NOUVELLE LOGIQUE : AUTO-REMPLISSAGE OTP ---
+  /*void _listenForOtpNotification() {
+    _fcmSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print("🔔 [VerifOtpScreen] Notification reçue au premier plan !");
+
+      // On récupère le texte du message (soit dans la notification, soit dans les datas invisibles)
+      String textToAnalyze = message.notification?.body ?? message.data['body'] ?? message.data['message'] ?? "";
+
+      if (textToAnalyze.isNotEmpty) {
+        // Expression régulière : on cherche exactement 6 chiffres d'affilée isolés
+        RegExp regExp = RegExp(r'\b\d{6}\b');
+        Match? match = regExp.firstMatch(textToAnalyze);
+
+        if (match != null) {
+          String extractedOtp = match.group(0)!;
+          print("✅ [VerifOtpScreen] Code OTP trouvé : $extractedOtp");
+          _autoFillOtp(extractedOtp);
+        }
+      }
+    });
+  }*/
+
+
+
+// 2. Modifie la méthode d'écoute :
+  void _listenForOtpNotification() {
+    // On écoute notre flux global personnalisé
+    _otpSubscription = GlobalOtpService.otpStream.stream.listen((String otp) {
+      print("✅ [VerifOtpScreen] OTP intercepté depuis le service global : $otp");
+      _autoFillOtp(otp);
+    });
+  }
+
+
+  void _autoFillOtp(String otp) {
+    if (otp.length == 6 && mounted) {
+      for (int i = 0; i < 6; i++) {
+        _controllers[i].text = otp[i];
+      }
+      setState(() {});
+      _showTopNotification("Code détecté automatiquement !", isError: false);
+
+      // On lance automatiquement la vérification
+      _verifyCode();
+    }
+  }
+  // --------------------------------------------------
 
   void _startCountdown() {
     _timer?.cancel();
@@ -67,7 +119,6 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     return "$minutes:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
-  // --- TON SYSTÈME DE NOTIFICATION TOP ---
   void _showTopNotification(String message, {bool isError = true}) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
@@ -110,13 +161,17 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     });
   }
 
+
+// 3. N'oublie pas de nettoyer dans le dispose() :
   @override
   void dispose() {
     _timer?.cancel();
+    _otpSubscription?.cancel(); // 🟢 On coupe l'écoute globale ici
     for (var c in _controllers) c.dispose();
     for (var f in _focusNodes) f.dispose();
     super.dispose();
   }
+
 
   Future<void> _handleResendCode() async {
     if (!_canResend) return;
@@ -129,6 +184,12 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
       );
       await authRepo.sendOtp(widget.email);
       _showTopNotification("Nouveau code envoyé !", isError: false);
+
+      // On vide les champs si on renvoie un code
+      for (var c in _controllers) {
+        c.clear();
+      }
+
       _startCountdown();
     } catch (e) {
       _showTopNotification("Erreur : ${e.toString()}", isError: true);
@@ -136,8 +197,6 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-
 
   Future<void> _verifyCode() async {
     String otpCode = _controllers.map((e) => e.text).join();
@@ -205,14 +264,12 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
                     ),
                     const Gap(30),
 
-                    // Grille OTP
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: List.generate(6, (index) => _buildOtpBox(index, primaryColor)),
                     ),
                     const Gap(30),
 
-                    // Badge de validité
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(20)),
@@ -228,7 +285,6 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
                     ),
                     const Gap(30),
 
-                    // Bouton Vérifier
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -249,7 +305,6 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
                     const Divider(),
                     const Gap(15),
 
-                    // SECTION RENVOI (Bloquée jusqu'à expiration)
                     _canResend
                         ? TextButton.icon(
                       onPressed: _isLoading ? null : _handleResendCode,
@@ -321,5 +376,3 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     );
   }
 }
-
-

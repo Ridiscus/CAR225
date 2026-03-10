@@ -73,8 +73,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
         ChangeNotifierProvider(create: (_) => AgentProfileProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
-        //gitygttfftftftftftf
-        // bienvenue ceci est un test de abib-branch
         // --- B. Repositories (Logique métier sans UI) ---
         Provider<AuthRepository>(
           create: (_) => AuthRepositoryImpl(

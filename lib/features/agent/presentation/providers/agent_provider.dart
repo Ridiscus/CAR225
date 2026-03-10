@@ -6,7 +6,6 @@ import '../../domain/usecases/get_scan_history_use_case.dart';
 import '../../domain/usecases/get_boarding_summary_use_case.dart';
 
 class AgentProvider extends ChangeNotifier {
-
   final ScanTicketUseCase scanTicketUseCase;
   final GetScanHistoryUseCase getScanHistoryUseCase;
   final GetBoardingSummaryUseCase getBoardingSummaryUseCase;
@@ -17,7 +16,7 @@ class AgentProvider extends ChangeNotifier {
     required this.getBoardingSummaryUseCase,
   });
 
-  // États 
+  // États
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -36,7 +35,7 @@ class AgentProvider extends ChangeNotifier {
   Future<void> fetchScanHistory() async {
     _setLoading(true);
     final result = await getScanHistoryUseCase();
-    
+
     result.fold(
       (failure) => _errorMessage = "Impossible de charger l'historique",
       (history) {
@@ -51,7 +50,7 @@ class AgentProvider extends ChangeNotifier {
   Future<void> fetchBoardingSummary(String travelId) async {
     _setLoading(true);
     final result = await getBoardingSummaryUseCase(travelId);
-    
+
     result.fold(
       (failure) => _errorMessage = "Erreur lors de la récupération du résumé",
       (summary) {
@@ -66,18 +65,17 @@ class AgentProvider extends ChangeNotifier {
   Future<ScannedTicket?> performScan(String qrCode) async {
     _setLoading(true);
     final result = await scanTicketUseCase(qrCode);
-    
+
     ScannedTicket? ticket;
-    result.fold(
-      (failure) => _errorMessage = "Erreur lors du scan du ticket",
-      (scannedTicket) {
-        ticket = scannedTicket;
-        if (scannedTicket.isValid) {
-          _scanHistory.insert(0, scannedTicket); // Ajouter en haut de la liste
-        }
-        _errorMessage = null;
-      },
-    );
+    result.fold((failure) => _errorMessage = "Erreur lors du scan du ticket", (
+      scannedTicket,
+    ) {
+      ticket = scannedTicket;
+      if (scannedTicket.isValid) {
+        _scanHistory.insert(0, scannedTicket); // Ajouter en haut de la liste
+      }
+      _errorMessage = null;
+    });
     _setLoading(false);
     return ticket;
   }
@@ -92,6 +90,4 @@ class AgentProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
-
-  
 }

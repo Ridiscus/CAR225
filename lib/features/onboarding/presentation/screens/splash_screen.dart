@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:gap/gap.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // <--- IMPORT CRUCIAL
 
 // Tes imports d'écrans
 import '../../../home/presentation/screens/main_wrapper_screen.dart';
-import 'onboarding_screen.dart'; // <--- Import de ton MainScreen (Dashboard)
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // CHOIX DE LA PAGE DE DESTINATION
     // TEMPORAIRE : On redirige vers l'écran Driver pour le développement
-    const String userType = "hostess";
+    const String userType = "agent";
 
     final Widget destination = _isConnected
         ? const MainScreen() // Si connecté -> Dashboard
@@ -116,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.yellowAccent.withOpacity(0.7),
+                              color: Colors.yellowAccent.withValues(alpha: 0.7),
                               width: 2,
                             ),
                           ),

@@ -157,65 +157,61 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              _buildPremiumHeader(),
-              const Divider(height: 1, color: Color(0xFFF5F5F5)),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    _buildSection(
-                      children: [
-                        _buildActionTile(
-                          icon: Icons.person_outline_rounded,
-                          label: 'Informations personnelles',
-                          onTap: () => Navigator.push(
-                            context,
-                            PageTransitions.create(
-                              page: const HostessPersonalInfoScreen(),
-                              type: PageTransitionType.cupertino,
-                            ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            _buildPremiumHeader(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
+              child: Column(
+                children: [
+                  _buildSection(
+                    children: [
+                      _buildActionTile(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Informations personnelles',
+                        onTap: () => Navigator.push(
+                          context,
+                          PageTransitions.create(
+                            page: const HostessPersonalInfoScreen(),
+                            type: PageTransitionType.cupertino,
                           ),
                         ),
-                        _buildDivider(),
-                        _buildActionTile(
-                          icon: Icons.lock_outline_rounded,
-                          label: 'Changer le mot de passe',
-                          onTap: () => Navigator.push(
-                            context,
-                            PageTransitions.create(
-                              page: const HostessChangePasswordScreen(),
-                              type: PageTransitionType
-                                  .cupertino, // Style iOS standard
-                            ),
+                      ),
+                      _buildDivider(),
+                      _buildActionTile(
+                        icon: Icons.lock_outline_rounded,
+                        label: 'Changer le mot de passe',
+                        onTap: () => Navigator.push(
+                          context,
+                          PageTransitions.create(
+                            page: const HostessChangePasswordScreen(),
+                            type: PageTransitionType.cupertino,
                           ),
                         ),
-                        _buildDivider(),
-                        _buildActionTile(
-                          icon: Icons.notifications_outlined,
-                          label: 'Notifications',
-                          trailing: Switch(
-                            value: _notificationEnabled,
-                            activeThumbColor: AppColors.primary,
-                            inactiveThumbColor: AppColors.grey,
-                            onChanged: (value) {
-                              setState(() => _notificationEnabled = value);
-                            },
-                          ),
+                      ),
+                      _buildDivider(),
+                      _buildActionTile(
+                        icon: Icons.notifications_outlined,
+                        label: 'Notifications',
+                        trailing: Switch(
+                          value: _notificationEnabled,
+                          activeThumbColor: AppColors.primary,
+                          inactiveThumbColor: AppColors.grey,
+                          onChanged: (value) {
+                            setState(() => _notificationEnabled = value);
+                          },
                         ),
-                      ],
-                    ),
-                    const Gap(30),
-                    _buildLogoutButton(),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                  const Gap(30),
+                  _buildLogoutButton(),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -223,99 +219,154 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
 
   Widget _buildPremiumHeader() {
     final pickedImage = context.watch<HostessProfileProvider>().profileImage;
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 30),
-      child: Column(
-        children: [
-          Stack(
+    final double topPadding = MediaQuery.of(context).padding.top;
+
+    return Stack(
+      children: [
+        // ── Image de Fond (Car) ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/busheader5.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        // ── Dégradé noir protecteur ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.8),
+              ],
+            ),
+          ),
+        ),
+        // ── Contenu du profil ──
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.only(top: topPadding + 40, bottom: 40),
+          child: Column(
             children: [
-              GestureDetector(
-                onTap: _showImagePreview,
-                child: Hero(
-                  tag: 'hostess_profile_hero',
-                  child: Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                        width: 4,
-                      ),
-                      image: DecorationImage(
-                        image: pickedImage != null
-                            ? FileImage(pickedImage)
-                            : const AssetImage(
-                                    'assets/images/agent_profile.png',
-                                  )
-                                  as ImageProvider,
-                        fit: BoxFit.cover,
+              // Photo de Profil avec bordure brillante
+              Stack(
+                children: [
+                  GestureDetector(
+                    onTap: _showImagePreview,
+                    child: Hero(
+                      tag: 'hostess_profile_hero',
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                          image: DecorationImage(
+                            image: pickedImage != null
+                                ? FileImage(pickedImage)
+                                : const AssetImage(
+                                        'assets/images/agent_profile.png',
+                                      )
+                                      as ImageProvider,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
                     ),
+                  ),
+                  Positioned(
+                    bottom: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: _showPhotoOptions,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(20),
+              // Nom et Prénoms (Blanc)
+              Text(
+                '$_firstName $_lastName',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const Gap(8),
+              // Badge Rôle (Orange UTB)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _role,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    letterSpacing: 1.0,
                   ),
                 ),
               ),
-              Positioned(
-                bottom: 5,
-                right: 5,
-                child: GestureDetector(
-                  onTap: _showPhotoOptions,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
+              const Gap(10),
+              // Entreprise (Blanc cassé)
+              Text(
+                'EMPLOYÉE PAR $_company'.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
           ),
-          const Gap(20),
-          Text(
-            '$_firstName $_lastName',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF263238),
-            ),
-          ),
-          const Gap(8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              _role,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const Gap(8),
-          Text(
-            'EMPLOYÉE PAR $_company'.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

@@ -1,11 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
-import '../providers/profile_provider.dart';
+import '../providers/agent_profile_provider.dart';
 import 'agent_personal_info_screen.dart';
 import 'agent_change_password_screen.dart';
 import '../widgets/custom_app_bar.dart';
@@ -50,7 +49,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
       if (image != null) {
         if (mounted) {
-          context.read<ProfileProvider>().updateImage(image.path);
+          context.read<AgentProfileProvider>().updateImage(image.path);
         }
         _showSnackBar(message: 'Photo de profil mise à jour');
       }
@@ -61,7 +60,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
   // Méthode pour afficher l'aperçu en plein écran
   void _showImagePreview() {
-    final pickedImage = context.read<ProfileProvider>().profileImage;
+    final pickedImage = context.read<AgentProfileProvider>().profileImage;
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -330,7 +329,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     const Color textOrange = Color(0xFFFF7043);
     const Color companyGrey = Color(0xFF90A4AE);
 
-    final pickedImage = context.watch<ProfileProvider>().profileImage;
+    final pickedImage = context.watch<AgentProfileProvider>().profileImage;
 
     return Container(
       width: double.infinity,
@@ -658,59 +657,6 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       appBar: const CustomAppBar(title: 'Mon Profil', showLeading: false),
       body: Stack(
         children: [
-          // --- BACKGROUND DECORATORS ---
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.15),
-                    AppColors.primary.withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 250,
-            left: -80,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF64748B).withValues(alpha: 0.1),
-                    const Color(0xFF64748B).withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -50,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.08),
-                    AppColors.primary.withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),

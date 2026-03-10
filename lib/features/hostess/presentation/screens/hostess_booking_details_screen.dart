@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
@@ -46,10 +47,10 @@ class _PassengerFormData {
   }
 
   bool isValid() {
-    return lastNameController.text.isNotEmpty &&
-        firstNameController.text.isNotEmpty &&
-        phoneController.text.isNotEmpty &&
-        procheNumberController.text.isNotEmpty;
+    return lastNameController.text.trim().isNotEmpty &&
+        firstNameController.text.trim().isNotEmpty &&
+        phoneController.text.trim().length == 10 &&
+        procheNumberController.text.trim().length == 10;
   }
 
   PassengerInfo toPassengerInfo() {
@@ -87,6 +88,9 @@ class _HostessBookingDetailsScreenState
   int _passengerCount = 1;
   final List<_PassengerFormData> _passengerForms = [_PassengerFormData()];
   int _currentPassengerIndex = 0;
+
+  // Validation visuelle
+  bool _showErrors = false;
 
   @override
   void dispose() {
@@ -129,7 +133,7 @@ class _HostessBookingDetailsScreenState
         backgroundColor: const Color(0xFFF5F5F5),
         appBar: const CustomAppBar(title: 'Détails du voyage'),
         body: SafeArea(
-          top: false,
+          top: true,
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Column(
@@ -157,52 +161,143 @@ class _HostessBookingDetailsScreenState
 
   Widget _buildTripInfo() {
     return Container(
-      margin: const EdgeInsets.all(15),
+      margin: const EdgeInsets.fromLTRB(15, 15, 15, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.08),
+            AppColors.primary.withValues(alpha: 0.03),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(child: _buildCityInfo(widget.departure, 'Départ')),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(
-              Icons.arrow_forward_rounded,
-              color: AppColors.primary,
-              size: 20,
+          // ── Point de départ ──
+          Expanded(
+            child: _buildCityInfo(
+              widget.departure,
+              'Départ',
+              Icons.radio_button_checked_rounded,
+              const Color(0xFF00C853),
             ),
           ),
-          Expanded(child: _buildCityInfo(widget.arrival, 'Arrivée')),
+          // ── Connecteur central ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _DottedLine(),
+                const Gap(4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.directions_bus_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                const Gap(4),
+                const _DottedLine(),
+              ],
+            ),
+          ),
+          // ── Point d'arrivée ──
+          Expanded(
+            child: _buildCityInfo(
+              widget.arrival,
+              'Arrivée',
+              Icons.location_on_rounded,
+              AppColors.primary,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCityInfo(String city, String label) {
+  Widget _buildCityInfo(String city, String label, IconData icon, Color color) {
+    final isDeparture = label == 'Départ';
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: isDeparture
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
+        // Icône + label
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: isDeparture
+              ? MainAxisAlignment.start
+              : MainAxisAlignment.end,
+          children: [
+            if (isDeparture)
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 14),
+              ),
+            if (isDeparture) const Gap(6),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
+            ),
+            if (!isDeparture) const Gap(6),
+            if (!isDeparture)
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 14),
+              ),
+          ],
         ),
-        const Gap(4),
+        const Gap(6),
+        // Nom de la ville
         Text(
           city,
           style: const TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 15,
+            fontSize: 14,
             color: Color(0xFF1A1A1A),
+            height: 1.3,
           ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
+          textAlign: isDeparture ? TextAlign.left : TextAlign.right,
         ),
       ],
     );
@@ -255,45 +350,70 @@ class _HostessBookingDetailsScreenState
 
   Widget _buildTripTypeButton(String type, String price, IconData icon) {
     bool isSelected = _tripType == type;
-    return GestureDetector(
-      onTap: () => setState(() => _tripType = type),
+    return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.primary : const Color(0xFFE0E0E0),
             width: isSelected ? 2 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : AppColors.primary,
-              size: 28,
-            ),
-            const Gap(8),
-            Text(
-              type,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+        child: Material(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(
+            10,
+          ), // Légèrement plus petit pour tenir dans la bordure
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _tripType = type);
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    color: isSelected ? Colors.white : AppColors.primary,
+                    size: 28,
+                  ),
+                  const Gap(8),
+                  Text(
+                    type,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const Gap(4),
+                  Text(
+                    price,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
             ),
-            const Gap(4),
-            Text(
-              price,
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppColors.primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -335,23 +455,32 @@ class _HostessBookingDetailsScreenState
 
   Widget _buildTimeChip(String time) {
     bool isSelected = _selectedTime == time;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTime = time),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : const Color(0xFFF8F9FA),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : const Color(0xFFE0E0E0),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : const Color(0xFFE0E0E0),
         ),
-        child: Text(
-          time,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
+      ),
+      child: Material(
+        color: isSelected ? AppColors.primary : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(9), // Pour tenir dans la bordure
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            setState(() => _selectedTime = time);
+          },
+          borderRadius: BorderRadius.circular(9),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            child: Text(
+              time,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
           ),
         ),
       ),
@@ -588,6 +717,8 @@ class _HostessBookingDetailsScreenState
             icon: Icons.phone_outlined,
             controller: currentForm.phoneController,
             keyboardType: TextInputType.phone,
+            maxLength: 10,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const Gap(12),
           _buildTextField(
@@ -595,6 +726,7 @@ class _HostessBookingDetailsScreenState
             icon: Icons.email_outlined,
             controller: currentForm.emailController,
             keyboardType: TextInputType.emailAddress,
+            isRequired: false,
           ),
           const Gap(12),
           _buildTextField(
@@ -602,6 +734,8 @@ class _HostessBookingDetailsScreenState
             icon: Icons.phone_outlined,
             controller: currentForm.procheNumberController,
             keyboardType: TextInputType.phone,
+            maxLength: 10,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           if (_passengerCount > 1 &&
               _currentPassengerIndex < _passengerCount - 1) ...[
@@ -639,46 +773,120 @@ class _HostessBookingDetailsScreenState
     required IconData icon,
     required TextEditingController controller,
     TextInputType? keyboardType,
+    bool isRequired = true,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
+    // Champ invalide = requis + (vide OU longueur incorrecte si maxLength spécifié) + erreurs activées
+    final String text = controller.text.trim();
+    bool isInvalid = false;
+    String? errorMessage;
+
+    if (_showErrors && isRequired) {
+      if (text.isEmpty) {
+        isInvalid = true;
+        errorMessage = 'Ce champ est obligatoire';
+      } else if (maxLength != null && text.length < maxLength) {
+        isInvalid = true;
+        errorMessage = 'Numéro de téléphone invalide';
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            if (isRequired) ...[
+              const Gap(4),
+              Text(
+                '*',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isInvalid ? Colors.red : const Color(0xFF9E9E9E),
+                ),
+              ),
+            ],
+          ],
         ),
         const Gap(8),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
+            counterText: "", // Cache le compteur de caractères par défaut
             hintText: "Entrez $label",
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-            prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+            prefixIcon: Icon(
+              icon,
+              color: isInvalid ? Colors.red : AppColors.primary,
+              size: 20,
+            ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: isInvalid ? const Color(0xFFFFF5F5) : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+              borderSide: BorderSide(
+                color: isInvalid ? Colors.red : const Color(0xFFE0E0E0),
+                width: 1,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: BorderSide(
+                color: isInvalid ? Colors.red : AppColors.primary,
+                width: 1.5,
+              ),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+              borderSide: BorderSide(
+                color: isInvalid ? Colors.red : const Color(0xFFE0E0E0),
+                width: 1,
+              ),
             ),
+            // Message d'erreur masqué ici car géré par un widget personnalisé plus bas
+            errorText: null,
           ),
         ),
+        if (isInvalid && errorMessage != null) ...[
+          const Gap(6),
+          Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red,
+                size: 14,
+              ),
+              const Gap(4),
+              Expanded(
+                child: Text(
+                  errorMessage,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -722,28 +930,13 @@ class _HostessBookingDetailsScreenState
     }
 
     if (invalidPassengers.isNotEmpty) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            invalidPassengers.length == 1
-                ? 'Veuillez remplir tous les champs obligatoires du passager ${invalidPassengers.first}'
-                : 'Veuillez remplir tous les champs obligatoires des passagers: ${invalidPassengers.join(", ")}',
-          ),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          dismissDirection: DismissDirection.horizontal,
-          showCloseIcon: false,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-      // Naviguer vers le premier passager invalide
-      if (invalidPassengers.isNotEmpty) {
-        setState(() => _currentPassengerIndex = invalidPassengers.first - 1);
-      }
+      // Vibration pour signaler l'erreur
+      HapticFeedback.heavyImpact();
+      // Active l'affichage des erreurs visuelles
+      setState(() {
+        _showErrors = true;
+        _currentPassengerIndex = invalidPassengers.first - 1;
+      });
       return;
     }
 
@@ -971,23 +1164,191 @@ class _HostessBookingDetailsScreenState
 
     // Vérification de sécurité
     if (passengers.isEmpty) {
-      print('ERROR: passengers list is empty!');
-      print('_passengerForms length: ${_passengerForms.length}');
-      print('_passengerCount: $_passengerCount');
       return;
     }
 
-    Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (context) => HostessTicketResultScreen(
-          isRoundTrip: _tripType == 'Aller-Retour',
-          passengers: passengers,
-          departure: widget.departure,
-          arrival: widget.arrival,
-          travelDate: '11/02/2026',
-          travelTime: _selectedTime,
-          totalPrice: totalPrice,
+    _showSuccessDialog(totalPrice, passengers);
+  }
+
+  void _showSuccessDialog(int totalPrice, List<PassengerInfo> passengers) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: "",
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        final curveValue = Curves.easeInOutBack.transform(anim1.value);
+        return Transform.scale(
+          scale: curveValue,
+          child: Opacity(
+            opacity: anim1.value,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icône animée ou stylisée
+                    Container(
+                      height: 80,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+                          width: 4,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 40,
+                      ),
+                    ),
+                    const Gap(24),
+                    const Text(
+                      'Vente Confirmée',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const Gap(12),
+                    Text(
+                      '${passengers.length > 1 ? "Les billets" : "Le billet"} pour ${passengers.length > 1 ? "les" : "le"} ${passengers.length > 1 ? "${passengers.length} passager(s)" : "passager"} ${passengers.length > 1 ? "sont prêts" : "est prêt"} à être ${passengers.length > 1 ? "imprimés" : "imprimé"}.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey[600],
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Gap(32),
+                    // Détails rapides
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 235, 237, 239),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Montant Total',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF666666),
+                            ),
+                          ),
+                          Text(
+                            '$totalPrice FCFA',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Gap(32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (context) => HostessTicketResultScreen(
+                                isRoundTrip: _tripType == 'Aller-Retour',
+                                passengers: passengers,
+                                departure: widget.departure,
+                                arrival: widget.arrival,
+                                travelDate: '06/03/2026',
+                                travelTime: _selectedTime,
+                                totalPrice: totalPrice,
+                              ),
+                            ),
+                            (route) => route.isFirst,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'VOIR LES BILLETS',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Ligne pointillée horizontale ──────────────────────────────────────────
+class _DottedLine extends StatelessWidget {
+  const _DottedLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 20,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          3,
+          (i) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1.5),
+            child: Container(
+              width: 3,
+              height: 3,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
         ),
       ),
     );

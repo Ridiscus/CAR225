@@ -30,7 +30,11 @@ class HostessTicketResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: const CustomAppBar(title: 'Billets Générés'),
+      appBar: const CustomAppBar(
+        title: 'Billets Générés',
+        showLeading: false,
+        leadingIcon: null,
+      ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -177,7 +181,6 @@ class HostessTicketResultScreen extends StatelessWidget {
 
   Widget _buildTicketListItem(int ticketNumber) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -190,73 +193,146 @@ class HostessTicketResultScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                '#$ticketNumber',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-          const Gap(16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // ── Header (Badge # + Type) ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '#$ticketNumber',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const Gap(12),
                 Text(
                   'Billet ${isRoundTrip ? "Aller-Retour" : "Aller Simple"}',
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
-                const Gap(4),
-                Text(
-                  '$departure → $arrival',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w600,
+              ],
+            ),
+          ),
+
+          // ── Trajet (Mise en avant Départ/Arrivée) ──
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DÉPART',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Gap(4),
+                      Text(
+                        departure,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                    ],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF5F5F7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.directions_bus_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'ARRIVÉE',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Gap(4),
+                      Text(
+                        arrival,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const Gap(12),
-          Builder(
-            builder: (context) => OutlinedButton(
-              onPressed: () => _showTicketDetails(context, ticketNumber),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primary, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-              ),
-              child: const Text(
-                'Aperçu',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
+
+          // ── Bouton Aperçu (En bas) ──
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Builder(
+              builder: (context) => SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showTicketDetails(context, ticketNumber),
+                  icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+                  label: const Text(
+                    'VOIR L\'APERÇU DU BILLET',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -272,7 +348,7 @@ class HostessTicketResultScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
+        height: MediaQuery.of(context).size.height * 0.95,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
@@ -622,39 +698,74 @@ class HostessTicketResultScreen extends StatelessWidget {
         ],
       ),
       padding: const EdgeInsets.all(20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            await TicketPdfGenerator.printAllTickets(
-              passengerCount: passengers.length,
-              passengerName: passengers.map((p) => p.fullName).join(', '),
-              departure: departure,
-              arrival: arrival,
-              travelDate: travelDate,
-              travelTime: travelTime,
-              isRoundTrip: isRoundTrip,
-              totalPrice: totalPrice,
-            );
-          },
-          icon: const Icon(Icons.print_rounded, color: Colors.white),
-          label: const Text(
-            'IMPRIMER TOUS LES BILLETS',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-              color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await TicketPdfGenerator.printAllTickets(
+                  passengerCount: passengers.length,
+                  passengerName: passengers.map((p) => p.fullName).join(', '),
+                  departure: departure,
+                  arrival: arrival,
+                  travelDate: travelDate,
+                  travelTime: travelTime,
+                  isRoundTrip: isRoundTrip,
+                  totalPrice: totalPrice,
+                );
+              },
+              icon: const Icon(Icons.print_rounded, color: Colors.white),
+              label: const Text(
+                'IMPRIMER TOUS LES BILLETS',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF263238),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
             ),
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF263238),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+          const Gap(12),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Retourne à la racine (Accueil) pour commencer une nouvelle vente
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
+              icon: const Icon(
+                Icons.add_shopping_cart_rounded,
+                color: Colors.white,
+              ),
+              label: const Text(
+                'NOUVELLE VENTE',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
             ),
-            elevation: 0,
           ),
-        ),
+        ],
       ),
     );
   }

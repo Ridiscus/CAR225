@@ -1,3 +1,7 @@
+import 'package:car225/features/agent/presentation/providers/agent_provider.dart';
+import 'package:car225/features/agent/presentation/providers/agent_profile_provider.dart';
+import 'package:car225/features/driver/presentation/providers/driver_provider.dart';
+import 'package:car225/features/hostess/presentation/providers/hostess_profile_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -66,7 +70,9 @@ void main() async {
         // --- A. Providers de base (ceux qui n'ont pas de dépendances) ---
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-
+        ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
+        ChangeNotifierProvider(create: (_) => AgentProfileProvider()),
+        ChangeNotifierProvider(create: (_) => DriverProvider()),
         // --- B. Repositories (Logique métier sans UI) ---
         Provider<AuthRepository>(
           create: (_) => AuthRepositoryImpl(
@@ -75,16 +81,13 @@ void main() async {
             deviceService: DeviceService(),
           ),
         ),
-
         // --- C. Providers avec Dépendances (Repositories) ---
-
         // ✅ CORRECTION ICI : On injecte le repository
         ChangeNotifierProvider(
           create: (_) => NotificationProvider(
             repository: NotificationRepository(dio: dio),
           ),
         ),
-
         // ✅ PROVIDER COMPANY
         ChangeNotifierProvider(
           create: (_) =>

@@ -3,7 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import '../widgets/custom_app_bar.dart';
-import '../providers/profile_provider.dart';
+import '../providers/agent_profile_provider.dart';
 
 class AgentPersonalInfoScreen extends StatefulWidget {
   const AgentPersonalInfoScreen({super.key});
@@ -65,7 +65,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
   // 5. MÉTHODE BUILD (Assemblage Final)
   @override
   Widget build(BuildContext context) {
-    final pickedImage = context.watch<ProfileProvider>().profileImage;
+    final pickedImage = context.watch<AgentProfileProvider>().profileImage;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

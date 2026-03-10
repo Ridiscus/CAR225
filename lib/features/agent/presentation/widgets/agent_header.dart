@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../screens/agent_main_wrapper.dart';
-import '../providers/profile_provider.dart';
+import '../providers/agent_profile_provider.dart';
 import '../screens/agent_profile_screen.dart';
 
 class AgentHeader extends StatefulWidget {
@@ -37,11 +37,13 @@ class _AgentHeaderState extends State<AgentHeader> {
   @override
   Widget build(BuildContext context) {
     // On écoute les changements de l'image de profil via le Provider
-    final profileProvider = Provider.of<ProfileProvider>(context);
+    final profileProvider = Provider.of<AgentProfileProvider>(context);
     final pickedImage = profileProvider.profileImage;
 
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 25),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 5, 24, 25),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -51,13 +53,6 @@ class _AgentHeaderState extends State<AgentHeader> {
             AppColors.primary.withValues(alpha: 0.85),
           ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
       ),
       child: Row(
         children: [

@@ -2,11 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ProfileProvider extends ChangeNotifier {
+class AgentProfileProvider extends ChangeNotifier {
   File? _profileImage;
   File? get profileImage => _profileImage;
 
-  ProfileProvider() {
+  AgentProfileProvider() {
     loadCachedImage();
   }
 

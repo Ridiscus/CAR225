@@ -419,49 +419,6 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 // ---------------------------------------------------------------------------
 // 👇 WIDGET HELPER MIS À JOUR (VERSION IMAGE)
 // ---------------------------------------------------------------------------
-  /*Widget _buildTextField(BuildContext context, String label, {
-    required TextEditingController controller,
-    String? imagePath, // ✅ Changé de IconData à String
-    TextInputType keyboardType = TextInputType.text,
-    String? hint,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final fillColor = isDark ? Colors.grey[800] : Colors.grey[100]; // Un peu plus clair que blanc pur souvent mieux
-    final borderColor = isDark ? Colors.transparent : Colors.grey.shade300;
-    final iconColor = Colors.grey;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor)),
-        const Gap(6),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: TextStyle(color: textColor),
-          validator: (value) => value == null || value.isEmpty ? "Requis" : null,
-          decoration: InputDecoration(
-            // ✅ Image à la place de l'icône
-            prefixIcon: imagePath != null
-                ? Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Image.asset(imagePath, width: 20, height: 20, color: iconColor),
-            )
-                : null,
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-            filled: true,
-            fillColor: fillColor,
-          ),
-        ),
-      ],
-    );
-  }*/
 
 
   Widget _buildTextField(

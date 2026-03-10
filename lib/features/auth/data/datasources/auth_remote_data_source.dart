@@ -225,24 +225,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
 
-
-
-// DANS L'IMPLÉMENTATION (AuthRemoteDataSourceImpl)
-  /*@override
-  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode) async {
-    try {
-      final response = await dio.post('/user/verify-phone-otp', data: {
-        'contact': contact,
-        'otp': otpCode,
-      });
-
-      // ✅ On retourne les données reçues (qui contiennent le token)
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? "Code invalide");
-    }
-  }*/
-
   @override
   Future<void> resetPassword(String email, String otpCode, String password, String passwordConfirmation) async {
     try {

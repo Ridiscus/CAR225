@@ -129,66 +129,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
 
-
-  // 3. UPDATE (Avec Validation)
-  /*Future<void> _updateProfile() async {
-    // 🛡️ VALIDATION DES CHAMPS AVANT ENVOI
-    if (_nomController.text.trim().isEmpty || _prenomController.text.trim().isEmpty) {
-      _showTopNotification("Le nom et le prénom sont obligatoires", isError: true);
-      return;
-    }
-
-    // 🟢 VALIDATION CONTACT PERSO : 10 Chiffres
-    if (_contactController.text.trim().length != 10) {
-      _showTopNotification("Le numéro de contact doit contenir exactement 10 chiffres", isError: true);
-      return;
-    }
-
-    // 🟢 VALIDATION URGENCE : 10 Chiffres
-    if (_contactUrgenceController.text.trim().length != 10) {
-      _showTopNotification("Le numéro d'urgence doit contenir exactement 10 chiffres", isError: true);
-      return;
-    }
-
-    setState(() => _isSaving = true);
-
-    try {
-      await _repo.updateUserProfile(
-        name: _nomController.text.trim(),
-        prenom: _prenomController.text.trim(),
-        email: _emailController.text.trim(),
-        contact: _contactController.text.trim(),
-        nomUrgence: _nomUrgenceController.text.trim(),
-        prenomUrgence: _prenomUrgenceController.text.trim(),
-        contactUrgence: _contactUrgenceController.text.trim(),
-        photoPath: _selectedImage?.path,
-      );
-
-      if (mounted) {
-        await context.read<UserProvider>().loadUser();
-      }
-
-      if (!mounted) return;
-
-      // ✅ SUCCÈS
-      _showTopNotification("Profil mis à jour avec succès !", isError: false);
-
-      // Petit délai pour laisser l'utilisateur voir la notif avant de fermer
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) Navigator.pop(context);
-
-    } catch (e) {
-      if (!mounted) return;
-      // ❌ ERREUR API
-      // On nettoie le message d'erreur pour qu'il soit lisible (retire "Exception:")
-      final message = e.toString().replaceAll("Exception: ", "");
-      _showTopNotification(message, isError: true);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }*/
-
-
   Future<void> _updateProfile() async {
     if (_nomController.text.trim().isEmpty || _prenomController.text.trim().isEmpty) {
       _showTopNotification("Le nom et le prénom sont obligatoires", isError: true);

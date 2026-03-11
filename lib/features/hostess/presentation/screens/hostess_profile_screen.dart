@@ -3,6 +3,11 @@ import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
+import '../../../auth/presentation/screens/login_screen.dart';
 import '../providers/hostess_profile_provider.dart';
 import 'hostess_personal_info_screen.dart';
 import 'hostess_change_password_screen.dart';
@@ -16,11 +21,11 @@ class HostessProfileScreen extends StatefulWidget {
 }
 
 class _HostessProfileScreenState extends State<HostessProfileScreen> {
-  final String _firstName = 'Fabiola';
-  final String _lastName = 'Kouassi';
-  final String _role = 'HÔTESSE';
-  final String _company = 'UTB EXPRESS';
+  // 🟢 On a supprimé les variables en dur (_firstName, _lastName, etc.)
+  final String _role = 'HÔTESSE'; // On garde le rôle en dur car c'est l'app Hôtesse
   bool _notificationEnabled = true;
+
+  bool _isLoadingLogout = false;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -42,8 +47,81 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    // 🟢 On lance le chargement des données au démarrage de l'écran (s'il est vide)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<HostessProfileProvider>();
+      if (provider.profileData == null) {
+        provider.fetchProfile(
+          AuthRepositoryImpl(
+            remoteDataSource: AuthRemoteDataSourceImpl(),
+            fcmService: FcmService(),
+            deviceService: DeviceService(),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _handleLogout() async {
+    // Demander confirmation avant de déconnecter
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Déconnexion"),
+        content: const Text("Êtes-vous sûr de vouloir vous déconnecter ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Annuler"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Se déconnecter", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoadingLogout = true);
+
+    try {
+      // Instanciation de ton repository (tu peux aussi utiliser un Provider/GetIt si tu en as un)
+      final authRepository = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),       // Remplace si tu as une injection de dépendance
+        deviceService: DeviceService(), // Remplace si tu as une injection de dépendance
+      );
+
+      await authRepository.logouut();
+
+      if (!mounted) return;
+
+      // Rediriger vers l'écran de connexion en vidant la pile de navigation
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+      );
+
+    } catch (e) {
+      _showSnackBar(message: "Erreur lors de la déconnexion", isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLogout = false);
+      }
+    }
+  }
+
   void _showImagePreview() {
-    final pickedImage = context.read<HostessProfileProvider>().profileImage;
+    final provider = context.read<HostessProfileProvider>();
+    final pickedImage = provider.profileImage;
+    final profile = provider.profileData;
+
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -70,10 +148,13 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(25),
                   image: DecorationImage(
+                    // 🟢 MÊME LOGIQUE POUR L'URL DE L'IMAGE DANS LA PRÉVISUALISATION
                     image: pickedImage != null
                         ? FileImage(pickedImage)
-                        : const AssetImage('assets/images/hostess_profile.png')
-                              as ImageProvider,
+                        : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
+                        ? NetworkImage('https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}')
+                        : const AssetImage('assets/images/hostess_profile.png'))
+                    as ImageProvider,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -152,15 +233,17 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
+    // 🟢 On écoute le provider complet ici
+    final provider = context.watch<HostessProfileProvider>();
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildPremiumHeader(),
+            _buildPremiumHeader(provider), // On passe le provider
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
               child: Column(
@@ -207,9 +290,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   ),
                   const Gap(30),
                   _buildLogoutButton(),
-                  const Gap(
-                    100,
-                  ), // Espace supplémentaire pour scroller au-delà du CurvedNavigationBar
+                  const Gap(100),
                 ],
               ),
             ),
@@ -219,7 +300,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
     );
   }
 
-  Widget _buildPremiumHeader() {
+  /*Widget _buildPremiumHeader() {
     final pickedImage = context.watch<HostessProfileProvider>().profileImage;
     final double topPadding = MediaQuery.of(context).padding.top;
 
@@ -370,6 +451,169 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
         ),
       ],
     );
+  }*/
+
+
+  Widget _buildPremiumHeader(HostessProfileProvider provider) {
+    final pickedImage = provider.profileImage;
+    final profile = provider.profileData;
+    final isLoading = provider.isLoading;
+
+    final double topPadding = MediaQuery.of(context).padding.top;
+
+    // 🟢 Données dynamiques avec fallbacks pendant le chargement
+    final String firstName = profile?.prenom ?? (isLoading ? '...' : '');
+    final String lastName = profile?.name ?? (isLoading ? 'Chargement' : 'Inconnu');
+    final String company = profile?.nomCompagnie ?? (isLoading ? '...' : 'Inconnue');
+
+    return Stack(
+      children: [
+        // ── Image de Fond (Car) ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/busheader5.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        // ── Dégradé noir protecteur ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.8),
+              ],
+            ),
+          ),
+        ),
+        // ── Contenu du profil ──
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.only(top: topPadding + 40, bottom: 40),
+          child: Column(
+            children: [
+              // Photo de Profil avec bordure brillante
+              Stack(
+                children: [
+                  GestureDetector(
+                    onTap: _showImagePreview,
+                    child: Hero(
+                      tag: 'hostess_profile_hero',
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                          image: DecorationImage(
+                            // 🟢 MÊME LOGIQUE D'URL ICI
+                            image: pickedImage != null
+                                ? FileImage(pickedImage)
+                                : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
+                                ? NetworkImage('https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}')
+                                : const AssetImage('assets/images/hostess_profile.png'))
+                            as ImageProvider,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: _showPhotoOptions,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(20),
+              // 🟢 Nom et Prénoms Dynamiques
+              Text(
+                '$firstName $lastName'.trim(),
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const Gap(8),
+              // Badge Rôle (Orange UTB)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _role,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+              const Gap(10),
+              // 🟢 Entreprise Dynamique
+              Text(
+                'EMPLOYÉE PAR $company'.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildSection({required List<Widget> children}) {
@@ -440,11 +684,17 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
       width: double.infinity,
       height: 56,
       child: OutlinedButton.icon(
-        onPressed: () {},
-        icon: const Icon(Icons.logout_rounded),
-        label: const Text(
-          'Se déconnecter',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        onPressed: _isLoadingLogout ? null : _handleLogout, // 🟢 Utilise la nouvelle méthode
+        icon: _isLoadingLogout
+            ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red)
+        )
+            : const Icon(Icons.logout_rounded),
+        label: Text(
+          _isLoadingLogout ? 'Déconnexion...' : 'Se déconnecter',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.red,

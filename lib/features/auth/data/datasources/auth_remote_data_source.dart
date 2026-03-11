@@ -3,13 +3,20 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/user_stats_model.dart';
+import '../../../hostess/models/hostess_profile_model.dart';
 import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
+import '../models/unified_login_request_model.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body);
+
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params);
+  Future<void> logoutHotesse();
+  Future<HostessProfileModel> getHostessProfile();
+
 
   // Ajoute ceci dans la classe abstraite AuthRemoteDataSource :
   Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode);
@@ -55,8 +62,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl() {
     dio = Dio(
       BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        //baseUrl: 'https://car225.com/api/',
+        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
         //baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
@@ -89,6 +96,79 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       ),
     );
   }
+
+  @override
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params) async {
+    try {
+      print("⏳ [UNIFIED LOGIN] Tentative avec Code ID: ${params.codeId}");
+
+      final response = await dio.post('/unified-login', data: params.toJson());
+
+      print("✅ [UNIFIED LOGIN] Succès : ${response.data}");
+
+      // On utilise le même modèle de réponse que le login normal
+      return AuthResponseModel.fromJson(response.data);
+
+    } on DioException catch (e) {
+      // 🟢 ON AJOUTE CES LOGS POUR COMPRENDRE LE VRAI PROBLÈME
+      print("❌ [UNIFIED LOGIN DIO ERROR] Type: ${e.type}");
+      print("❌ [UNIFIED LOGIN DIO ERROR] Message: ${e.message}");
+      print("❌ [UNIFIED LOGIN DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+
+      if (e.response == null) {
+        // Le serveur n'a pas répondu (crash, mauvaise URL, ou pas de réseau)
+        throw Exception("Impossible de joindre le serveur. Erreur réseau ou mauvaise URL.");
+      }
+
+      throw Exception(e.response?.data['message'] ?? "Identifiants invalides");
+    } catch (e) {
+      print("🚨 [UNIFIED LOGIN ERROR] Erreur : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> logoutHotesse() async {
+    try {
+      print("⏳ [LOGOUT] Déconnexion de l'hôtesse en cours...");
+
+      // Appel à l'API. Si tu utilises une méthode DELETE ou POST, adapte le `.post`
+      await dio.post('/hotesse/logout');
+
+      print("✅ [LOGOUT] Succès : Hôtesse déconnectée du serveur.");
+    } on DioException catch (e) {
+      print("❌ [LOGOUT DIO ERROR] Status: ${e.response?.statusCode}");
+      // Même si le serveur renvoie une erreur (ex: token déjà expiré),
+      // on veut généralement quand même déconnecter l'utilisateur localement.
+      // On log l'erreur mais on ne throw pas forcément d'exception bloquante.
+    } catch (e) {
+      print("🚨 [LOGOUT ERROR] Erreur : $e");
+    }
+  }
+
+
+  @override
+  Future<HostessProfileModel> getHostessProfile() async {
+    try {
+      print("⏳ [GET HOSTESS PROFILE] Appel API...");
+      final response = await dio.get('/hotesse/profile');
+      print("✅ [GET HOSTESS PROFILE] Succès : ${response.data}");
+
+      // 🟢 CHANGEMENT ICI : On pointe sur 'hotesse' selon ton JSON
+      final data = response.data['hotesse'];
+
+      if (data == null) {
+        throw Exception("Clé 'hotesse' manquante dans le JSON.");
+      }
+
+      return HostessProfileModel.fromJson(data);
+
+    } catch (e) {
+      print("🚨 [GET HOSTESS PROFILE ERROR] $e");
+      rethrow;
+    }
+  }
+
 
   @override
   Future<Map<String, dynamic>> loginSocial(Map<String, dynamic> body) async {

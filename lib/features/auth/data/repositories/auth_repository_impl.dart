@@ -2,11 +2,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../booking/data/models/user_stats_model.dart';
+import '../../../hostess/models/hostess_profile_model.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
 import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
+import '../models/unified_login_request_model.dart';
 import '../models/user_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -242,4 +244,83 @@ class AuthRepositoryImpl implements AuthRepository {
       await prefs.remove('auth_token');
     }
   }
+
+  /*@override
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params) async {
+    try {
+      final AuthResponseModel response = await remoteDataSource.unifiedLogin(params);
+
+      if (response.success && response.token != null) {
+        final prefs = await SharedPreferences.getInstance();
+
+        // 1. Sauvegarde du Token
+        await prefs.setString('auth_token', response.token!);
+
+        // 2. Sauvegarde du type d'utilisateur (CRUCIAL pour le SplashScreen !)
+        // Si ton API te renvoie le rôle exact (ex: response.user.role), utilise-le.
+        // Sinon, pour l'instant, on va identifier qu'il s'agit d'un compte "agent/hotesse".
+        await prefs.setString('user_type', 'hostess');
+
+        print("✅ [REPO] Token et Rôle (hostess) sauvegardés !");
+      }
+
+      return response;
+    } catch (e) {
+      print("❌ [REPO] Erreur Unified Login : $e");
+      rethrow;
+    }
+  }*/
+
+  @override
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params) async {
+    try {
+      final AuthResponseModel response = await remoteDataSource.unifiedLogin(params);
+
+      if (response.success && response.token != null) {
+        final prefs = await SharedPreferences.getInstance();
+
+        await prefs.setString('auth_token', response.token!);
+
+        // 🟢 ON SAUVEGARDE LE VRAI RÔLE DE L'API
+        // Si response.role existe, on le prend, sinon on met 'user' par défaut
+        await prefs.setString('user_type', response.role ?? 'user');
+
+        print("✅ [REPO] Token et Rôle (${response.role}) sauvegardés !");
+      }
+
+      return response;
+    } catch (e) {
+      print("❌ [REPO] Erreur Unified Login : $e");
+      rethrow;
+    }
+  }
+
+
+  @override
+  Future<void> logouut() async {
+    try {
+      // 1. Appeler l'API pour invalider le token côté serveur
+      await remoteDataSource.logoutHotesse();
+
+      // 2. Nettoyer les données locales
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('user_type');
+
+      // Optionnel : Si tu stockes d'autres infos (profil, etc.), supprime-les ici
+      // await prefs.remove('user_profile');
+
+      print("✅ [REPO] Token et rôle supprimés localement.");
+
+    } catch (e) {
+      print("❌ [REPO] Erreur lors de la déconnexion : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<HostessProfileModel> getHostessProfile() async {
+    return await remoteDataSource.getHostessProfile();
+  }
+
 }

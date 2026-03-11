@@ -7,6 +7,7 @@ class AuthResponseModel {
   final String? contact; // Pour savoir où envoyer l'OTP
   final String? token;   // Sera null si requiresOtp est true
   final UserModel? user;
+  final String? role;
 
   AuthResponseModel({
     required this.success,
@@ -15,6 +16,7 @@ class AuthResponseModel {
     this.contact,
     this.token,
     this.user,
+    this.role
   });
 
   factory AuthResponseModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class AuthResponseModel {
       // Le token peut être dans 'token' ou 'access_token' selon le dev
       token: json['token'] ?? json['access_token'],
       user: json['user'] != null ? UserModel.fromJson(json['user']) : null,
+      role: json['role'],
     );
   }
 }

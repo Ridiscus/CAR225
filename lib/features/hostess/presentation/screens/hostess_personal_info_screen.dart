@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
@@ -139,6 +139,198 @@ class _HostessPersonalInfoScreenState extends State<HostessPersonalInfoScreen> {
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+*/
+
+
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import 'package:provider/provider.dart';
+import 'package:car225/core/theme/app_colors.dart';
+import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
+import '../providers/hostess_profile_provider.dart';
+
+// Import de ton repository pour pouvoir le passer au fetchProfile
+// import '../data/repositories/hostess_repository_impl.dart';
+
+class HostessPersonalInfoScreen extends StatefulWidget {
+  const HostessPersonalInfoScreen({super.key});
+  @override
+  State<HostessPersonalInfoScreen> createState() =>
+      _HostessPersonalInfoScreenState();
+}
+
+class _HostessPersonalInfoScreenState extends State<HostessPersonalInfoScreen> {
+
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<HostessProfileProvider>();
+      if (provider.profileData == null) {
+
+        // 🟢 ON FOURNIT TOUTES LES DÉPENDANCES REQUISES
+        provider.fetchProfile(
+          AuthRepositoryImpl(
+            remoteDataSource: AuthRemoteDataSourceImpl(),
+            fcmService: FcmService(),       // 👈 Ajouté ici
+            deviceService: DeviceService(), // 👈 Ajouté ici
+          ),
+        );
+
+      }
+    });
+  }
+
+  Widget _buildDisabledField({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF607D8B),
+          ),
+        ),
+        const Gap(8),
+        TextFormField(
+          key: Key(value), // Pour forcer la mise à jour quand la donnée arrive
+          initialValue: value,
+          enabled: false,
+          style: const TextStyle(
+            color: Color(0xFF263238),
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
+            prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: const BorderSide(color: Color(0xFFECEFF1)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 18),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // On écoute le provider
+    final provider = context.watch<HostessProfileProvider>();
+    final profile = provider.profileData;
+    final isLoading = provider.isLoading;
+    final pickedImage = provider.profileImage;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: CustomAppBar(
+        title: 'Informations Personnelles',
+        leadingIcon: Icons.arrow_back,
+        leadingOnPressed: () => Navigator.pop(context),
+      ),
+      body: SafeArea(
+        top: false,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      width: 4,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 54,
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    // Si l'API renvoie une image réseau, on l'affiche ici idéalement
+                    backgroundImage: pickedImage != null
+                        ? FileImage(pickedImage)
+                        : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
+                    // 🟢 ON CONCATÈNE L'URL DU SERVEUR AVEC LE CHEMIN DE L'IMAGE
+                    // Remarque : ajoute 'storage/' si ton backend (ex: Laravel) expose les images via ce dossier.
+                    // Si ça ne marche pas, essaie d'enlever 'storage/'.
+                        ? NetworkImage('https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}')
+                        : const AssetImage('assets/images/hostess_profile.png'))
+                    as ImageProvider,
+                  ),
+                ),
+              ),
+              const Gap(40),
+
+              if (profile != null) ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDisabledField(
+                      icon: Icons.badge_outlined,
+                      label: 'ID Hôtesse',
+                      value: profile.codeId, // 🟢 Dynamique
+                    ),
+                    const Gap(20),
+                    _buildDisabledField(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Nom',
+                      value: profile.name, // 🟢 Dynamique
+                    ),
+                    const Gap(20),
+                    _buildDisabledField(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Prénom',
+                      value: profile.prenom, // 🟢 Dynamique
+                    ),
+                    const Gap(20),
+                    _buildDisabledField(
+                      icon: Icons.business_rounded,
+                      label: 'Compagnie',
+                      value: profile.nomCompagnie ?? 'N/A', // 🟢 Utilise nomCompagnie
+                    ),
+                    const Gap(20),
+                    _buildDisabledField(
+                      icon: Icons.email_outlined,
+                      label: 'Email',
+                      value: profile.email, // 🟢 Dynamique
+                    ),
+                    const Gap(20),
+                    _buildDisabledField(
+                      icon: Icons.phone_outlined,
+                      label: 'Téléphone',
+                      value: profile.contact, // 🟢 Dynamique
+                    ),
+                  ],
+                ),
+              ] else if (provider.errorMessage != null) ...[
+                // Message d'erreur si l'API a échoué
+                Text(provider.errorMessage!, style: const TextStyle(color: Colors.red)),
+              ]
             ],
           ),
         ),

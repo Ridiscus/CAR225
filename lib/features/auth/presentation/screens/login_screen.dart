@@ -9,9 +9,12 @@ import '../../../../core/providers/user_provider.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/device/device_service.dart';
+import '../../../agent/presentation/screens/agent_main_wrapper.dart';
 import '../../../home/presentation/screens/VerifOtpScreen.dart';
+import '../../../hostess/presentation/screens/hostess_main_wrapper.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/models/login_request_model.dart';
+import '../../data/models/unified_login_request_model.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 
 import '../../../../features/home/presentation/screens/main_wrapper_screen.dart';
@@ -19,6 +22,8 @@ import '../../../home/presentation/screens/forgot_password_flow.dart';
 import 'signup_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,7 +34,12 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   // --- 1. CONTROLLERS ---
-  final TextEditingController _emailController = TextEditingController();
+  /*final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();*/
+
+  // --- 1. CONTROLLERS ---
+  // Remplacer _emailController par _identifierController
+  final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _rememberMe =
@@ -109,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _currentOverlayEntry = null;
   }
 
-  Future<void> _handleLogin() async {
+  /*Future<void> _handleLogin() async {
     final emailClean = _emailController.text.trim();
     final passwordClean = _passwordController.text;
 
@@ -173,6 +183,145 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e, stackTrace) {
+      print("🔴 [ERREUR] $e");
+      _showTopNotification(e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }*/
+
+
+  Future<void> _handleLogin() async {
+    final identifierClean = _identifierController.text.trim(); // <-- Modifié
+    final passwordClean = _passwordController.text;
+
+    if (identifierClean.isEmpty || passwordClean.isEmpty) {
+      _showTopNotification("Veuillez remplir tous les champs", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final fcmService = FcmService();
+      final deviceService = DeviceService();
+
+      final authRepository = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: fcmService,
+        deviceService: deviceService,
+      );
+
+      String fcmToken = await fcmService.getToken() ?? "no_token";
+      String deviceName = await deviceService.getDeviceName();
+
+      // 🟢 LOGIQUE DE SÉPARATION (Email vs Code ID)
+      bool isEmail = identifierClean.contains('@');
+
+      if (isEmail) {
+        // ---------------------------------------------------------
+        // 1️⃣ C'EST UN PARTICULIER (Il a tapé un email avec @)
+        // ---------------------------------------------------------
+        final loginParams = LoginRequestModel(
+          email: identifierClean,
+          password: passwordClean,
+          fcmToken: fcmToken,
+          deviceName: deviceName,
+        );
+
+        final response = await authRepository.login(loginParams);
+
+        if (!mounted) return;
+
+        if (response.success) {
+          if (response.requiresOtp) {
+            _showTopNotification(response.message);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VerifOtpScreen(
+                  email: identifierClean,
+                  contact: response.contact ?? "",
+                ),
+              ),
+            );
+          } else {
+            await context.read<UserProvider>().loadUser();
+            _showTopNotification("Connexion réussie !");
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (!mounted) return;
+
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const MainScreen()), // Redirection Particulier
+                  (route) => false,
+            );
+          }
+        }
+      } else {
+        // ---------------------------------------------------------
+        // 2️⃣ C'EST UNE HÔTESSE / AGENT (Il a tapé un Code, ex: ZEUS123)
+        // ---------------------------------------------------------
+        print("👉 [DEBUG] Tentative de connexion via Code ID : $identifierClean");
+
+        final unifiedLoginParams = UnifiedLoginRequestModel(
+          codeId: identifierClean,
+          password: passwordClean,
+          fcmToken: fcmToken,
+          nomDevice: deviceName,
+        );
+
+        final response = await authRepository.unifiedLogin(unifiedLoginParams);
+
+        if (!mounted) return;
+
+        /*if (response.success) {
+          // Si besoin, charger des infos utilisateurs spécifiques ici
+          // await context.read<UserProvider>().loadUser();
+
+          _showTopNotification("Connexion réussie !");
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          if (!mounted) return;
+
+          // Redirection vers l'espace Hôtesse !
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HostessMainWrapper()),
+                (route) => false,
+          );
+        }*/
+
+        if (response.success) {
+          await context.read<UserProvider>().loadUser(); // À décommenter si besoin
+
+          _showTopNotification("Connexion réussie !");
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          if (!mounted) return;
+
+          // 🟢 ROUTAGE DYNAMIQUE SELON LE RÔLE
+          Widget destination;
+          if (response.role == 'hotesse') {
+            destination = const HostessMainWrapper();
+          } else if (response.role == 'agent') {
+            destination = const AgentMainWrapper();
+          } else {
+            // Par défaut si le rôle n'est pas reconnu
+            destination = const MainScreen();
+          }
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+                (route) => false,
+          );
+        }
+
+
+      }
+
+    } catch (e) {
       print("🔴 [ERREUR] $e");
       _showTopNotification(e.toString(), isError: true);
     } finally {
@@ -264,7 +413,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _removeOverlay();
-    _emailController.dispose();
+    //_emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -296,10 +446,18 @@ class _LoginScreenState extends State<LoginScreen> {
               const Gap(30),
 
               // --- CHAMPS ---
-              _buildAuthInput(
+              /*_buildAuthInput(
                 "Email",
                 Icons.email_outlined,
                 controller: _emailController,
+              ),
+              const Gap(15),*/
+
+              // --- CHAMPS ---
+              _buildAuthInput(
+                "Email ou Code ID", // 🟢 Le texte change pour être explicite
+                Icons.person_outline, // 🟢 L'icône change pour être plus générique
+                controller: _identifierController,
               ),
               const Gap(15),
 

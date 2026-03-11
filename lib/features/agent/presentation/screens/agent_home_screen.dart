@@ -378,198 +378,201 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Gap(24),
-            // Trip Overview Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.departure_board_rounded,
-                    color: AppColors.primary,
-                    size: 28,
-                  ),
-                ),
-                const Gap(16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$from ➔ $to',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF1E293B),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      Text(
-                        '$departureTime • $busId • $departureStation',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Gap(32),
-
-            // Condition Check Box
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isAssigned
-                    ? const Color(0xFFF0FDF4)
-                    : const Color(0xFFFFFBFA),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isAssigned
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFFEE4E2),
-                  width: 1.5,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              child: Column(
+              const Gap(24),
+              // Trip Overview Header
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        isAssigned
-                            ? Icons.check_circle_rounded
-                            : Icons.warning_amber_rounded,
-                        color: isAssigned
-                            ? const Color(0xFF16A34A)
-                            : const Color(0xFFD92D20),
-                        size: 24,
-                      ),
-                      const Gap(12),
-                      Expanded(
-                        child: Text(
-                          isAssigned
-                              ? 'Chauffeur assigné : $driverName'
-                              : 'Chauffeur non assigné',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: isAssigned
-                                ? const Color(0xFF166534)
-                                : const Color(0xFF912018),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.departure_board_rounded,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const Gap(16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$from ➔ $to',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -0.5,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  if (!isAssigned) ...[
-                    const Gap(12),
-                    const Text(
-                      'Vous ne pouvez pas entamer les scans tant qu\'aucun chauffeur n\'est assigné à ce programme.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF912018),
-                        height: 1.4,
-                      ),
+                        Text(
+                          '$departureTime • $busId • $departureStation',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-            const Gap(32),
+              const Gap(32),
 
-            // Action Buttons
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: isAssigned
-                    ? () {
-                        Navigator.pop(context);
-                        // Navigation vers l'écran de scan ici
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey[200],
-                  disabledForegroundColor: Colors.grey[400],
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              // Condition Check Box
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isAssigned
+                      ? const Color(0xFFF0FDF4)
+                      : const Color(0xFFFFFBFA),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isAssigned
+                        ? const Color(0xFFDCFCE7)
+                        : const Color(0xFFFEE4E2),
+                    width: 1.5,
                   ),
                 ),
-                child: const Text(
-                  'DÉMARRER LES SCANS',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-            const Gap(12),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    CupertinoPageRoute(
-                      builder: (context) => ProgramDetailsScreen(
-                        from: from,
-                        to: to,
-                        time: departureTime,
-                        busId: busId,
-                        type: 'Standard',
-                        departureStation: departureStation,
-                        arrivalStation: arrivalStation,
-                        duration: '3h 15min',
-                        driverName: driverName ?? 'Non assigné',
-                        driverPhone: '+225 00 00 00 00 00',
-                        licensePlate: 'En attente',
-                        price: '5 000 FCFA',
-                        passengersCount: isAssigned ? '28' : '0',
-                        totalSeats: '50',
-                        tripDate: 'Lundi 02 Mars 2026',
-                      ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isAssigned
+                              ? Icons.check_circle_rounded
+                              : Icons.warning_amber_rounded,
+                          color: isAssigned
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFFD92D20),
+                          size: 24,
+                        ),
+                        const Gap(12),
+                        Expanded(
+                          child: Text(
+                            isAssigned
+                                ? 'Chauffeur assigné : $driverName'
+                                : 'Chauffeur non assigné',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isAssigned
+                                  ? const Color(0xFF166534)
+                                  : const Color(0xFF912018),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'VOIR LES DÉTAILS COMPLETS',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                    if (!isAssigned) ...[
+                      const Gap(12),
+                      const Text(
+                        'Vous ne pouvez pas entamer les scans tant qu\'aucun chauffeur n\'est assigné à ce programme.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF912018),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ),
-          ],
+              const Gap(32),
+
+              // Action Buttons
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: isAssigned
+                      ? () {
+                          Navigator.pop(context);
+                          // Navigation vers l'écran de scan ici
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey[200],
+                    disabledForegroundColor: Colors.grey[400],
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'DÉMARRER LES SCANS',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const Gap(12),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (context) => ProgramDetailsScreen(
+                          from: from,
+                          to: to,
+                          time: departureTime,
+                          busId: busId,
+                          type: 'Standard',
+                          departureStation: departureStation,
+                          arrivalStation: arrivalStation,
+                          duration: '3h 15min',
+                          driverName: driverName ?? 'Non assigné',
+                          driverPhone: '+225 00 00 00 00 00',
+                          licensePlate: 'En attente',
+                          price: '5 000 FCFA',
+                          passengersCount: isAssigned ? '28' : '0',
+                          totalSeats: '50',
+                          tripDate: 'Lundi 02 Mars 2026',
+                        ),
+                      ),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'VOIR LES DÉTAILS COMPLETS',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

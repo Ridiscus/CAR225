@@ -157,58 +157,6 @@ class _AgentChangePasswordScreenState extends State<AgentChangePasswordScreen> {
         child: Stack(
           children: [
             // --- BACKGROUND DECORATORS ---
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.15),
-                      AppColors.primary.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 250,
-              left: -80,
-              child: Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFF64748B).withValues(alpha: 0.1),
-                      const Color(0xFF64748B).withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -50,
-              right: -50,
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.08),
-                      AppColors.primary.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
             SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),

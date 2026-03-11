@@ -73,13 +73,9 @@ class DriverHeader extends StatelessWidget {
             child: ClipOval(
               child: driverProvider.profileImage != null
                   ? Image.file(driverProvider.profileImage!, fit: BoxFit.cover)
-                  : Container(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 35,
-                      ),
+                  : Image.asset(
+                      'assets/images/driver_profile.png',
+                      fit: BoxFit.cover,
                     ),
             ),
           ),

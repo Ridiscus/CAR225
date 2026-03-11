@@ -16,7 +16,7 @@ class HostessHeader extends StatefulWidget {
     super.key,
     this.hostessName = 'Fabiola Kouassi',
     this.hostessRole = 'Hôtesse UTB',
-    this.profileImage = 'assets/images/agent_profile.png',
+    this.profileImage = 'assets/images/hostess_profile.png',
     this.initialIsOnline = true,
   });
 
@@ -91,7 +91,10 @@ class _HostessHeaderState extends State<HostessHeader> {
                   child: ClipOval(
                     child: pickedImage != null
                         ? Image.file(pickedImage, fit: BoxFit.cover)
-                        : Image.asset(widget.profileImage, fit: BoxFit.cover),
+                        : Image.asset(
+                            'assets/images/hostess_profile.png',
+                            fit: BoxFit.cover,
+                          ),
                   ),
                 ),
                 Positioned(

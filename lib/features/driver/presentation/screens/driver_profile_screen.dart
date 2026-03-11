@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -10,8 +8,6 @@ import 'package:car225/core/providers/user_provider.dart';
 import '../providers/driver_provider.dart';
 import 'driver_personal_info_screen.dart';
 import 'driver_change_password_screen.dart';
-
-import '../widgets/driver_header.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -61,157 +57,213 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          const DriverHeader(title: "Mon Profil", showProfile: false),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildPremiumHeader(user, driverProvider),
+            const Gap(10),
+            // SETTINGS LIST
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
               child: Column(
                 children: [
-                  const Gap(15),
-                  // USER CARD
-                  _buildUserCard(user, driverProvider),
-                  const Gap(5),
-                  // SETTINGS LIST
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 22),
-                    child: Column(
-                      children: [
-                        _buildSettingTile(
-                          icon: Icons.person_outline,
-                          label: "Informations personnelles",
-                          onTap: () => Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (context) =>
-                                  const DriverPersonalInfoScreen(),
-                            ),
-                          ),
-                        ),
-                        _buildSettingTile(
-                          icon: Icons.lock_outline,
-                          label: "Mot de passe & Sécurité",
-                          onTap: () => Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (context) =>
-                                  const DriverChangePasswordScreen(),
-                            ),
-                          ),
-                        ),
-                        _buildSettingTile(
-                          icon: Icons.notifications_none_rounded,
-                          label: "Notifications",
-                          trailing: CupertinoSwitch(
-                            activeTrackColor: AppColors.primary,
-                            value: _notificationEnabled,
-                            onChanged: (v) =>
-                                setState(() => _notificationEnabled = v),
-                          ),
-                        ),
-                        _buildSettingTile(
-                          icon: Icons.translate_rounded,
-                          label: "Langue",
-                        ),
-                        _buildSettingTile(
-                          icon: Icons.help_outline_rounded,
-                          label: "Centre d'aide",
-                        ),
-                        _buildSettingTile(
-                          icon: Icons.phone_outlined,
-                          label: "Contactez-nous",
-                        ),
-                      ],
+                  _buildSettingTile(
+                    icon: Icons.person_outline,
+                    label: "Informations personnelles",
+                    onTap: () => Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (context) => const DriverPersonalInfoScreen(),
+                      ),
                     ),
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.lock_outline,
+                    label: "Mot de passe & Sécurité",
+                    onTap: () => Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (context) =>
+                            const DriverChangePasswordScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.notifications_none_rounded,
+                    label: "Notifications",
+                    trailing: CupertinoSwitch(
+                      activeTrackColor: AppColors.primary,
+                      value: _notificationEnabled,
+                      onChanged: (v) =>
+                          setState(() => _notificationEnabled = v),
+                    ),
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.translate_rounded,
+                    label: "Langue",
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.help_outline_rounded,
+                    label: "Centre d'aide",
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.phone_outlined,
+                    label: "Contactez-nous",
                   ),
                 ],
               ),
             ),
-          ),
-          SafeArea(
-            top: Platform.isAndroid ? true : false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                22,
-                0,
-                22,
-                30,
-              ), // Ajusté pour être juste au-dessus du CurvedNavigationBar (65px)
+            const Gap(30),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
               child: _buildLogoutButton(),
             ),
-          ),
-        ],
+            const Gap(
+              100,
+            ), // Espace supplémentaire pour scroller au-delà du CurvedNavigationBar
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildUserCard(dynamic user, DriverProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey[100],
-                  backgroundImage: provider.profileImage != null
-                      ? FileImage(provider.profileImage!)
-                      : null,
-                  child: provider.profileImage == null
-                      ? const Icon(Icons.person, size: 40, color: Colors.grey)
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: InkWell(
-                    onTap: () => _pickImage(ImageSource.gallery),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt_rounded,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                    ),
-                  ),
-                ),
+  Widget _buildPremiumHeader(dynamic user, DriverProvider provider) {
+    final double topPadding = MediaQuery.of(context).padding.top;
+
+    return Stack(
+      children: [
+        // ── Image de Fond ──
+        Container(
+          height: 280 + topPadding,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/busheader2.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        // ── Dégradé noir ──
+        Container(
+          height: 280 + topPadding,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.7),
               ],
             ),
-            const Gap(16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+        // ── Contenu ──
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.only(top: topPadding + 40, bottom: 30),
+          child: Column(
+            children: [
+              Stack(
                 children: [
-                  Text(
-                    user != null
-                        ? "${user.name} ${user.prenom}"
-                        : "Ronald Richards",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                  Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 15,
+                        ),
+                      ],
+                      image: DecorationImage(
+                        image: provider.profileImage != null
+                            ? FileImage(provider.profileImage!)
+                            : const AssetImage(
+                                    'assets/images/driver_profile.png',
+                                  )
+                                  as ImageProvider,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                  const Gap(4),
-                  Text(
-                    user?.email ?? "ronaldrichards@gmail.com",
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: () => _pickImage(ImageSource.gallery),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const Gap(15),
+              Text(
+                user != null ? "${user.name} ${user.prenom}" : "Chauffeur",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const Gap(5),
+              Text(
+                user?.email ?? "chauffeur@car225.ci",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
+              ),
+              const Gap(15),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  "CHAUFFEUR",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        // Back Button
+        Positioned(
+          top: topPadding + 10,
+          left: 10,
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+      ],
     );
   }
 

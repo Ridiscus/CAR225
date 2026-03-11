@@ -72,7 +72,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   image: DecorationImage(
                     image: pickedImage != null
                         ? FileImage(pickedImage)
-                        : const AssetImage('assets/images/agent_profile.png')
+                        : const AssetImage('assets/images/hostess_profile.png')
                               as ImageProvider,
                     fit: BoxFit.cover,
                   ),
@@ -158,7 +158,6 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
             _buildPremiumHeader(),
@@ -208,6 +207,9 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   ),
                   const Gap(30),
                   _buildLogoutButton(),
+                  const Gap(
+                    100,
+                  ), // Espace supplémentaire pour scroller au-delà du CurvedNavigationBar
                 ],
               ),
             ),
@@ -282,7 +284,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                             image: pickedImage != null
                                 ? FileImage(pickedImage)
                                 : const AssetImage(
-                                        'assets/images/agent_profile.png',
+                                        'assets/images/hostess_profile.png',
                                       )
                                       as ImageProvider,
                             fit: BoxFit.cover,

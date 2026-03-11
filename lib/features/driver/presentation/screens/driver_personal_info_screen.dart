@@ -60,10 +60,9 @@ class DriverPersonalInfoScreen extends StatelessWidget {
                   backgroundColor: const Color(0xFFF5F5F5),
                   backgroundImage: driverProvider.profileImage != null
                       ? FileImage(driverProvider.profileImage!)
-                      : null,
-                  child: driverProvider.profileImage == null
-                      ? const Icon(Icons.person, size: 60, color: Colors.grey)
-                      : null,
+                      : const AssetImage('assets/images/driver_profile.png')
+                            as ImageProvider,
+                  child: null,
                 ),
               ),
             ),

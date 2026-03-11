@@ -7,7 +7,6 @@ import 'package:car225/core/theme/app_colors.dart';
 import '../providers/agent_profile_provider.dart';
 import 'agent_personal_info_screen.dart';
 import 'agent_change_password_screen.dart';
-import '../widgets/custom_app_bar.dart';
 
 class AgentProfileScreen extends StatefulWidget {
   const AgentProfileScreen({super.key});
@@ -324,116 +323,155 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
   // 4. COMPOSANTS UI (Helper Méthodes)
   Widget _buildPremiumHeader() {
-    const Color peachBorder = Color(0xFFFFCCBC);
-    const Color peachBadge = Color(0xFFFFE0B2);
-    const Color textOrange = Color(0xFFFF7043);
-    const Color companyGrey = Color(0xFF90A4AE);
-
     final pickedImage = context.watch<AgentProfileProvider>().profileImage;
+    final double topPadding = MediaQuery.of(context).padding.top;
 
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 30),
-      child: Column(
-        children: [
-          // Avatar avec bordure premium
-          Stack(
+    return Stack(
+      children: [
+        // ── Image de Fond (Car) ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/busheader4.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        // ── Dégradé noir protecteur ──
+        Container(
+          height: 300 + topPadding,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.8),
+              ],
+            ),
+          ),
+        ),
+        // ── Contenu du profil ──
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.only(top: topPadding + 40, bottom: 40),
+          child: Column(
             children: [
-              GestureDetector(
-                onTap: _showImagePreview,
-                child: Hero(
-                  tag: 'profile_hero',
-                  child: Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(100),
-                      border: Border.all(color: peachBorder, width: 4),
-                      image: DecorationImage(
-                        image: pickedImage != null
-                            ? FileImage(pickedImage)
-                            : const AssetImage(
-                                    'assets/images/agent_profile.png',
-                                  )
-                                  as ImageProvider,
-                        fit: BoxFit.cover,
+              // Photo de Profil avec bordure brillante
+              Stack(
+                children: [
+                  GestureDetector(
+                    onTap: _showImagePreview,
+                    child: Hero(
+                      tag: 'profile_hero',
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                          image: DecorationImage(
+                            image: pickedImage != null
+                                ? FileImage(pickedImage)
+                                : const AssetImage(
+                                        'assets/images/agent_profile.png',
+                                      )
+                                      as ImageProvider,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              // Bouton d'ajout/edition
-              Positioned(
-                bottom: 5,
-                right: 5,
-                child: GestureDetector(
-                  onTap: _showPhotoOptions,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: peachBadge,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  Positioned(
+                    bottom: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: _showPhotoOptions,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: textOrange,
-                      size: 20,
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
                     ),
                   ),
+                ],
+              ),
+              const Gap(20),
+              // Nom et Prénoms (Blanc)
+              Text(
+                '$_firstName $_lastName',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const Gap(8),
+              // Badge Rôle (Orange UTB)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _role,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+              const Gap(10),
+              // Entreprise (Blanc cassé)
+              Text(
+                'EMPLOYÉ PAR $_company'.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
           ),
-
-          const Gap(25),
-          Text(
-            '$_firstName $_lastName',
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 23,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-            ),
-          ),
-
-          const Gap(12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            decoration: BoxDecoration(
-              color: peachBadge.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Text(
-              _role,
-              style: const TextStyle(
-                color: textOrange,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-
-          const Gap(12),
-          Text(
-            'EMPLOYE PAR $_company'.toUpperCase(),
-            style: const TextStyle(
-              color: companyGrey,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -649,141 +687,140 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     );
   }
 
-  // 5. MÉTHODE BUILD (Assemblage Final)
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: const CustomAppBar(title: 'Mon Profil', showLeading: false),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        title: const Text(
+          'Profil',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 23,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildPremiumHeader(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildPremiumHeader(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSection(
-                          title: 'Mon Compte',
-                          children: [
-                            _buildActionTile(
-                              icon: Icons.person_outline_rounded,
-                              label: 'Informations personnelles',
-                              onTap: () => Navigator.of(context).push(
-                                PageRouteBuilder(
-                                  pageBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                      ) => const AgentPersonalInfoScreen(),
-                                  transitionsBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                        child,
-                                      ) {
-                                        return SlideTransition(
-                                          position:
-                                              Tween<Offset>(
-                                                begin: const Offset(1.0, 0.0),
-                                                end: Offset.zero,
-                                              ).animate(
-                                                CurvedAnimation(
-                                                  parent: animation,
-                                                  curve: Curves.easeOutCubic,
-                                                ),
-                                              ),
-                                          child: child,
-                                        );
-                                      },
-                                  transitionDuration: const Duration(
-                                    milliseconds: 400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildDivider(),
-                            _buildActionTile(
-                              icon: Icons.lock_outline_rounded,
-                              label: 'Changer le mot de passe',
-                              onTap: () => Navigator.of(context).push(
-                                PageRouteBuilder(
-                                  pageBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                      ) => const AgentChangePasswordScreen(),
-                                  transitionsBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                        child,
-                                      ) {
-                                        return SlideTransition(
-                                          position:
-                                              Tween<Offset>(
-                                                begin: const Offset(1.0, 0.0),
-                                                end: Offset.zero,
-                                              ).animate(
-                                                CurvedAnimation(
-                                                  parent: animation,
-                                                  curve: Curves.easeOutCubic,
-                                                ),
-                                              ),
-                                          child: child,
-                                        );
-                                      },
-                                  transitionDuration: const Duration(
-                                    milliseconds: 400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildDivider(),
-                            _buildActionTile(
-                              icon: Icons.notifications_outlined,
-                              label: 'Notifications',
-                              trailing: Switch(
-                                value: _notificationEnabled,
-                                activeTrackColor: AppColors.primary,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _notificationEnabled = value;
-                                  });
+                  _buildSection(
+                    title: 'Mon Compte',
+                    children: [
+                      _buildActionTile(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Informations personnelles',
+                        onTap: () => Navigator.of(context).push(
+                          PageRouteBuilder(
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    const AgentPersonalInfoScreen(),
+                            transitionsBuilder:
+                                (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) {
+                                  return SlideTransition(
+                                    position:
+                                        Tween<Offset>(
+                                          begin: const Offset(1.0, 0.0),
+                                          end: Offset.zero,
+                                        ).animate(
+                                          CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOutCubic,
+                                          ),
+                                        ),
+                                    child: child,
+                                  );
                                 },
-                              ),
+                            transitionDuration: const Duration(
+                              milliseconds: 400,
                             ),
-                            _buildDivider(),
-                            _buildActionTile(
-                              icon: Icons.help_outline_rounded,
-                              label: 'Aide & Support',
-                              onTap: _showSupportModal,
-                            ),
-                          ],
+                          ),
                         ),
-                        const Gap(30),
-                        _buildLogoutButton(),
-                        const Gap(30),
-                      ],
-                    ),
+                      ),
+                      _buildDivider(),
+                      _buildActionTile(
+                        icon: Icons.lock_outline_rounded,
+                        label: 'Changer le mot de passe',
+                        onTap: () => Navigator.of(context).push(
+                          PageRouteBuilder(
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    const AgentChangePasswordScreen(),
+                            transitionsBuilder:
+                                (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) {
+                                  return SlideTransition(
+                                    position:
+                                        Tween<Offset>(
+                                          begin: const Offset(1.0, 0.0),
+                                          end: Offset.zero,
+                                        ).animate(
+                                          CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOutCubic,
+                                          ),
+                                        ),
+                                    child: child,
+                                  );
+                                },
+                            transitionDuration: const Duration(
+                              milliseconds: 400,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _buildDivider(),
+                      _buildActionTile(
+                        icon: Icons.notifications_outlined,
+                        label: 'Notifications',
+                        trailing: Switch(
+                          value: _notificationEnabled,
+                          activeTrackColor: AppColors.primary,
+                          onChanged: (value) {
+                            setState(() {
+                              _notificationEnabled = value;
+                            });
+                          },
+                        ),
+                      ),
+                      _buildDivider(),
+                      _buildActionTile(
+                        icon: Icons.help_outline_rounded,
+                        label: 'Aide & Support',
+                        onTap: _showSupportModal,
+                      ),
+                    ],
                   ),
+                  const Gap(30),
+                  _buildLogoutButton(),
+                  const Gap(
+                    130,
+                  ), // Espace supplémentaire pour scroller au-delà du CurvedNavigationBar
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

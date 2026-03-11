@@ -93,7 +93,7 @@ class _HostessPersonalInfoScreenState extends State<HostessPersonalInfoScreen> {
                     backgroundColor: const Color(0xFFF5F5F5),
                     backgroundImage: pickedImage != null
                         ? FileImage(pickedImage)
-                        : const AssetImage('assets/images/agent_profile.png')
+                        : const AssetImage('assets/images/hostess_profile.png')
                               as ImageProvider,
                   ),
                 ),

@@ -287,7 +287,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String pointArrive,
   }) async {
     try {
-      // Dio s'occupe de formater l'URL avec les '?' et les '&' grâce à queryParameters
+      print("🌍 [GET REQUÊTE] Vers: /hotesse/vendre-ticket");
+      print("🔍 [GET PARAMS] date: $dateDepart, depart: $pointDepart, arrivee: $pointArrive");
+
       final response = await dio.get(
         '/hotesse/vendre-ticket',
         queryParameters: {
@@ -296,9 +298,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'point_arrive': pointArrive,
         },
       );
+
+      print("✅ [GET SUCCÈS] Code: ${response.statusCode}");
+      print("📦 [GET RÉPONSE] ${response.data}");
+
       return response.data;
     } catch (e) {
-      // On laisse remonter l'erreur pour la gérer dans l'UI
+      print("❌ [GET ERREUR] $e");
+      if (e is DioException) {
+        print("🚨 [GET DÉTAILS BACKEND] ${e.response?.data}");
+      }
       rethrow;
     }
   }
@@ -306,16 +315,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload) async {
     try {
-      // ⚠️ À CONFIRMER AVEC LE DEV BACKEND : l'URL exacte pour le POST
-      // Souvent, c'est la même URL que le GET, mais avec la méthode POST.
+      print("🚀 [POST REQUÊTE] Vers: /hotesse/vendre-ticket");
+      print("📤 [POST PAYLOAD] $payload");
+
       final response = await dio.post(
         '/hotesse/vendre-ticket',
         data: payload,
       );
 
+      print("✅ [POST SUCCÈS] Code: ${response.statusCode}");
+      print("📥 [POST RÉPONSE] ${response.data}");
+
       return response.data;
     } catch (e) {
-      // On laisse l'erreur remonter vers le Repository puis vers l'UI
+      print("❌ [POST ERREUR] $e");
+      // Souvent, quand un POST échoue (ex: erreur 400 ou 422),
+      // le backend envoie la vraie raison dans e.response.data
+      if (e is DioException) {
+        print("🚨 [POST DÉTAILS BACKEND] ${e.response?.statusCode} - ${e.response?.data}");
+      }
       rethrow;
     }
   }
@@ -465,24 +483,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-
-
-
-// DANS L'IMPLÉMENTATION (AuthRemoteDataSourceImpl)
-  /*@override
-  Future<Map<String, dynamic>> verifyOtp(String contact, String otpCode) async {
-    try {
-      final response = await dio.post('/user/verify-phone-otp', data: {
-        'contact': contact,
-        'otp': otpCode,
-      });
-
-      // ✅ On retourne les données reçues (qui contiennent le token)
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? "Code invalide");
-    }
-  }*/
 
   @override
   Future<void> resetPassword(String email, String otpCode, String password, String passwordConfirmation) async {

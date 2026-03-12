@@ -5,6 +5,10 @@ import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
 import 'package:car225/features/hostess/models/passenger_info.dart';
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
 import 'hostess_ticket_result_screen.dart';
 import 'package:flutter/services.dart';
 
@@ -122,12 +126,9 @@ class _HostessBookingDetailsScreenState
     });
   }
 
-
   Future<void> _confirmBooking() async {
-    // 1. Activer l'affichage des erreurs en rouge si des champs sont vides
     setState(() => _showErrors = true);
 
-    // 2. Vérifier si tous les formulaires des passagers sont valides
     bool allValid = _passengerForms.every((form) => form.isValid());
 
     if (!allValid) {
@@ -138,24 +139,28 @@ class _HostessBookingDetailsScreenState
           behavior: SnackBarBehavior.floating,
         ),
       );
-      return; // On stoppe tout si c'est invalide
+      return;
     }
 
-    // 3. Afficher le chargement
     setState(() => _isLoading = true);
 
     try {
-      // 4. Calculer le montant final
-      final int totalPrice = _tripType == 'Aller-Retour' ? _roundTripPrice : _oneWayPrice;
-
-      // 5. 🟢 CONSTRUIRE LE JSON (PAYLOAD) 🟢
+      // 1. Calcul du total
+      final int totalPrice = _tripType == 'Aller-Retour'
+          ? _roundTripPrice * _passengerCount
+          : _oneWayPrice * _passengerCount;
+      // 2. 🟢 CONSTRUIRE LE JSON (PAYLOAD) CORRIGÉ 🟢
       final Map<String, dynamic> payload = {
-        "horaire_id": widget.horaireId,
-        "type_voyage": _tripType, // "Aller Simple" ou "Aller-Retour"
+        // Les clés corrigées selon les logs du backend :
+        "programme_id": widget.horaireId,
+        "date_voyage": widget.date, // ⚠️ REMPLACE CECI par la vraie variable contenant la date (ex: widget.date)
+        "heure_depart": widget.time, // ⚠️ REMPLACE CECI par la vraie variable contenant l'heure
+        "type_voyage": _tripType,
         "nombre_passagers": _passengerCount,
         "montant_total": totalPrice,
-        // On transforme la liste des formulaires en une belle liste de JSON
-        "passagers": _passengerForms.map((form) => {
+
+        // "passagers" devient "passenger_details"
+        "passenger_details": _passengerForms.map((form) => {
           "nom": form.lastNameController.text.trim(),
           "prenom": form.firstNameController.text.trim(),
           "telephone": form.phoneController.text.trim(),
@@ -164,48 +169,55 @@ class _HostessBookingDetailsScreenState
         }).toList(),
       };
 
-      // Astuce de pro : Affiche-le dans la console pour vérifier avant d'appeler l'API !
       print("🚀 JSON PRÊT À ÊTRE ENVOYÉ : $payload");
 
-      /* // 6. APPEL DE TON API POST (À faire quand le backend sera prêt)
-      final repo = AuthRepositoryImpl(...);
-      final response = await repo.bookTicket(payload); // <-- Nouvelle méthode à créer dans le repo
+      // 3. 🟢 LE VRAI APPEL API ICI 🟢
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),       // 🟢 Ajouté
+        deviceService: DeviceService(), // 🟢 Ajouté
+      );
 
-      if (response['success'] == true) {
-        // ... navigation vers le succès
-      }
-      */
+      // On lance la requête !
+      final response = await repo.bookTicket(payload);
 
-      // Pour l'instant, on simule 2 secondes de chargement API
-      await Future.delayed(const Duration(seconds: 2));
-
-      // 7. Si tout s'est bien passé, on va à l'écran de résultat
-      // 7. Si tout s'est bien passé, on va à l'écran de résultat
-      if (mounted) {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            // 🔴 ATTENTION : On enlève le mot "const" car les données sont dynamiques !
-            builder: (context) => HostessTicketResultScreen(
-              isRoundTrip: _tripType == 'Aller-Retour',
-              // On convertit tes formulaires en objets PassengerInfo grâce à ta méthode toPassengerInfo()
-              passengers: _passengerForms.map((form) => form.toPassengerInfo()).toList(),
-              departure: widget.departure,
-              arrival: widget.arrival,
-              // ⚠️ Pour la date, si tu ne l'as pas encore passée depuis l'écran précédent, mets une valeur en dur pour tester
-              travelDate: widget.time,
-              //travelTime: widget.time,
-              totalPrice: totalPrice,
+      // 4. On vérifie le succès
+      // ⚠️ Assure-toi que ton backend renvoie bien "success": true dans son JSON !
+      if (response['success'] == true || response['status'] == 200 || response['status'] == 201) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (context) => HostessTicketResultScreen(
+                isRoundTrip: _tripType == 'Aller-Retour',
+                passengers: _passengerForms.map((form) => form.toPassengerInfo()).toList(),
+                departure: widget.departure,
+                arrival: widget.arrival,
+                travelDate: widget.time, // Attention: on met le 'time' dans la 'date' ici
+                //travelTime: widget.time, // On le remet ici pour éviter l'erreur (voir explication bas)
+                totalPrice: totalPrice,
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } else {
+        // Le backend a répondu, mais a refusé la vente (erreur métier)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Erreur lors de la réservation.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
 
     } catch (e) {
+      // Erreur réseau, serveur éteint, ou erreur Dio interceptée
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erreur lors de la réservation. Réessayez.'),
+            content: Text('Erreur réseau. Impossible de contacter le serveur.'),
             backgroundColor: Colors.redAccent,
           ),
         );

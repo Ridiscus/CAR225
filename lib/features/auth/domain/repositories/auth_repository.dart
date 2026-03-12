@@ -2,22 +2,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../booking/data/models/user_stats_model.dart';
+import '../../../hostess/models/hostess_profile_model.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/models/auth_response.dart';
 import '../../data/models/login_request_model.dart';
 import '../../data/models/register_request_model.dart';
+import '../../data/models/unified_login_request_model.dart';
 import '../../data/models/user_model.dart';
 
 // ===========================================================================
 // 1️⃣ L'INTERFACE (LE CONTRAT)
 // ===========================================================================
 abstract class AuthRepository {
-  // Authentification de base avec le nouveau modèle de réponse
-  //Future<AuthResponseModel> login(String email, String password);
-  //Future<AuthResponseModel> register(RegisterRequestModel params);
   Future<void> verifyPasswordOtp(String email, String otpCode);
   // ✅ MODIFIE CETTE LIGNE : elle doit prendre LoginRequestModel
   Future<AuthResponseModel> login(LoginRequestModel params);
+
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params);
+  Future<void> logout();
+  Future<HostessProfileModel> getHostessProfile();
+  Future<HostessProfileModel> updateProfile(Map<String, dynamic> data);
+  Future<void> changePasswordHotesse(Map<String, dynamic> data);
 
   // ✅ MODIFIE AUSSI CELLE-CI pour être cohérent
   Future<AuthResponseModel> register(RegisterRequestModel params);
@@ -60,13 +65,12 @@ abstract class AuthRepository {
     required String newPassword,
     required String confirmPassword,
   });
-  Future<void> logout();
+  Future<void> logouut();
 
   // Statistiques
   Future<UserStatsModel> getUserStats();
   Future<TripDetailsModel> getTripDetails();
 }
-
 
 // ===========================================================================
 // 2️⃣ L'IMPLÉMENTATION
@@ -84,9 +88,91 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
 
+
+  @override
+  Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params) async {
+    try {
+      final AuthResponseModel response = await remoteDataSource.unifiedLogin(params);
+
+      if (response.success && response.token != null) {
+        final prefs = await SharedPreferences.getInstance();
+
+        await prefs.setString('auth_token', response.token!);
+
+        // 🟢 ON SAUVEGARDE LE VRAI RÔLE DE L'API
+        // Si response.role existe, on le prend, sinon on met 'user' par défaut
+        await prefs.setString('user_type', response.role ?? 'user');
+
+        print("✅ [REPO] Token et Rôle (${response.role}) sauvegardés !");
+      }
+
+      return response;
+    } catch (e) {
+      print("❌ [REPO] Erreur Unified Login : $e");
+      rethrow;
+    }
+  }
+
+
+  @override
+  Future<void> logouut() async {
+    try {
+      // 1. Appeler l'API pour invalider le token côté serveur
+      await remoteDataSource.logoutHotesse();
+
+      // 2. Nettoyer les données locales
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('user_type');
+
+      // Optionnel : Si tu stockes d'autres infos (profil, etc.), supprime-les ici
+      // await prefs.remove('user_profile');
+
+      print("✅ [REPO] Token et rôle supprimés localement.");
+
+    } catch (e) {
+      print("❌ [REPO] Erreur lors de la déconnexion : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<HostessProfileModel> getHostessProfile() async {
+    try {
+      // On délègue simplement le travail au RemoteDataSource
+      return await remoteDataSource.getHostessProfile();
+    } catch (e) {
+      print("❌ [REPO ERROR] Erreur dans AuthRepositoryImpl.getHostessProfile : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<HostessProfileModel> updateProfile(Map<String, dynamic> data) async {
+    try {
+      // Tu peux ajouter des vérifications réseau ici (InternetConnectionChecker) si tu en as
+      final updatedProfile = await remoteDataSource.updateProfile(data);
+      return updatedProfile;
+    } catch (e) {
+      // Gère tes exceptions personnalisées ici si nécessaire
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> changePasswordHotesse(Map<String, dynamic> data) async {
+    try {
+      await remoteDataSource.changePasswordHotesse(data);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+
   // 🔐 LOGIN : Corrigé pour accepter l'objet LoginRequestModel
   @override
-  Future<AuthResponseModel> login(LoginRequestModel params) async { // <-- Signature corrigée ici
+  Future<AuthResponseModel> login(LoginRequestModel params) async {
+    // <-- Signature corrigée ici
     try {
       // Plus besoin de créer 'request' ici car on reçoit déjà 'params' (le modèle)
 
@@ -109,7 +195,6 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-
   // 🟢 NOUVEAU : Implémentation pour le reset de mot de passe
   @override
   Future<void> verifyPasswordOtp(String email, String otpCode) async {
@@ -120,7 +205,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<AuthResponseModel> register(RegisterRequestModel params) async {
     try {
-      final AuthResponseModel response = await remoteDataSource.register(params);
+      final AuthResponseModel response = await remoteDataSource.register(
+        params,
+      );
 
       if (response.success && !response.requiresOtp && response.token != null) {
         final prefs = await SharedPreferences.getInstance();
@@ -172,11 +259,12 @@ class AuthRepositoryImpl implements AuthRepository {
         "avatar_url": photoUrl ?? "",
         "google_token": idToken,
         "fcm_token": fcmToken,
-        "nom_device": deviceName
+        "nom_device": deviceName,
       };
 
       final responseData = await remoteDataSource.loginSocial(body);
-      final String? token = responseData['token'] ?? responseData['access_token'];
+      final String? token =
+          responseData['token'] ?? responseData['access_token'];
 
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
@@ -190,13 +278,16 @@ class AuthRepositoryImpl implements AuthRepository {
   // --- MÉTHODES DE PROFIL & STATS ---
 
   @override
-  Future<UserModel> getUserProfile() async => await remoteDataSource.getUserProfile();
+  Future<UserModel> getUserProfile() async =>
+      await remoteDataSource.getUserProfile();
 
   @override
-  Future<UserStatsModel> getUserStats() async => await remoteDataSource.getUserStats();
+  Future<UserStatsModel> getUserStats() async =>
+      await remoteDataSource.getUserStats();
 
   @override
-  Future<TripDetailsModel> getTripDetails() async => await remoteDataSource.getTripDetails();
+  Future<TripDetailsModel> getTripDetails() async =>
+      await remoteDataSource.getTripDetails();
 
   @override
   Future<UserModel> updateUserProfile({
@@ -210,9 +301,14 @@ class AuthRepositoryImpl implements AuthRepository {
     String? photoPath,
   }) async {
     return await remoteDataSource.updateUserProfile(
-      name: name, prenom: prenom, email: email, contact: contact,
-      nomUrgence: nomUrgence, lienParenteUrgence: lienParenteUrgence,
-      contactUrgence: contactUrgence, photoPath: photoPath,
+      name: name,
+      prenom: prenom,
+      email: email,
+      contact: contact,
+      nomUrgence: nomUrgence,
+      lienParenteUrgence: lienParenteUrgence,
+      contactUrgence: contactUrgence,
+      photoPath: photoPath,
     );
   }
 
@@ -235,19 +331,29 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<void> sendOtp(String email) async => await remoteDataSource.sendOtp(email);
+  Future<void> sendOtp(String email) async =>
+      await remoteDataSource.sendOtp(email);
 
   @override
   Future<void> resetPassword({
-    required String email, required String otpCode,
-    required String password, required String passwordConfirmation,
+    required String email,
+    required String otpCode,
+    required String password,
+    required String passwordConfirmation,
   }) async {
-    await remoteDataSource.resetPassword(email, otpCode, password, passwordConfirmation);
+    await remoteDataSource.resetPassword(
+      email,
+      otpCode,
+      password,
+      passwordConfirmation,
+    );
   }
 
   @override
   Future<void> changePassword({
-    required String currentPassword, required String newPassword, required String confirmPassword,
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
   }) async {
     await remoteDataSource.changePassword(
       currentPassword: currentPassword,

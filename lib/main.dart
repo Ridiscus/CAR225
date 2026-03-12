@@ -169,6 +169,7 @@ import 'features/auth/domain/repositories/auth_repository.dart'
     hide AuthRepositoryImpl;
 import 'features/booking/data/repositories/notification_repository.dart';
 import 'features/booking/domain/repositories/company_repository.dart';
+import 'features/hostess/presentation/providers/hostess_sales_provider.dart';
 import 'features/onboarding/presentation/screens/splash_screen.dart';
 
 // --- 👇 NOUVEAUX IMPORTS (Nécessaires pour l'Auth) 👇 ---
@@ -219,6 +220,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
         ChangeNotifierProvider(create: (_) => AgentProfileProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
+        ChangeNotifierProvider(create: (_) => HostessSalesProvider()),
         // --- B. Repositories (Logique métier sans UI) ---
         Provider<AuthRepository>(
           create: (_) => AuthRepositoryImpl(

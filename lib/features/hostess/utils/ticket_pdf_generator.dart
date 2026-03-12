@@ -9,7 +9,7 @@ class TicketPdfGenerator {
     required String departure,
     required String arrival,
     required String travelDate,
-    required String travelTime,
+    //required String travelTime,
     required bool isRoundTrip,
     required int totalPrice,
   }) async {
@@ -28,7 +28,7 @@ class TicketPdfGenerator {
             departure: departure,
             arrival: arrival,
             travelDate: travelDate,
-            travelTime: travelTime,
+            //travelTime: travelTime,
             isRoundTrip: isRoundTrip,
             price: pricePerTicket,
           ),
@@ -49,7 +49,7 @@ class TicketPdfGenerator {
     required String departure,
     required String arrival,
     required String travelDate,
-    required String travelTime,
+    //required String travelTime,
     required bool isRoundTrip,
     required int price,
   }) async {
@@ -65,7 +65,7 @@ class TicketPdfGenerator {
           departure: departure,
           arrival: arrival,
           travelDate: travelDate,
-          travelTime: travelTime,
+          //travelTime: travelTime,
           isRoundTrip: isRoundTrip,
           price: price,
         ),
@@ -84,7 +84,7 @@ class TicketPdfGenerator {
     required String departure,
     required String arrival,
     required String travelDate,
-    required String travelTime,
+    //required String travelTime,
     required bool isRoundTrip,
     required int price,
   }) {
@@ -160,10 +160,6 @@ class TicketPdfGenerator {
             style: const pw.TextStyle(fontSize: 12),
           ),
           pw.SizedBox(height: 8),
-          pw.Text(
-            'Date: $travelDate - Heure: $travelTime',
-            style: const pw.TextStyle(fontSize: 12),
-          ),
           pw.SizedBox(height: 8),
           pw.Text(
             'Passager: $passengerName',

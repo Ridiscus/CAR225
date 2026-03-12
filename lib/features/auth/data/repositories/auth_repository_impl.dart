@@ -3,6 +3,7 @@ import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
+import '../../../hostess/models/sale_model.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
 import '../models/auth_response.dart';
@@ -305,7 +306,36 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<List<HostessSaleModel>> getSalesHistory(DateTime? startDate, DateTime? endDate) async {
+    try {
+      // Le repository délègue simplement le travail au remoteDataSource
+      final sales = await remoteDataSource.getSalesHistory(startDate, endDate);
+      return sales;
+    } catch (e) {
+      // On relance l'erreur pour que le Provider (ou l'UI) puisse l'attraper
+      rethrow;
+    }
+  }
 
+  @override
+  Future<Map<String, dynamic>> searchTickets({
+    required String dateDepart,
+    required String pointDepart,
+    required String pointArrive,
+  }) async {
+    return await remoteDataSource.searchTickets(
+      dateDepart: dateDepart,
+      pointDepart: pointDepart,
+      pointArrive: pointArrive,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload) async {
+    // Tu peux ajouter de la logique ici plus tard si besoin (sauvegarde locale, etc.)
+    return await remoteDataSource.bookTicket(payload);
+  }
 
 
 

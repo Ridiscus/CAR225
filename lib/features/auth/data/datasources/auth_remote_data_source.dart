@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
+import '../../../hostess/models/sale_model.dart';
 import '../models/auth_response.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
@@ -21,6 +23,14 @@ abstract class AuthRemoteDataSource {
   Future<HostessProfileModel> getHostessProfile();
   Future<HostessProfileModel> updateProfile(Map<String, dynamic> data);
   Future<void> changePasswordHotesse(Map<String, dynamic> data);
+  Future<List<HostessSaleModel>> getSalesHistory(DateTime? startDate, DateTime? endDate);
+  Future<Map<String, dynamic>> searchTickets({
+    required String dateDepart,
+    required String pointDepart,
+    required String pointArrive,
+  });
+  // 🟢 NOUVELLE MÉTHODE
+  Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload);
 
   // Ajoute ceci dans la classe abstraite AuthRemoteDataSource :
   Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode);
@@ -236,6 +246,80 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception("Une erreur inattendue s'est produite.");
     }
   }
+
+
+  Future<List<HostessSaleModel>> getSalesHistory(DateTime? startDate, DateTime? endDate) async {
+    try {
+      // 1. Formatage des dates au format attendu par Laravel (YYYY-MM-DD)
+      final fmt = DateFormat('yyyy-MM-dd');
+      String queryParams = '';
+
+      if (startDate != null) {
+        queryParams += '?date_debut=${fmt.format(startDate)}';
+      }
+      // Si tu as aussi un paramètre date_fin côté backend :
+      if (endDate != null) {
+        final prefix = queryParams.isEmpty ? '?' : '&';
+        queryParams += '${prefix}date_fin=${fmt.format(endDate)}';
+      }
+
+      // 2. Appel API
+      final response = await dio.get('/hotesse/ventes$queryParams');
+
+      // 3. Parsing
+      if (response.data['success'] == true) {
+        final List<dynamic> data = response.data['ventes']['data'];
+        return data.map((json) => HostessSaleModel.fromJson(json)).toList();
+
+        // Note: Tu peux aussi extraire les stats ici si tu veux les afficher en haut de l'écran !
+      } else {
+        throw Exception("Erreur lors de la récupération des ventes.");
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> searchTickets({
+    required String dateDepart,
+    required String pointDepart,
+    required String pointArrive,
+  }) async {
+    try {
+      // Dio s'occupe de formater l'URL avec les '?' et les '&' grâce à queryParameters
+      final response = await dio.get(
+        '/hotesse/vendre-ticket',
+        queryParameters: {
+          'date_depart': dateDepart,
+          'point_depart': pointDepart,
+          'point_arrive': pointArrive,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      // On laisse remonter l'erreur pour la gérer dans l'UI
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload) async {
+    try {
+      // ⚠️ À CONFIRMER AVEC LE DEV BACKEND : l'URL exacte pour le POST
+      // Souvent, c'est la même URL que le GET, mais avec la méthode POST.
+      final response = await dio.post(
+        '/hotesse/vendre-ticket',
+        data: payload,
+      );
+
+      return response.data;
+    } catch (e) {
+      // On laisse l'erreur remonter vers le Repository puis vers l'UI
+      rethrow;
+    }
+  }
+
 
 
 

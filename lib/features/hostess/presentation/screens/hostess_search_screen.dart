@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
 import 'hostess_booking_details_screen.dart';
 
 class HostessSearchScreen extends StatefulWidget {
@@ -25,6 +29,78 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
     duration: const Duration(milliseconds: 400),
   );
 
+// On remplace la liste en dur par une liste vide qui se remplira via l'API
+  List<String> _availableCities = [];
+  bool _isLoadingCities = true; // Pour afficher un petit chargement au début
+
+  List<Map<String, dynamic>> _filteredTrips = [];
+
+  // Les listes déroulantes liront désormais cette liste dynamique
+  List<String> get _departureCities => List.from(_availableCities)..sort();
+
+  List<String> get _arrivalCities {
+    if (_selectedDeparture.isEmpty) return List.from(_availableCities)..sort();
+    return _availableCities.where((c) => c != _selectedDeparture).toList()..sort();
+  }
+  @override
+  void initState() {
+    super.initState();
+    _filteredTrips = [];
+
+    // On lance la récupération des villes juste après la construction de l'écran
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInitialCities();
+    });
+  }
+
+  // 🟢 LA NOUVELLE MÉTHODE QUI EXTRAIT LES VILLES DE TON API
+  Future<void> _loadInitialCities() async {
+    try {
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: DeviceService(),
+      );
+
+      // On appelle l'API avec la date d'aujourd'hui, mais SANS ville de départ ni d'arrivée
+      // pour que le backend nous renvoie tous les trajets possibles.
+      final String today = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+
+      final apiResponse = await repo.searchTickets(
+        dateDepart: today,
+        pointDepart: '', // Vide pour tout récupérer
+        pointArrive: '', // Vide pour tout récupérer
+      );
+
+      if (apiResponse['success'] == true && apiResponse['routes'] != null) {
+        // Un "Set" permet d'éviter les doublons automatiquement
+        Set<String> extractedCities = {};
+
+        // On parcourt ton JSON pour extraire toutes les villes !
+        for (var route in apiResponse['routes']) {
+          if (route['point_depart'] != null) extractedCities.add(route['point_depart']);
+          if (route['point_arrive'] != null) extractedCities.add(route['point_arrive']);
+        }
+
+        if (mounted) {
+          setState(() {
+            _availableCities = extractedCities.toList();
+            _isLoadingCities = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingCities = false);
+        // Si ça échoue, on peut mettre 2-3 villes par défaut pour ne pas bloquer l'hôtesse
+        setState(() {
+          _availableCities = ["Abidjan, Côte d'Ivoire", "Daloa, Côte d'Ivoire", "Bouaké, Côte d'Ivoire"];
+        });
+      }
+    }
+  }
+
+
   void _swapCities() {
     final tmp = _selectedDeparture;
     setState(() {
@@ -34,78 +110,6 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
       _showArrivalDropdown = false;
     });
     _swapController.forward(from: 0);
-  }
-
-  final List<Map<String, dynamic>> _allTrips = [
-    {
-      'company': 'UNION DES TRANSPORTS DE BOUAKE',
-      'departure': 'Abidjan, Côte d\'Ivoire',
-      'arrival': 'Korhogo, Côte d\'Ivoire',
-      'time': '06:30',
-      'seats': '12 place(s)',
-      'status': 'Retour disponible',
-      'price': '12000',
-    },
-    {
-      'company': 'UNION DES TRANSPORTS DE BOUAKE',
-      'departure': 'Korhogo, Côte d\'Ivoire',
-      'arrival': 'Abidjan, Côte d\'Ivoire',
-      'time': '08:00',
-      'seats': '8 place(s)',
-      'status': 'Retour disponible',
-      'price': '12000',
-    },
-    {
-      'company': 'TRANSPORT RAPIDE DU SUD',
-      'departure': 'Abidjan, Côte d\'Ivoire',
-      'arrival': 'Yamoussoukro, Côte d\'Ivoire',
-      'time': '07:00',
-      'seats': '20 place(s)',
-      'status': 'Retour disponible',
-      'price': '5000',
-    },
-    {
-      'company': 'UTB EXPRESS',
-      'departure': 'Bouaké, Côte d\'Ivoire',
-      'arrival': 'Abidjan, Côte d\'Ivoire',
-      'time': '09:00',
-      'seats': '15 place(s)',
-      'status': 'Retour disponible',
-      'price': '7500',
-    },
-    {
-      'company': 'UTB EXPRESS',
-      'departure': 'Man, Côte d\'Ivoire',
-      'arrival': 'Abidjan, Côte d\'Ivoire',
-      'time': '05:30',
-      'seats': '10 place(s)',
-      'status': 'Aller simple',
-      'price': '9000',
-    },
-  ];
-
-  List<Map<String, dynamic>> _filteredTrips = [];
-
-  List<String> get _departureCities =>
-      _allTrips.map((t) => t['departure'] as String).toSet().toList()..sort();
-
-  List<String> get _arrivalCities {
-    if (_selectedDeparture.isEmpty) {
-      return _allTrips.map((t) => t['arrival'] as String).toSet().toList()
-        ..sort();
-    }
-    return _allTrips
-        .where((t) => t['departure'] == _selectedDeparture)
-        .map((t) => t['arrival'] as String)
-        .toSet()
-        .toList()
-      ..sort();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredTrips = List.from(_allTrips);
   }
 
   void _closeAllDropdowns() => setState(() {
@@ -118,6 +122,131 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
     _swapController.dispose();
     super.dispose();
   }
+
+
+
+  void _searchTrips() async {
+    _closeAllDropdowns();
+
+    if (_selectedDeparture.isEmpty || _selectedArrival.isEmpty) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez choisir un point de départ et d\'arrivée'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    try {
+      // 1. Formatage de la date (ex: 2026-03-15)
+      final String formattedDate = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+
+      // 2. Instanciation du Repository (avec tes imports)
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: DeviceService(),
+      );
+
+      // 3. Appel à l'API
+      final apiResponse = await repo.searchTickets(
+        dateDepart: formattedDate,
+        pointDepart: _selectedDeparture,
+        pointArrive: _selectedArrival,
+      );
+
+      // 4. Transformation du JSON en liste pour ton UI
+      List<Map<String, dynamic>> fetchedTrips = [];
+
+      if (apiResponse['success'] == true && apiResponse['routes'] != null) {
+        for (var route in apiResponse['routes']) {
+          if (route['aller_horaires'] != null) {
+            for (var horaire in route['aller_horaires']) {
+
+              final int totalSeats = horaire['total_seats'] ?? 0;
+              final int reserved = horaire['reserved_count'] ?? 0;
+              final int availableSeats = totalSeats - reserved;
+              String price = route['montant_billet'].toString().replaceAll('.00', '');
+
+              fetchedTrips.add({
+                'company': route['compagnie']['name'],
+                'departure': route['point_depart'],
+                'arrival': route['point_arrive'],
+                'time': horaire['heure_depart'].substring(0, 5), // Coupe les secondes si "06:00:00"
+                'seats': '$availableSeats place(s)',
+                'status': route['has_retour'] == true ? 'Retour disponible' : 'Aller simple',
+                'price': price,
+                'route_id': route['id_group'],
+                'horaire_id': horaire['id'],
+              });
+            }
+          }
+        }
+      }
+
+      // 5. Mise à jour de l'interface
+      if (mounted) {
+        setState(() {
+          _filteredTrips = fetchedTrips;
+          _isSearching = false;
+        });
+
+        if (fetchedTrips.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aucun trajet trouvé pour cette date.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSearching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: const Text('Erreur de connexion. Veuillez réessayer.'),
+              backgroundColor: Colors.redAccent
+          ),
+        );
+      }
+    }
+  }
+
+
+  void _viewAllTrips() {
+    setState(() {
+      _selectedDeparture = '';
+      _selectedArrival = '';
+      _selectedDate = DateTime.now();
+      _filteredTrips = List.from(_availableCities);
+      _showDepartureDropdown = false;
+      _showArrivalDropdown = false;
+    });
+    ScaffoldMessenger.of(context).clearSnackBars();
+  }
+
+  void _reserveTrip(Map<String, dynamic> trip) {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (context) => HostessBookingDetailsScreen(
+          departure: trip['departure'],
+          arrival: trip['arrival'],
+          isRoundTrip: trip['status'] == 'Retour disponible', // Dynamique selon le statut
+          horaireId: trip['horaire_id'], // 🟢 L'ID unique du trajet
+          price: int.parse(trip['price'].toString()), // 🟢 Le vrai prix (ex: 3000)
+          time: trip['time'], // 🟢 L'heure exacte choisie
+        ),
+      ),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -621,78 +750,6 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
     );
   }
 
-  void _searchTrips() async {
-    _closeAllDropdowns();
-    if (_selectedDeparture.isEmpty && _selectedArrival.isEmpty) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Veuillez choisir un point de départ ou d\'arrivée',
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-    setState(() => _isSearching = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      _filteredTrips = _allTrips.where((trip) {
-        final matchDep =
-            _selectedDeparture.isEmpty ||
-            trip['departure'] == _selectedDeparture;
-        final matchArr =
-            _selectedArrival.isEmpty || trip['arrival'] == _selectedArrival;
-        return matchDep && matchArr;
-      }).toList();
-      _isSearching = false;
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_filteredTrips.length} voyage(s) trouvé(s)'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _viewAllTrips() {
-    setState(() {
-      _selectedDeparture = '';
-      _selectedArrival = '';
-      _selectedDate = DateTime.now();
-      _filteredTrips = List.from(_allTrips);
-      _showDepartureDropdown = false;
-      _showArrivalDropdown = false;
-    });
-    ScaffoldMessenger.of(context).clearSnackBars();
-  }
-
-  void _reserveTrip(Map<String, dynamic> trip) {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (context) => HostessBookingDetailsScreen(
-          departure: trip['departure'],
-          arrival: trip['arrival'],
-          isRoundTrip: false,
-        ),
-      ),
-    );
-  }
 }
 
 // ─── CITY DROPDOWN FIELD ────────────────────────────────────────────────────

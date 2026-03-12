@@ -3,6 +3,7 @@ import '../../../../core/services/device/device_service.dart';
 import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
+import '../../../hostess/models/sale_model.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/models/auth_response.dart';
 import '../../data/models/login_request_model.dart';
@@ -23,6 +24,14 @@ abstract class AuthRepository {
   Future<HostessProfileModel> getHostessProfile();
   Future<HostessProfileModel> updateProfile(Map<String, dynamic> data);
   Future<void> changePasswordHotesse(Map<String, dynamic> data);
+  Future<List<HostessSaleModel>> getSalesHistory(DateTime? startDate, DateTime? endDate);
+  Future<Map<String, dynamic>> searchTickets({
+    required String dateDepart,
+    required String pointDepart,
+    required String pointArrive,
+  });
+  // 🟢 NOUVELLE MÉTHODE
+  Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload);
 
   // ✅ MODIFIE AUSSI CELLE-CI pour être cohérent
   Future<AuthResponseModel> register(RegisterRequestModel params);
@@ -167,6 +176,37 @@ class AuthRepositoryImpl implements AuthRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<List<HostessSaleModel>> getSalesHistory(DateTime? startDate, DateTime? endDate) async {
+    try {
+      // On délègue simplement l'appel au Remote Data Source
+      return await remoteDataSource.getSalesHistory(startDate, endDate);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // 👇 L'IMPLÉMENTATION MANQUANTE À AJOUTER ICI :
+  @override
+  Future<Map<String, dynamic>> searchTickets({
+    required String dateDepart,
+    required String pointDepart,
+    required String pointArrive,
+  }) async {
+    return await remoteDataSource.searchTickets(
+      dateDepart: dateDepart,
+      pointDepart: pointDepart,
+      pointArrive: pointArrive,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload) async {
+    // Tu peux ajouter de la logique ici plus tard si besoin (sauvegarde locale, etc.)
+    return await remoteDataSource.bookTicket(payload);
+  }
+
 
 
   // 🔐 LOGIN : Corrigé pour accepter l'objet LoginRequestModel

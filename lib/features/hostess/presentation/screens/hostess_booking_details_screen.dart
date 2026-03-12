@@ -6,17 +6,24 @@ import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/features/agent/presentation/widgets/custom_app_bar.dart';
 import 'package:car225/features/hostess/models/passenger_info.dart';
 import 'hostess_ticket_result_screen.dart';
+import 'package:flutter/services.dart';
 
 class HostessBookingDetailsScreen extends StatefulWidget {
   final String departure;
   final String arrival;
   final bool isRoundTrip;
+  final int horaireId; // 🟢 Nouveau
+  final int price;     // 🟢 Nouveau
+  final String time;   // 🟢 Nouveau
 
   const HostessBookingDetailsScreen({
     super.key,
     required this.departure,
     required this.arrival,
     required this.isRoundTrip,
+    required this.horaireId,
+    required this.price,
+    required this.time,
   });
 
   @override
@@ -68,21 +75,11 @@ class _HostessBookingDetailsScreenState
     extends State<HostessBookingDetailsScreen> {
   // Type de voyage
   String _tripType = 'Aller Simple';
-  final int _oneWayPrice = 100;
-  final int _roundTripPrice = 200;
 
-  // Heure de départ
-  String _selectedTime = '08:00';
-  final List<String> _timeSlots = [
-    '08:00',
-    '09:30',
-    '11:00',
-    '13:30',
-    '15:00',
-    '16:30',
-    '18:00',
-    '20:30',
-  ];
+
+  // 🟢 UTILISE DES GETTERS DYNAMIQUES À LA PLACE :
+  int get _oneWayPrice => widget.price * _passengerCount;
+  int get _roundTripPrice => (widget.price * 2) * _passengerCount;
 
   // Nombre de passagers et formulaires
   int _passengerCount = 1;
@@ -91,6 +88,9 @@ class _HostessBookingDetailsScreenState
 
   // Validation visuelle
   bool _showErrors = false;
+  bool _isLoading = false;
+
+
 
   @override
   void dispose() {
@@ -122,6 +122,101 @@ class _HostessBookingDetailsScreenState
     });
   }
 
+
+  Future<void> _confirmBooking() async {
+    // 1. Activer l'affichage des erreurs en rouge si des champs sont vides
+    setState(() => _showErrors = true);
+
+    // 2. Vérifier si tous les formulaires des passagers sont valides
+    bool allValid = _passengerForms.every((form) => form.isValid());
+
+    if (!allValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir correctement les informations de tous les passagers.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return; // On stoppe tout si c'est invalide
+    }
+
+    // 3. Afficher le chargement
+    setState(() => _isLoading = true);
+
+    try {
+      // 4. Calculer le montant final
+      final int totalPrice = _tripType == 'Aller-Retour' ? _roundTripPrice : _oneWayPrice;
+
+      // 5. 🟢 CONSTRUIRE LE JSON (PAYLOAD) 🟢
+      final Map<String, dynamic> payload = {
+        "horaire_id": widget.horaireId,
+        "type_voyage": _tripType, // "Aller Simple" ou "Aller-Retour"
+        "nombre_passagers": _passengerCount,
+        "montant_total": totalPrice,
+        // On transforme la liste des formulaires en une belle liste de JSON
+        "passagers": _passengerForms.map((form) => {
+          "nom": form.lastNameController.text.trim(),
+          "prenom": form.firstNameController.text.trim(),
+          "telephone": form.phoneController.text.trim(),
+          "contact_urgence": form.procheNumberController.text.trim(),
+          "email": form.emailController.text.trim(),
+        }).toList(),
+      };
+
+      // Astuce de pro : Affiche-le dans la console pour vérifier avant d'appeler l'API !
+      print("🚀 JSON PRÊT À ÊTRE ENVOYÉ : $payload");
+
+      /* // 6. APPEL DE TON API POST (À faire quand le backend sera prêt)
+      final repo = AuthRepositoryImpl(...);
+      final response = await repo.bookTicket(payload); // <-- Nouvelle méthode à créer dans le repo
+
+      if (response['success'] == true) {
+        // ... navigation vers le succès
+      }
+      */
+
+      // Pour l'instant, on simule 2 secondes de chargement API
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 7. Si tout s'est bien passé, on va à l'écran de résultat
+      // 7. Si tout s'est bien passé, on va à l'écran de résultat
+      if (mounted) {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            // 🔴 ATTENTION : On enlève le mot "const" car les données sont dynamiques !
+            builder: (context) => HostessTicketResultScreen(
+              isRoundTrip: _tripType == 'Aller-Retour',
+              // On convertit tes formulaires en objets PassengerInfo grâce à ta méthode toPassengerInfo()
+              passengers: _passengerForms.map((form) => form.toPassengerInfo()).toList(),
+              departure: widget.departure,
+              arrival: widget.arrival,
+              // ⚠️ Pour la date, si tu ne l'as pas encore passée depuis l'écran précédent, mets une valeur en dur pour tester
+              travelDate: widget.time,
+              //travelTime: widget.time,
+              totalPrice: totalPrice,
+            ),
+          ),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la réservation. Réessayez.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -143,7 +238,7 @@ class _HostessBookingDetailsScreenState
                 const Gap(20),
                 _buildTripTypeSection(),
                 const Gap(20),
-                _buildTimeSection(),
+                //_buildTimeSection(),
                 const Gap(20),
                 _buildPassengerCountSection(),
                 const Gap(20),
@@ -419,7 +514,7 @@ class _HostessBookingDetailsScreenState
     );
   }
 
-  Widget _buildTimeSection() {
+  /*Widget _buildTimeSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 15),
       padding: const EdgeInsets.all(20),
@@ -451,9 +546,9 @@ class _HostessBookingDetailsScreenState
         ],
       ),
     );
-  }
+  }*/
 
-  Widget _buildTimeChip(String time) {
+  /*Widget _buildTimeChip(String time) {
     bool isSelected = _selectedTime == time;
     return Container(
       decoration: BoxDecoration(
@@ -485,7 +580,7 @@ class _HostessBookingDetailsScreenState
         ),
       ),
     );
-  }
+  }*/
 
   Widget _buildPassengerCountSection() {
     return Container(
@@ -891,29 +986,64 @@ class _HostessBookingDetailsScreenState
     );
   }
 
+
   Widget _buildConfirmButton() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15),
+    // 💡 CORRECTION : On multiplie bien par le nombre de passagers !
+    final int totalPrice = _tripType == 'Aller-Retour'
+        ? _roundTripPrice * _passengerCount
+        : _oneWayPrice * _passengerCount;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
       child: SizedBox(
         width: double.infinity,
-        height: 56,
+        height: 55,
         child: ElevatedButton(
-          onPressed: _showConfirmationDialog,
+          // 🟢 MODIFICATION ICI : On appelle le dialogue !
+          onPressed: _isLoading ? null : _showConfirmationDialog,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
             elevation: 0,
           ),
-          child: const Text(
-            'CONFIRMER LA VENTE',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-              color: Colors.white,
-              letterSpacing: 0.5,
+          child: _isLoading
+              ? const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
+          )
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Confirmer la réservation',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Gap(8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$totalPrice FCFA',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1045,7 +1175,7 @@ class _HostessBookingDetailsScreenState
                             '$_passengerCount passager(s)',
                           ),
                           const Gap(12),
-                          _buildDialogRow('Heure', _selectedTime),
+                          //_buildDialogRow('Heure', _selectedTime),
                           const Divider(height: 32, thickness: 1),
                           _buildDialogRow(
                             'Total',
@@ -1092,8 +1222,9 @@ class _HostessBookingDetailsScreenState
                         height: 52,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.pop(context);
-                            _confirmSale();
+                            Navigator.pop(context); // On ferme le dialogue
+                            // 🟢 MODIFICATION ICI : on appelle la vraie méthode d'API
+                            _confirmBooking();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -1290,7 +1421,7 @@ class _HostessBookingDetailsScreenState
                                 departure: widget.departure,
                                 arrival: widget.arrival,
                                 travelDate: '06/03/2026',
-                                travelTime: _selectedTime,
+                                //travelTime: _selectedTime,
                                 totalPrice: totalPrice,
                               ),
                             ),

@@ -12,7 +12,7 @@ class HostessTicketResultScreen extends StatelessWidget {
   final String departure;
   final String arrival;
   final String travelDate;
-  final String travelTime;
+  //final String travelTime;
   final int totalPrice;
 
   const HostessTicketResultScreen({
@@ -22,7 +22,7 @@ class HostessTicketResultScreen extends StatelessWidget {
     required this.departure,
     required this.arrival,
     required this.travelDate,
-    required this.travelTime,
+    //required this.travelTime,
     required this.totalPrice,
   });
 
@@ -434,7 +434,7 @@ class HostessTicketResultScreen extends StatelessWidget {
                         departure: departure,
                         arrival: arrival,
                         travelDate: travelDate,
-                        travelTime: travelTime,
+                        //travelTime: travelTime,
                         isRoundTrip: isRoundTrip,
                         price: pricePerTicket,
                       );
@@ -586,7 +586,7 @@ class HostessTicketResultScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildInfoItem('DATE', travelDate),
-                    _buildInfoItem('HEURE', travelTime),
+                    //_buildInfoItem('HEURE', travelTime),
                   ],
                 ),
                 const Gap(20),
@@ -712,7 +712,7 @@ class HostessTicketResultScreen extends StatelessWidget {
                   departure: departure,
                   arrival: arrival,
                   travelDate: travelDate,
-                  travelTime: travelTime,
+                  //travelTime: travelTime,
                   isRoundTrip: isRoundTrip,
                   totalPrice: totalPrice,
                 );

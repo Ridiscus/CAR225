@@ -19,6 +19,7 @@ class HostessBookingDetailsScreen extends StatefulWidget {
   final int horaireId; // 🟢 Nouveau
   final int price;     // 🟢 Nouveau
   final String time;   // 🟢 Nouveau
+  final String date;
 
   const HostessBookingDetailsScreen({
     super.key,
@@ -28,6 +29,7 @@ class HostessBookingDetailsScreen extends StatefulWidget {
     required this.horaireId,
     required this.price,
     required this.time,
+    required this.date,
   });
 
   @override

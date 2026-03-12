@@ -96,7 +96,7 @@ class DriverProvider extends ChangeNotifier {
         carRegistration: "AB-123-CD",
         scheduledDepartureTime: DateTime.now().add(const Duration(hours: 1)),
         scheduledArrivalTime: DateTime.now().add(const Duration(hours: 3)),
-        status: 'started',
+        status: 'pending',
         price: 5000,
         passengersCount: 42,
         totalSeats: 70,
@@ -195,9 +195,14 @@ class DriverProvider extends ChangeNotifier {
     required String type,
     required String description,
     required String tripId,
+    File? image,
+    double? latitude,
+    double? longitude,
   }) async {
     // Simulation d'envoi de rapport
     await Future.delayed(const Duration(seconds: 1));
-    print("Rapport envoyé: $type - $description pour le trajet $tripId");
+    print(
+      "Rapport envoyé: $type - $description pour le trajet $tripId. Image: ${image != null}, Loc: $latitude, $longitude",
+    );
   }
 }

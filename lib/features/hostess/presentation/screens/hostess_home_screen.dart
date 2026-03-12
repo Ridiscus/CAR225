@@ -50,34 +50,37 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // 1. HEADER FIXE
-          const HostessHeader(),
-          // 2. CONTENU SCROLLABLE
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDashboardHeader(),
-                  const Gap(10),
-                  _buildMetricsGrid(),
-                  const Gap(20),
-                  _buildActionButton(),
-                  const Gap(30),
-                  _buildSalesTableHeader(),
-                  const Gap(12),
-                  _buildRecentSales(),
-                  const Gap(120),
-                ],
+      backgroundColor: const Color(0xFFF1F5F9), // Fond pour le contraste
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // 1. HEADER FIXE
+            const HostessHeader(),
+            // 2. CONTENU SCROLLABLE
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDashboardHeader(),
+                    const Gap(10),
+                    _buildMetricsGrid(),
+                    const Gap(20),
+                    _buildActionButton(),
+                    const Gap(30),
+                    _buildSalesTableHeader(),
+                    const Gap(12),
+                    _buildRecentSales(),
+                    const Gap(120),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -161,9 +164,9 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         border: Border.all(color: const Color(0xFFE0E0E0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -229,7 +232,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
+            color: AppColors.primary.withOpacity(0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -322,9 +325,9 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -653,9 +656,16 @@ class _DigitalClockState extends State<_DigitalClock> {
       width: 105,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,

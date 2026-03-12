@@ -47,12 +47,12 @@ class _HostessHeaderState extends State<HostessHeader> {
           end: Alignment.bottomRight,
           colors: [
             AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            AppColors.primary.withOpacity(0.85),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: AppColors.primary.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 5),
           ),
@@ -77,12 +77,12 @@ class _HostessHeaderState extends State<HostessHeader> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Colors.white.withOpacity(0.3),
                       width: 2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.15),
+                        color: AppColors.primary.withOpacity(0.15),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -125,7 +125,7 @@ class _HostessHeaderState extends State<HostessHeader> {
                   'Bonjour,',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withOpacity(0.8),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -145,7 +145,7 @@ class _HostessHeaderState extends State<HostessHeader> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -176,9 +176,9 @@ class _HostessHeaderState extends State<HostessHeader> {
                     });
                   },
                   activeThumbColor: const Color(0xFF4CAF50),
-                  activeTrackColor: Colors.white.withValues(alpha: 0.3),
+                  activeTrackColor: Colors.white.withOpacity(0.3),
                   inactiveThumbColor: const Color(0xFFC62828),
-                  inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
+                  inactiveTrackColor: Colors.white.withOpacity(0.3),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -186,7 +186,7 @@ class _HostessHeaderState extends State<HostessHeader> {
               Text(
                 _isOnline ? 'En ligne' : 'Hors ligne',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: Colors.white.withOpacity(0.9),
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.3,

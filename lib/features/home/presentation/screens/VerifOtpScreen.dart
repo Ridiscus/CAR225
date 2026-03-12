@@ -22,7 +22,10 @@ class VerifOtpScreen extends StatefulWidget {
 }
 
 class _VerifOtpScreenState extends State<VerifOtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (index) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
 
   bool _isLoading = false;
@@ -64,17 +67,16 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     });
   }*/
 
-
-
-// 2. Modifie la méthode d'écoute :
+  // 2. Modifie la méthode d'écoute :
   void _listenForOtpNotification() {
     // On écoute notre flux global personnalisé
     _otpSubscription = GlobalOtpService.otpStream.stream.listen((String otp) {
-      print("✅ [VerifOtpScreen] OTP intercepté depuis le service global : $otp");
+      print(
+        "✅ [VerifOtpScreen] OTP intercepté depuis le service global : $otp",
+      );
       _autoFillOtp(otp);
     });
   }
-
 
   void _autoFillOtp(String otp) {
     if (otp.length == 6 && mounted) {
@@ -125,7 +127,9 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
 
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: 60.0, left: 20.0, right: 20.0,
+        top: 60.0,
+        left: 20.0,
+        right: 20.0,
         child: Material(
           color: Colors.transparent,
           child: Container(
@@ -133,20 +137,34 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
             decoration: BoxDecoration(
               color: isError ? const Color(0xFF222222) : Colors.green.shade700,
               borderRadius: BorderRadius.circular(25),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
+                Icon(
+                  isError ? Icons.info_outline : Icons.check_circle,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                    child: Text(
-                        message,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-                        textAlign: TextAlign.center,
-                        maxLines: 2
-                    )
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                  ),
                 ),
               ],
             ),
@@ -161,8 +179,7 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     });
   }
 
-
-// 3. N'oublie pas de nettoyer dans le dispose() :
+  // 3. N'oublie pas de nettoyer dans le dispose() :
   @override
   void dispose() {
     _timer?.cancel();
@@ -171,7 +188,6 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
     for (var f in _focusNodes) f.dispose();
     super.dispose();
   }
-
 
   Future<void> _handleResendCode() async {
     if (!_canResend) return;
@@ -218,10 +234,13 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const MainScreen()),
-            (route) => false,
+        (route) => false,
       );
     } catch (e) {
-      _showTopNotification(e.toString().replaceAll("Exception:", ""), isError: true);
+      _showTopNotification(
+        e.toString().replaceAll("Exception:", ""),
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -239,47 +258,100 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 40,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
                     CircleAvatar(
                       radius: 35,
                       backgroundColor: primaryColor.withOpacity(0.1),
-                      child: Icon(Icons.shield_outlined, color: primaryColor, size: 35),
+                      child: Icon(
+                        Icons.shield_outlined,
+                        color: primaryColor,
+                        size: 35,
+                      ),
                     ),
                     const Gap(20),
-                    const Text("Vérification OTP 🔐", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const Text(
+                      "Vérification OTP 🔐",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const Gap(10),
-                    const Text("Saisissez le code envoyé au", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    const Text(
+                      "Saisissez le code envoyé au",
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
                     const Gap(10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xFFF1F4F8), borderRadius: BorderRadius.circular(8)),
-                      child: Text(widget.contact, style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F4F8),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        widget.contact,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     const Gap(30),
 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (index) => _buildOtpBox(index, primaryColor)),
+                      children: List.generate(
+                        6,
+                        (index) => _buildOtpBox(index, primaryColor),
+                      ),
                     ),
                     const Gap(30),
 
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.timer_outlined, size: 16, color: Colors.orange),
+                          const Icon(
+                            Icons.timer_outlined,
+                            size: 16,
+                            color: Colors.orange,
+                          ),
                           const Gap(8),
-                          Text("Expire dans : ${_formatTime(_validitySeconds)}",
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          Text(
+                            "Expire dans : ${_formatTime(_validitySeconds)}",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -292,12 +364,23 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
                         onPressed: _isLoading ? null : _verifyCode,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
                           elevation: 0,
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text("Vérifier maintenant", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                "Vérifier maintenant",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
                     ),
                     const Gap(25),
@@ -307,25 +390,46 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
 
                     _canResend
                         ? TextButton.icon(
-                      onPressed: _isLoading ? null : _handleResendCode,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text("Renvoyer un nouveau code", style: TextStyle(fontWeight: FontWeight.bold)),
-                    )
+                            onPressed: _isLoading ? null : _handleResendCode,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text(
+                              "Renvoyer un nouveau code",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          )
                         : Column(
-                      children: [
-                        const Text("Code encore valide.", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                        const Gap(5),
-                        Text("Renvoi possible dans ${_formatTime(_resendSeconds)}",
-                            style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
+                            children: [
+                              const Text(
+                                "Code encore valide.",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const Gap(5),
+                              Text(
+                                "Renvoi possible dans ${_formatTime(_resendSeconds)}",
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                   ],
                 ),
               ),
               const Gap(20),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text("← Retour", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "← Retour",
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -355,7 +459,12 @@ class _VerifOtpScreenState extends State<VerifOtpScreen> {
         keyboardType: TextInputType.number,
         maxLength: 1,
         cursorColor: primary,
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black, height: 1.2),
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+          height: 1.2,
+        ),
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         decoration: const InputDecoration(
           counterText: "",

@@ -128,7 +128,7 @@ class _HostessScannerScreenState extends State<HostessScannerScreen>
               height: 250,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: Colors.white.withOpacity(0.4),
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(35),
@@ -161,7 +161,7 @@ class _HostessScannerScreenState extends State<HostessScannerScreen>
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.6),
+                                color: AppColors.primary.withOpacity(0.6),
                                 blurRadius: 10,
                                 spreadRadius: 2,
                               ),
@@ -174,7 +174,7 @@ class _HostessScannerScreenState extends State<HostessScannerScreen>
                     // OVERLAY SI PAS EN TRAIN DE SCANNER
                     if (!_isScanning)
                       Container(
-                        color: Colors.black.withValues(alpha: 0.7),
+                        color: Colors.black.withOpacity(0.7),
                         child: const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -209,13 +209,13 @@ class _HostessScannerScreenState extends State<HostessScannerScreen>
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(
             color: _isScanning
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.redAccent.withValues(alpha: 0.2),
+                ? Colors.white.withOpacity(0.3)
+                : Colors.redAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
               color: _isScanning
                   ? Colors.transparent
-                  : Colors.redAccent.withValues(alpha: 0.5),
+                  : Colors.redAccent.withOpacity(0.5),
             ),
           ),
           child: Text(
@@ -280,14 +280,14 @@ class _HostessScannerScreenState extends State<HostessScannerScreen>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
+            color: Colors.white.withOpacity(0.2),
             width: 5,
           ),
         ),
         child: Container(
           margin: const EdgeInsets.all(5),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.4),
+            color: Colors.white.withOpacity(0.4),
             shape: BoxShape.circle,
           ),
           child: Center(

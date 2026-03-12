@@ -58,7 +58,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
-                color: Colors.black.withValues(alpha: 0.85),
+                color: Colors.black.withOpacity(0.85),
               ),
             ),
             Hero(
@@ -245,8 +245,8 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0.1),
-                Colors.black.withValues(alpha: 0.8),
+                Colors.black.withOpacity(0.1),
+                Colors.black.withOpacity(0.8),
               ],
             ),
           ),
@@ -270,12 +270,12 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: Colors.white.withOpacity(0.5),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withOpacity(0.3),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
@@ -338,7 +338,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -359,7 +359,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
               Text(
                 'EMPLOYÉE PAR $_company'.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.5,
@@ -380,7 +380,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
         border: Border.all(color: const Color(0xFFF0F2F5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

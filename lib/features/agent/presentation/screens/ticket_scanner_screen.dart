@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:gap/gap.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import 'scan_result_screen.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   const TicketScannerScreen({super.key});
-
   @override
   State<TicketScannerScreen> createState() => _TicketScannerScreenState();
 }
@@ -27,6 +27,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
         DetectionSpeed.normal, // Fix: 'balanced' n'existe plus en v7
     facing: CameraFacing.back,
   );
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // 2. CYCLE DE VIE (Lifecycle)
   @override
@@ -48,6 +49,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
   void dispose() {
     _animationController.dispose();
     _scannerController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -66,27 +68,33 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
 
   void _handleBarcodeDetection(BarcodeCapture capture) {
     if (_hasDetected || !_isScanning) return;
-
     final List<Barcode> barcodes = capture.barcodes;
     if (barcodes.isNotEmpty) {
       _hasDetected = true;
       final String code = barcodes.first.rawValue ?? "ID-INCONNU";
-
       _stopScanAnimation();
       _navigateToResult(code);
     }
   }
 
   void _navigateToResult(String code) async {
+    // 1. Retour Tactile & Sonore immédiat
     HapticFeedback.heavyImpact();
+    try {
+      await _audioPlayer.play(AssetSource('sounds/beep.wav'));
+      // Petit délai pour que l'oreille humaine saisisse le son avant le changement visuel
+      await Future.delayed(const Duration(milliseconds: 100));
+    } catch (_) {}
 
+    if (!mounted) return;
+
+    // 2. Navigation après le son
     await Navigator.push(
       context,
       CupertinoPageRoute(
         builder: (context) => ScanResultScreen(ticketReference: code),
       ),
     );
-
     // Une fois revenu sur l'écran du scanner
     if (mounted) {
       setState(() {
@@ -129,7 +137,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
               height: 250,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: Colors.white.withOpacity(0.4),
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(35),
@@ -163,7 +171,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.6),
+                                color: AppColors.primary.withOpacity(0.6),
                                 blurRadius: 10,
                                 spreadRadius: 2,
                               ),
@@ -176,7 +184,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
                     // OVERLAY SI PAS EN TRAIN DE SCANNER
                     if (!_isScanning)
                       Container(
-                        color: Colors.black.withValues(alpha: 0.7),
+                        color: Colors.black.withOpacity(0.7),
                         child: const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -211,13 +219,13 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(
             color: _isScanning
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.redAccent.withValues(alpha: 0.2),
+                ? Colors.white.withOpacity(0.3)
+                : Colors.redAccent.withOpacity(0.2),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
               color: _isScanning
                   ? Colors.transparent
-                  : Colors.redAccent.withValues(alpha: 0.5),
+                  : Colors.redAccent.withOpacity(0.5),
             ),
           ),
           child: Text(
@@ -282,14 +290,14 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
+            color: Colors.white.withOpacity(0.2),
             width: 5,
           ),
         ),
         child: Container(
           margin: const EdgeInsets.all(5),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.4),
+            color: Colors.white.withOpacity(0.4),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -312,7 +320,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(

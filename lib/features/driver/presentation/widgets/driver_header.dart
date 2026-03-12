@@ -32,13 +32,6 @@ class DriverHeader extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [AppColors.primary, Color(0xFFFF8C1A)],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x4DFF7900),
-            blurRadius: 15,
-            offset: Offset(0, 5),
-          ),
-        ],
       ),
       child: SafeArea(
         bottom: false,
@@ -64,7 +57,7 @@ class DriverHeader extends StatelessWidget {
               border: Border.all(color: Colors.white, width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
+                  color: Colors.black.withOpacity(0.15),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -110,7 +103,7 @@ class DriverHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(

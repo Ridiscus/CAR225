@@ -166,17 +166,17 @@ class _HostessBookingDetailsScreenState
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.primary.withValues(alpha: 0.03),
+            AppColors.primary.withOpacity(0.08),
+            AppColors.primary.withOpacity(0.03),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.06),
+            color: AppColors.primary.withOpacity(0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -209,7 +209,7 @@ class _HostessBookingDetailsScreenState
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.35),
+                        color: AppColors.primary.withOpacity(0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -258,7 +258,7 @@ class _HostessBookingDetailsScreenState
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: color.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 14),
@@ -278,7 +278,7 @@ class _HostessBookingDetailsScreenState
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: color.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 14),
@@ -361,7 +361,7 @@ class _HostessBookingDetailsScreenState
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.primary.withOpacity(0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -536,14 +536,14 @@ class _HostessBookingDetailsScreenState
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.3),
+                        color: AppColors.primary.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.3),
+                        color: AppColors.primary.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
@@ -555,7 +555,7 @@ class _HostessBookingDetailsScreenState
                       ),
                     ),
                     filled: true,
-                    fillColor: AppColors.primary.withValues(alpha: 0.1),
+                    fillColor: AppColors.primary.withOpacity(0.1),
                     contentPadding: EdgeInsets.zero,
                   ),
                   controller: TextEditingController(text: '$_passengerCount')
@@ -983,7 +983,7 @@ class _HostessBookingDetailsScreenState
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -1023,10 +1023,10 @@ class _HostessBookingDetailsScreenState
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.05),
+                        color: AppColors.primary.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: AppColors.primary.withOpacity(0.1),
                         ),
                       ),
                       child: Column(
@@ -1175,7 +1175,7 @@ class _HostessBookingDetailsScreenState
       context: context,
       barrierDismissible: false,
       barrierLabel: "",
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) => const SizedBox(),
       transitionBuilder: (context, anim1, anim2, child) {
@@ -1194,7 +1194,7 @@ class _HostessBookingDetailsScreenState
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -1211,7 +1211,7 @@ class _HostessBookingDetailsScreenState
                         color: const Color(0xFFE8F5E9),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+                          color: const Color(0xFF2E7D32).withOpacity(0.1),
                           width: 4,
                         ),
                       ),
@@ -1344,7 +1344,7 @@ class _DottedLine extends StatelessWidget {
               width: 3,
               height: 3,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.4),
+                color: AppColors.primary.withOpacity(0.4),
                 shape: BoxShape.circle,
               ),
             ),

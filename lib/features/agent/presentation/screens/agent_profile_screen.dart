@@ -74,7 +74,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
-                color: Colors.black.withValues(alpha: 0.85),
+                color: Colors.black.withOpacity(0.85),
               ),
             ),
             Hero(
@@ -94,7 +94,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withOpacity(0.3),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -238,7 +238,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -348,8 +348,8 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0.1),
-                Colors.black.withValues(alpha: 0.8),
+                Colors.black.withOpacity(0.1),
+                Colors.black.withOpacity(0.8),
               ],
             ),
           ),
@@ -373,12 +373,12 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: Colors.white.withOpacity(0.5),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withOpacity(0.3),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
@@ -441,7 +441,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -462,7 +462,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               Text(
                 'EMPLOYÉ PAR $_company'.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.5,
@@ -486,13 +486,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.2),
+              color: Colors.grey.withOpacity(0.2),
               width: 1,
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -541,7 +541,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               trailing ??
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.grey.withValues(alpha: 0.5),
+                    color: AppColors.grey.withOpacity(0.5),
                     size: 22,
                   ),
             ],
@@ -573,7 +573,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 24),
@@ -654,7 +654,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: AppColors.greyLight.withValues(alpha: 0.5),
+        color: AppColors.greyLight.withOpacity(0.5),
       ),
     );
   }

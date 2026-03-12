@@ -123,6 +123,8 @@ class PageTransitions {
             );
           },
         );
+
+      case PageTransitionType.perspective3D:
         return PageRouteBuilder<T>(
           pageBuilder: (context, animation, secondaryAnimation) => page,
           transitionDuration: const Duration(milliseconds: 700),
@@ -218,6 +220,8 @@ class PageTransitions {
             );
           },
         );
+
+      case PageTransitionType.flipHorizontal:
         return PageRouteBuilder<T>(
           pageBuilder: (context, animation, secondaryAnimation) => page,
           transitionDuration: const Duration(milliseconds: 600),
@@ -291,12 +295,6 @@ class PageTransitions {
             );
           },
         );
-      case PageTransitionType.perspective3D:
-        // TODO: Handle this case.
-        throw UnimplementedError();
-      case PageTransitionType.flipHorizontal:
-        // TODO: Handle this case.
-        throw UnimplementedError();
     }
   }
-}// TODO Implement this library.
+}

@@ -84,7 +84,7 @@ class _HostessPersonalInfoScreenState extends State<HostessPersonalInfoScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: AppColors.primary.withOpacity(0.2),
                       width: 4,
                     ),
                   ),

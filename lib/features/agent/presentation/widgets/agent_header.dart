@@ -43,14 +43,14 @@ class _AgentHeaderState extends State<AgentHeader> {
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(24, topPadding + 5, 24, 25),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            AppColors.primary.withOpacity(0.85),
           ],
         ),
       ),
@@ -85,12 +85,12 @@ class _AgentHeaderState extends State<AgentHeader> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
+                              color: Colors.white.withOpacity(0.3),
                               width: 2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
+                                color: Colors.black.withOpacity(0.2),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -156,7 +156,7 @@ class _AgentHeaderState extends State<AgentHeader> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -193,9 +193,9 @@ class _AgentHeaderState extends State<AgentHeader> {
                     });
                   },
                   activeThumbColor: const Color(0xFF4CAF50),
-                  activeTrackColor: Colors.white.withValues(alpha: 0.3),
+                  activeTrackColor: Colors.white.withOpacity(0.3),
                   inactiveThumbColor: const Color(0xFFC62828),
-                  inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
+                  inactiveTrackColor: Colors.white.withOpacity(0.3),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -203,7 +203,7 @@ class _AgentHeaderState extends State<AgentHeader> {
               Text(
                 _isOnline ? 'En ligne' : 'Hors ligne',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: Colors.white.withOpacity(0.9),
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.3,

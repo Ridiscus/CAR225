@@ -43,7 +43,7 @@ class HostessScanResultScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.secondary.withValues(alpha: 0.1),
+          color: AppColors.secondary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(30),
         ),
         child: const Row(

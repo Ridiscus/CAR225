@@ -211,7 +211,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: AppColors.primary.withOpacity(0.3),
             blurRadius: 12,
             // offset: const Offset(0, 6),
           ),
@@ -252,7 +252,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -295,12 +295,12 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
+                      color: Colors.black.withOpacity(0.15),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: AppColors.primary.withOpacity(0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -317,8 +317,8 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                             _applyFilter();
                           },
                     borderRadius: BorderRadius.circular(16),
-                    splashColor: AppColors.primary.withValues(alpha: 0.1),
-                    highlightColor: AppColors.primary.withValues(alpha: 0.05),
+                    splashColor: AppColors.primary.withOpacity(0.1),
+                    highlightColor: AppColors.primary.withOpacity(0.05),
                     child: SizedBox(
                       height: 50,
                       width: 50,
@@ -378,7 +378,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isEmpty
-                    ? Colors.white.withValues(alpha: 0.4)
+                    ? Colors.white.withOpacity(0.4)
                     : Colors.white,
                 width: 1.5,
               ),
@@ -491,7 +491,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

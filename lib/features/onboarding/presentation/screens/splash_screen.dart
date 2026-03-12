@@ -54,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // CHOIX DE LA PAGE DE DESTINATION
     // TEMPORAIRE : On redirige vers l'écran Driver pour le développement
-    const String userType = "agent";
+    const String userType = "driver";
 
     final Widget destination = _isConnected
         ? const MainScreen() // Si connecté -> Dashboard
@@ -114,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.yellowAccent.withValues(alpha: 0.7),
+                              color: Colors.yellowAccent.withOpacity(0.7),
                               width: 2,
                             ),
                           ),

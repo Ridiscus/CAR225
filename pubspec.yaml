@@ -70,6 +70,7 @@ dependencies:
   url_launcher: ^6.2.0
   geolocator: ^14.0.2
   geocoding: ^2.1.1
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
@@ -92,3 +93,4 @@ flutter:
     - assets/images/
     - assets/vectors/
     - assets/icons/
+    - assets/sounds/

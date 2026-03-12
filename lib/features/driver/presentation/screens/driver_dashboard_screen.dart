@@ -15,7 +15,7 @@ class DriverDashboardScreen extends StatelessWidget {
     final driverProvider = Provider.of<DriverProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF1F5F9),
       body: Column(
         children: [
           const DriverHeader(title: "Tableau de Bord", isDashboard: true),
@@ -33,7 +33,7 @@ class DriverDashboardScreen extends StatelessWidget {
                           "Prêt pour votre mission ?",
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                             color: Color(0xFF1A1A1A),
                           ),
                         ),
@@ -70,9 +70,10 @@ class DriverDashboardScreen extends StatelessWidget {
                           ),
                         ] else
                           _buildEmptyState(
-                            icon: Icons.assignment_turned_in_outlined,
-                            title: "Tout est à jour",
-                            message: "Aucun trajet actif pour aujourd'hui.",
+                            icon: Icons.assignment_late_outlined,
+                            title: "Aucun trajet assigné",
+                            message:
+                                "Il n'y a actuellement aucun voyage ou trajet actif qui vous est assigné. Votre planning de mission apparaîtra ici dès qu'il sera configuré.",
                           ),
 
                         const Gap(35),
@@ -104,10 +105,10 @@ class DriverDashboardScreen extends StatelessWidget {
                               )
                         else
                           _buildEmptyState(
-                            icon: Icons.calendar_today_outlined,
+                            icon: Icons.calendar_month_outlined,
                             title: "Planning libre",
                             message:
-                                "Aucun voyage prévu pour les prochains jours.",
+                                "Aucun autre voyage n'est prévu dans votre planning pour les prochains jours.",
                           ),
 
                         if (driverProvider.upcomingTrips.length > 2)
@@ -218,8 +219,8 @@ class DriverDashboardScreen extends StatelessWidget {
                 const Text(
                   "Détails du Voyage",
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
@@ -234,46 +235,51 @@ class DriverDashboardScreen extends StatelessWidget {
             const Gap(30),
 
             // Itinerary
-            Row(
-              children: [
-                Column(
-                  children: [
-                    const Icon(
-                      Icons.circle,
-                      color: AppColors.primary,
-                      size: 12,
-                    ),
-                    Container(
-                      width: 2,
-                      height: 50,
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                    const Icon(
-                      Icons.location_on,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                  ],
-                ),
-                const Gap(16),
-                Expanded(
-                  child: Column(
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  Column(
                     children: [
-                      _buildStationDetailItem(
-                        label: "Départ",
-                        station: trip.departureStation,
-                        time: timeFormat.format(trip.scheduledDepartureTime),
+                      const Gap(5),
+                      const Icon(
+                        Icons.circle,
+                        color: AppColors.primary,
+                        size: 10,
                       ),
-                      const Gap(20),
-                      _buildStationDetailItem(
-                        label: "Destination",
-                        station: trip.arrivalStation,
-                        time: timeFormat.format(trip.scheduledArrivalTime),
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                        ),
                       ),
+                      const Icon(
+                        Icons.location_on,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      const Gap(5),
                     ],
                   ),
-                ),
-              ],
+                  const Gap(16),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildStationDetailItem(
+                          label: "Départ",
+                          station: trip.departureStation,
+                          time: timeFormat.format(trip.scheduledDepartureTime),
+                        ),
+                        const Gap(25),
+                        _buildStationDetailItem(
+                          label: "Destination",
+                          station: trip.arrivalStation,
+                          time: timeFormat.format(trip.scheduledArrivalTime),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             const Gap(30),
@@ -296,7 +302,7 @@ class DriverDashboardScreen extends StatelessWidget {
                       Text(
                         trip.carRegistration,
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w500,
                           fontSize: 15,
                         ),
                       ),
@@ -316,7 +322,7 @@ class DriverDashboardScreen extends StatelessWidget {
                       Text(
                         "${trip.passengersCount}/${trip.totalSeats}",
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w500,
                           fontSize: 15,
                         ),
                       ),
@@ -377,7 +383,7 @@ class DriverDashboardScreen extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A1A1A),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
@@ -409,15 +415,15 @@ class DriverDashboardScreen extends StatelessWidget {
             ),
             Text(
               station,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
             ),
           ],
         ),
         Text(
           time,
           style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
             color: AppColors.primary,
           ),
         ),
@@ -445,7 +451,14 @@ class DriverDashboardScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -531,27 +544,56 @@ class DriverDashboardScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 25),
-          _buildStationInfo(
-            icon: Icons.location_on_outlined,
-            label: "Gare de Départ",
-            value: trip.departureStation,
-            time: timeFormat.format(trip.scheduledDepartureTime),
-            isDeparture: true,
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
-            child: Container(
-              height: 30,
-              width: 2,
-              color: AppColors.primary.withOpacity(0.3),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                // Colonne de gauche : Icônes et Barre verticale
+                Column(
+                  children: [
+                    const Gap(8),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.flag_outlined,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                    const Gap(8),
+                  ],
+                ),
+                const Gap(15),
+                // Colonne de droite : Informations textuelles
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildStationInfoOnly(
+                        label: "Gare de Départ",
+                        value: trip.departureStation,
+                        time: timeFormat.format(trip.scheduledDepartureTime),
+                      ),
+                      const Gap(25),
+                      _buildStationInfoOnly(
+                        label: "Gare de Destination",
+                        value: trip.arrivalStation,
+                        time: timeFormat.format(trip.scheduledArrivalTime),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
-          _buildStationInfo(
-            icon: Icons.flag_outlined,
-            label: "Gare de Destination",
-            value: trip.arrivalStation,
-            time: timeFormat.format(trip.scheduledArrivalTime),
-            isDeparture: false,
           ),
           const Gap(20),
           const Divider(),
@@ -608,8 +650,8 @@ class DriverDashboardScreen extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
             color: isPrice ? AppColors.secondary : Colors.black,
           ),
         ),
@@ -653,18 +695,14 @@ class DriverDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStationInfo({
-    required IconData icon,
+  Widget _buildStationInfoOnly({
     required String label,
     required String value,
     required String time,
-    required bool isDeparture,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: AppColors.primary, size: 28),
-        const SizedBox(width: 15),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -676,8 +714,8 @@ class DriverDashboardScreen extends StatelessWidget {
               Text(
                 value,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
                 ),
               ),
             ],
@@ -727,17 +765,18 @@ class DriverDashboardScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 55,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.play_circle_filled_rounded),
               onPressed: () => _confirmAction(
                 context,
                 "Confirmation du Départ",
-                "Êtes-vous sûr de vouloir marquer le départ de ce trajet ?",
+                "Êtes-vous sûr de vouloir marquer le départ de ce trajet ? Cela informera les passagers du démarrage effectif.",
                 Icons.play_circle_fill_rounded,
                 AppColors.primary,
                 () => provider.markDeparture(),
               ),
-              child: const Text(
-                "MARQUER LE DÉPART",
+              label: const Text(
+                "DÉMARRER LE TRAJET",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
@@ -746,19 +785,20 @@ class DriverDashboardScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 55,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check_circle_rounded),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.secondary,
               ),
               onPressed: () => _confirmAction(
                 context,
                 "Confirmation de l'Arrivée",
-                "Êtes-vous sûr de vouloir marquer l'arrivée à destination ? Le trajet sera alors clôturé.",
+                "Êtes-vous sûr de vouloir marquer l'arrivée à destination ? Le trajet sera alors clôturé définitivement.",
                 Icons.check_circle_rounded,
                 AppColors.secondary,
                 () => provider.markArrival(),
               ),
-              child: const Text(
+              label: const Text(
                 "MARQUER L'ARRIVÉE",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
@@ -788,6 +828,7 @@ class DriverDashboardScreen extends StatelessWidget {
           child: Opacity(
             opacity: anim1.value,
             child: Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
               ),
@@ -823,7 +864,7 @@ class DriverDashboardScreen extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: Color(0xFF1A1B2E),
                         letterSpacing: -0.5,
                       ),

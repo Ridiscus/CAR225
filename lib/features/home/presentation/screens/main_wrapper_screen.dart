@@ -129,9 +129,6 @@ class _MainScreenState extends State<MainScreen> {
     _currentIndex = widget.initialIndex;
   }
 
-
-
-
   @override
   Widget build(BuildContext context) {
     // 1. On détecte le mode (Clair ou Sombre)
@@ -151,7 +148,9 @@ class _MainScreenState extends State<MainScreen> {
         systemNavigationBarColor: backgroundColor,
 
         // On inverse la couleur des icônes (Carré, Rond, Retour) selon le mode
-        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarIconBrightness: isDark
+            ? Brightness.light
+            : Brightness.dark,
 
         // (Optionnel) Pour la barre de statut en haut (Heure, Batterie)
         statusBarColor: Colors.transparent,
@@ -159,7 +158,8 @@ class _MainScreenState extends State<MainScreen> {
       ),
       child: Scaffold(
         extendBody: true,
-        backgroundColor: backgroundColor, // On utilise la variable définie plus haut
+        backgroundColor:
+            backgroundColor, // On utilise la variable définie plus haut
 
         body: _pages[_currentIndex],
 
@@ -173,7 +173,8 @@ class _MainScreenState extends State<MainScreen> {
             height: 70.0,
             color: _navBarGreen,
             buttonBackgroundColor: _navBarGreen,
-            backgroundColor: Colors.transparent, // Transparence pour voir le fond derrière la courbe
+            backgroundColor: Colors
+                .transparent, // Transparence pour voir le fond derrière la courbe
             animationCurve: Curves.easeInOutCubic,
             animationDuration: const Duration(milliseconds: 500),
             items: <Widget>[
@@ -193,9 +194,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-
-
-
   // Ton widget personnalisé intact
   Widget _buildNavItem(String iconPath, int index) {
     final bool isSelected = _currentIndex == index;
@@ -209,11 +207,7 @@ class _MainScreenState extends State<MainScreen> {
           shape: BoxShape.circle,
         ),
         padding: const EdgeInsets.all(10),
-        child: Image.asset(
-          iconPath,
-          color: _navBarGreen,
-          fit: BoxFit.contain,
-        ),
+        child: Image.asset(iconPath, color: _navBarGreen, fit: BoxFit.contain),
       );
     } else {
       return Padding(

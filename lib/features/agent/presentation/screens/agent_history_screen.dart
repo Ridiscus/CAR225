@@ -104,36 +104,9 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
     );
 
     if (pickedDate != null) {
-      if (!context.mounted) return;
-
-      final TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.fromDateTime(_selectedDate ?? DateTime.now()),
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: AppColors.primary,
-                onPrimary: Colors.white,
-                onSurface: Color(0xFF1E293B),
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
-
-      if (pickedTime != null) {
-        setState(() {
-          _selectedDate = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-        });
-      }
+      setState(() {
+        _selectedDate = pickedDate;
+      });
     }
   }
 
@@ -150,213 +123,163 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const CustomAppBar(
-        title: 'Historique des scans',
+        title: 'Historique des Scans',
         showLeading: false,
       ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Gap(24),
-                        // --- DATE & TIME SELECTION ---
-                        _buildSectionHeader('FILTRER PAR DATE ET HEURE'),
-                        _buildDateTimePickerButton(),
-
-                        // --- SECTION TITLE ---
-                        _buildTitleSection(),
-
-                        // --- SCANS LIST ---
-                        filteredScans.isEmpty
-                            ? _buildEmptyState(
-                                isFiltered: _selectedDate != null,
-                              )
-                            : _buildScansList(filteredScans),
-                        const Gap(100),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // --- HEADER: TOTAL & FILTER ---
+            _buildCompactHeader(filteredScans.length),
+            // --- SCANS LIST ---
+            Expanded(
+              child: filteredScans.isEmpty
+                  ? _buildEmptyState(isFiltered: _selectedDate != null)
+                  : _buildScansList(filteredScans),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFF94A3B8),
-          letterSpacing: 1.2,
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildDateTimePickerButton() {
+  Widget _buildCompactHeader(int count) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: GestureDetector(
-        onTap: () => _selectDate(context),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      child: Column(
+        children: [
+          _buildDateTimePickerButton(),
+          const Gap(16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.event_available_rounded,
-                  color: AppColors.primary,
-                  size: 24,
+              const Text(
+                'RÉSULTATS DES SCANS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF90A4AE),
+                  letterSpacing: 1,
                 ),
               ),
-              const Gap(16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _selectedDate == null
-                          ? 'CHOISIR UNE PÉRIODE'
-                          : 'PÉRIODE SÉLECTIONNÉE',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 1,
-                      ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF263238),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF263238).withOpacity(0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    const Gap(4),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const Gap(10),
                     Text(
-                      _selectedDate == null
-                          ? 'Historique complet'
-                          : DateFormat(
-                              'EEEE dd MMMM yyyy à HH:mm',
-                              'fr_FR',
-                            ).format(_selectedDate!),
+                      '$count SCAN${count > 1 ? 'S' : ''}',
                       style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (_selectedDate != null)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDate = null;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: Color(0xFF64748B),
-                      size: 20,
-                    ),
-                  ),
-                )
-              else
-                const Icon(
-                  Icons.keyboard_arrow_right_rounded,
-                  color: Color(0xFF94A3B8),
-                ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTitleSection() {
-    String dateText = 'Aujourd\'hui';
-    if (_selectedDate != null) {
-      final now = DateTime.now();
-      if (_selectedDate!.day == now.day &&
-          _selectedDate!.month == now.month &&
-          _selectedDate!.year == now.year) {
-        dateText = 'Aujourd\'hui';
-      } else {
-        dateText = DateFormat('dd MMMM yyyy', 'fr_FR').format(_selectedDate!);
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 15),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Historique des scans',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
-              letterSpacing: -0.5,
+  Widget _buildDateTimePickerButton() {
+    return GestureDetector(
+      onTap: () => _selectDate(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 15,
+              offset: const Offset(0, 6),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.search_rounded,
+              color: AppColors.primary,
+              size: 22,
             ),
-            child: Text(
-              dateText.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
+            const Gap(14),
+            Expanded(
+              child: Text(
+                _selectedDate == null
+                    ? 'Rechercher par date...'
+                    : DateFormat(
+                        'EEEE dd MMMM yyyy',
+                        'fr_FR',
+                      ).format(_selectedDate!),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: _selectedDate == null
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF1E293B),
+                ),
               ),
             ),
-          ),
-        ],
+            if (_selectedDate != null)
+              GestureDetector(
+                onTap: () {
+                  setState(() => _selectedDate = null);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF64748B),
+                    size: 16,
+                  ),
+                ),
+              )
+            else
+              const Icon(
+                Icons.calendar_month_rounded,
+                color: Color(0xFFCBD5E1),
+                size: 20,
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildScansList(List<TicketScan> scans) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
       itemCount: scans.length,
       itemBuilder: (context, index) {
         return _buildScanCard(scans[index]);
@@ -366,138 +289,126 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
 
   Widget _buildScanCard(TicketScan scan) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      height: 95,
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.06),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              _showScanDetails(scan);
-            },
-            child: Stack(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _showScanDetails(scan);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                // Liseré Orange flottant/courbé à gauche
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 6,
-                    decoration: const BoxDecoration(color: AppColors.primary),
+                // Ticket Icon instead of Person avatar
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.confirmation_number_rounded,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Row(
+                const Gap(16),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Gap(4), // Espace pour compenser le liseré
-                      // Bloc Numéro de Siège (Noir)
-                      _buildSeatIndicator(scan.seatNumber),
-                      const Gap(16),
-                      // Infos Passager
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    scan.passengerName,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF263238),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ),
-                                const Gap(10),
-                                // Badge de validation (Checkmark vert)
-                                Container(
-                                  height: 24,
-                                  width: 24,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE8F5E9),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Color(0xFF2E7D32),
-                                    size: 14,
-                                  ),
-                                ),
-                              ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              scan.passengerName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF263238),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const Gap(8),
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    scan.startLocation,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFFB0BEC5),
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6),
-                                  child: Icon(
-                                    Icons.arrow_forward_rounded,
-                                    size: 18,
-                                    color: Color(0xFFB0BEC5),
-                                  ),
-                                ),
-                                Flexible(
-                                  child: Text(
-                                    scan.location,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFFB0BEC5),
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                const Gap(10),
-                                const CircleAvatar(
-                                  radius: 2.5,
-                                  backgroundColor: Color(0xFFCFD8DC),
-                                ),
-                                const Gap(8),
-                                Text(
-                                  DateFormat('HH:mm').format(scan.scanTime),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
+                          ),
+                          Text(
+                            DateFormat('HH:mm').format(scan.scanTime),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const Gap(4),
+                      Row(
+                        children: [
+                          Text(
+                            'REF: ${scan.ticketId}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const Gap(8),
+                          const CircleAvatar(
+                            radius: 2,
+                            backgroundColor: Color(0xFFB0BEC5),
+                          ),
+                          const Gap(8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'SIEGE #${scan.seatNumber}',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Gap(6),
+                      Text(
+                        '${scan.startLocation} ➔ ${scan.location}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF78909C),
+                          fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -523,6 +434,7 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
         ),
         child: SafeArea(
           top: false,
+          bottom: true,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,8 +456,8 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
                   const Text(
                     'Détails du Scan',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
                       // fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -587,7 +499,7 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: const Color.fromARGB(255, 231, 62, 36),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -597,7 +509,7 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
                   child: const Text(
                     'FERMER',
                     style: TextStyle(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w500,
                       fontSize: 16,
                       letterSpacing: 1,
                     ),
@@ -630,50 +542,9 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
               color: Color(0xFF263238),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSeatIndicator(String seat) {
-    return Container(
-      height: 62,
-      width: 62,
-      decoration: BoxDecoration(
-        color: const Color(0xFF000000),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'SIEGE',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 8,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-            ),
-          ),
-          const Gap(2),
-          Text(
-            '#$seat',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
             ),
           ),
         ],

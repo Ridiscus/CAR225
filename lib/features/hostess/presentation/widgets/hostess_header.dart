@@ -100,7 +100,7 @@ class _HostessHeaderState extends State<HostessHeader> {
                         ? Image.file(pickedImage, fit: BoxFit.cover, width: 64, height: 64)
                         : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
                         ? Image.network(
-                      'https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}',
+                      'https://car225.com/storage/${profile.profilePicture}',
                       fit: BoxFit.cover,
                       width: 64,
                       height: 64,

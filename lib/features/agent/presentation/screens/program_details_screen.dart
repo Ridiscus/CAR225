@@ -184,13 +184,13 @@ class ProgramDetailsScreen extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            AppColors.primary.withOpacity(0.85),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
+            color: AppColors.primary.withOpacity(0.2),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -216,7 +216,7 @@ class ProgramDetailsScreen extends StatelessWidget {
                     height: 25,
                     margin: const EdgeInsets.symmetric(vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Colors.white.withOpacity(0.3),
                     ),
                   ),
                   const Icon(
@@ -250,7 +250,7 @@ class ProgramDetailsScreen extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: Colors.white.withOpacity(0.7),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -281,7 +281,7 @@ class ProgramDetailsScreen extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: Colors.white.withOpacity(0.7),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -298,7 +298,7 @@ class ProgramDetailsScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 15),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -313,7 +313,7 @@ class ProgramDetailsScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -362,7 +362,7 @@ class ProgramDetailsScreen extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE8ECEF), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -383,7 +383,7 @@ class ProgramDetailsScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
+            color: iconColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: iconColor, size: 22),

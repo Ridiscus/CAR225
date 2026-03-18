@@ -15,7 +15,8 @@ class DioClient {
     if (_dio == null) {
       _dio = Dio(
         BaseOptions(
-          baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+          //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+          baseUrl: 'https://car225.com/api/',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',

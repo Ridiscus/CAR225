@@ -337,6 +337,10 @@ class AuthRepositoryImpl implements AuthRepository {
     return await remoteDataSource.bookTicket(payload);
   }
 
-
+  @override
+  Future<Map<String, dynamic>> getHostessDashboard() async {
+    // On appelle simplement la méthode de la source de données
+    return await remoteDataSource.getHostessDashboard();
+  }
 
 }

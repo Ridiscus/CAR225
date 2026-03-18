@@ -152,7 +152,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                     image: pickedImage != null
                         ? FileImage(pickedImage)
                         : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                        ? NetworkImage('https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}')
+                        ? NetworkImage('https://car225.com/storage/${profile.profilePicture}')
                         : const AssetImage('assets/images/hostess_profile.png'))
                     as ImageProvider,
                     fit: BoxFit.cover,
@@ -528,7 +528,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                             image: pickedImage != null
                                 ? FileImage(pickedImage)
                                 : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                                ? NetworkImage('https://jingly-lindy-unminding.ngrok-free.dev/storage/${profile.profilePicture}')
+                                ? NetworkImage('https://car225.com/storage/${profile.profilePicture}')
                                 : const AssetImage('assets/images/hostess_profile.png'))
                             as ImageProvider,
                             fit: BoxFit.cover,

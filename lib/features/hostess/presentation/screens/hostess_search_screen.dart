@@ -220,27 +220,42 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
 
   void _viewAllTrips() {
     setState(() {
+      // 1. On vide les champs de sélection
       _selectedDeparture = '';
       _selectedArrival = '';
+
+      // 2. On remet la date à aujourd'hui
       _selectedDate = DateTime.now();
-      _filteredTrips = List.from(_availableCities);
+
+      // 3. On vide la liste des résultats de recherche
+      _filteredTrips = [];
+
+      // 4. On ferme les menus déroulants s'ils étaient ouverts
       _showDepartureDropdown = false;
       _showArrivalDropdown = false;
     });
+
+    // On efface les petits messages d'erreur éventuels en bas de l'écran
     ScaffoldMessenger.of(context).clearSnackBars();
   }
 
+
   void _reserveTrip(Map<String, dynamic> trip) {
+    // 1. On formate la date globale sélectionnée par l'hôtesse
+    final String formattedDate = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+
     Navigator.push(
       context,
       CupertinoPageRoute(
         builder: (context) => HostessBookingDetailsScreen(
           departure: trip['departure'],
           arrival: trip['arrival'],
-          isRoundTrip: trip['status'] == 'Retour disponible', // Dynamique selon le statut
-          horaireId: trip['horaire_id'], // 🟢 L'ID unique du trajet
-          price: int.parse(trip['price'].toString()), // 🟢 Le vrai prix (ex: 3000)
-          time: trip['time'], // 🟢 L'heure exacte choisie
+          isRoundTrip: trip['status'] == 'Retour disponible',
+          horaireId: trip['horaire_id'],
+          price: int.parse(trip['price'].toString()),
+          time: trip['time'],
+          // 2. 🟢 ON PASSE LA DATE FORMATÉE ICI AU LIEU DE trip['date']
+          date: formattedDate,
         ),
       ),
     );
@@ -580,6 +595,31 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
   }
 
   Widget _buildTripCard(Map<String, dynamic> trip) {
+    // 🟢 1. LOGIQUE DE VÉRIFICATION DE L'HEURE
+    final now = DateTime.now();
+    final isToday = _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+
+    bool isPassed = false;
+    if (isToday && trip['time'] != null) {
+      try {
+        final parts = trip['time'].toString().split(':');
+        if (parts.length >= 2) {
+          final tripHour = int.parse(parts[0]);
+          final tripMinute = int.parse(parts[1]);
+          // On crée un objet DateTime pour l'heure du trajet d'aujourd'hui
+          final tripTime = DateTime(now.year, now.month, now.day, tripHour, tripMinute);
+
+          // Si l'heure actuelle a dépassé l'heure du trajet, c'est expiré
+          isPassed = now.isAfter(tripTime);
+        }
+      } catch (e) {
+        // En cas de format d'heure inattendu, on ne bloque pas par défaut
+        isPassed = false;
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -668,7 +708,12 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
           const Gap(12),
           Row(
             children: [
-              _badge(Icons.access_time, trip['time'], const Color(0xFF00C853)),
+              // 🟢 2. On met l'icône de temps en rouge si c'est dépassé
+              _badge(
+                  Icons.access_time,
+                  trip['time'],
+                  isPassed ? Colors.redAccent : const Color(0xFF00C853)
+              ),
               const Gap(8),
               _badge(
                 Icons.event_seat_rounded,
@@ -700,21 +745,27 @@ class _HostessSearchScreenState extends State<HostessSearchScreen>
               ),
               SizedBox(
                 height: 40,
+                // 🟢 3. On adapte le bouton selon le statut "isPassed"
                 child: ElevatedButton.icon(
-                  onPressed: () => _reserveTrip(trip),
+                  onPressed: isPassed ? null : () => _reserveTrip(trip),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: isPassed ? Colors.grey[300] : AppColors.primary,
+                    foregroundColor: isPassed ? Colors.grey[600] : Colors.white,
+                    disabledBackgroundColor: Colors.grey[300],
+                    disabledForegroundColor: Colors.grey[500],
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text(
-                    'Réserver',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  icon: Icon(
+                      isPassed ? Icons.block_rounded : Icons.check_circle_outline,
+                      size: 18
+                  ),
+                  label: Text(
+                    isPassed ? 'Dépassé' : 'Réserver',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

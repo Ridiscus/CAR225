@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:car225/core/theme/app_colors.dart';
+
+// 🟢 N'oublie pas d'importer tes services !
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
+
 import 'hostess_main_wrapper.dart';
 import '../widgets/hostess_header.dart';
 
@@ -14,38 +21,61 @@ class HostessHomeScreen extends StatefulWidget {
 }
 
 class _HostessHomeScreenState extends State<HostessHomeScreen> {
-  final List<Map<String, dynamic>> _recentSales = [
-    {
-      'id': 'TK-001',
-      'passenger': 'Kouamé Yao',
-      'route': 'Abidjan → Bouaké',
-      'seat': 'A12',
-      'amount': '7,500',
-      'date': '04 Mar 2026',
-      'time': '07:00',
-      'status': 'confirmed',
-    },
-    {
-      'id': 'TK-002',
-      'passenger': 'Awa Traoré',
-      'route': 'Abidjan → Yamoussoukro',
-      'seat': 'B05',
-      'amount': '5,000',
-      'date': '04 Mar 2026',
-      'time': '09:30',
-      'status': 'confirmed',
-    },
-    {
-      'id': 'TK-003',
-      'passenger': 'Djibril Koné',
-      'route': 'Bouaké → Korhogo',
-      'seat': 'C08',
-      'amount': '4,500',
-      'date': '04 Mar 2026',
-      'time': '11:00',
-      'status': 'pending',
-    },
-  ];
+  // 🟢 Nouvelles variables d'état pour les données dynamiques
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  int _ventesAujourdhui = 0;
+  num _revenuAujourdhui = 0;
+  List<dynamic> _recentSales = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Lance la récupération des données au démarrage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDashboardData();
+    });
+  }
+
+
+  Future<void> _fetchDashboardData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: DeviceService(),
+      );
+
+      final response = await repo.getHostessDashboard();
+
+      if (response['success'] == true) {
+        setState(() {
+          // 🟢 2. On parse tout en .toString() d'abord pour éviter l'erreur "String is not a subtype of int"
+          _ventesAujourdhui = int.tryParse(response['stats']['ventes_aujourdhui'].toString()) ?? 0;
+          _revenuAujourdhui = num.tryParse(response['stats']['revenu_aujourdhui'].toString()) ?? 0;
+
+          _recentSales = response['recent_reservations'] ?? [];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = "Impossible de charger les données.";
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Erreur de connexion : $e";
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,28 +85,79 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         children: [
           // 1. HEADER FIXE
           const HostessHeader(),
-          // 2. CONTENU SCROLLABLE
+
+          // 2. CONTENU SCROLLABLE (Avec Pull-to-refresh !)
           Expanded(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDashboardHeader(),
-                  const Gap(10),
-                  _buildMetricsGrid(),
-                  const Gap(20),
-                  _buildActionButton(),
-                  const Gap(30),
-                  _buildSalesTableHeader(),
-                  const Gap(12),
-                  _buildRecentSales(),
-                  const Gap(120),
-                ],
+            child: RefreshIndicator(
+              onRefresh: _fetchDashboardData, // 🟢 Permet de rafraîchir en tirant
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDashboardHeader(),
+                    const Gap(10),
+
+                    // 🟢 Gestion de l'affichage (Chargement, Erreur ou Données)
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                      )
+                    else if (_errorMessage.isNotEmpty)
+                      _buildErrorState()
+                    else ...[
+                        _buildMetricsGrid(),
+                        const Gap(20),
+                        _buildActionButton(),
+                        const Gap(30),
+                        _buildSalesTableHeader(),
+                        const Gap(12),
+                        _buildRecentSales(),
+                      ],
+
+                    const Gap(120), // Espace en bas pour le menu
+                  ],
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // 🟢 Widget pour afficher les erreurs
+  Widget _buildErrorState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+          const Gap(10),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+          ),
+          const Gap(10),
+          ElevatedButton(
+            onPressed: _fetchDashboardData,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Réessayer'),
+          )
         ],
       ),
     );
@@ -118,12 +199,16 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   }
 
   Widget _buildMetricsGrid() {
+    // 🟢 Formatage du prix pour avoir des espaces (ex: 450 000)
+    final formatter = NumberFormat('#,###', 'fr_FR');
+    final formattedRevenue = formatter.format(_revenuAujourdhui);
+
     return Row(
       children: [
         Expanded(
           child: _buildMetricCard(
             title: 'Tickets vendus',
-            value: '28',
+            value: _ventesAujourdhui.toString(), // 🟢 Dynamique
             subtitle: 'Aujourd\'hui',
             icon: Icons.confirmation_number_rounded,
             iconColor: AppColors.primary,
@@ -134,7 +219,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         Expanded(
           child: _buildMetricCard(
             title: 'Revenus du jour',
-            value: '450,000',
+            value: formattedRevenue, // 🟢 Dynamique
             subtitle: 'FCFA',
             icon: Icons.account_balance_wallet_rounded,
             iconColor: AppColors.primary,
@@ -200,11 +285,13 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 28,
+                  fontSize: 26, // Légèrement réduit pour éviter que les grands nombres dépassent
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF1A1A1A),
                   letterSpacing: -1,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 subtitle,
@@ -237,8 +324,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
       ),
       child: ElevatedButton(
         onPressed: () {
-          final state = context
-              .findAncestorStateOfType<HostessMainWrapperState>();
+          final state = context.findAncestorStateOfType<HostessMainWrapperState>();
           if (state != null) state.setIndex(1);
         },
         style: ElevatedButton.styleFrom(
@@ -283,9 +369,8 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         ),
         TextButton(
           onPressed: () {
-            final state = context
-                .findAncestorStateOfType<HostessMainWrapperState>();
-            if (state != null) state.setIndex(3);
+            final state = context.findAncestorStateOfType<HostessMainWrapperState>();
+            if (state != null) state.setIndex(2);
           },
           child: const Row(
             children: [
@@ -306,14 +391,68 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
     );
   }
 
-  // ── Cartes individuelles style History Screen ──────────────────────────────
   Widget _buildRecentSales() {
+    // 🟢 Gestion du cas où la liste est vide
+    if (_recentSales.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.receipt_long_rounded, color: Colors.grey, size: 40),
+            Gap(10),
+            Text(
+              "Aucune vente récente.",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: _recentSales.map((sale) => _buildSaleCard(sale)).toList(),
     );
   }
 
-  Widget _buildSaleCard(Map<String, dynamic> sale) {
+
+
+  Widget _buildSaleCard(dynamic sale) {
+    // 🟢 3. On utilise les VRAIES clés renvoyées par ton API
+    final id = sale['reference']?.toString() ?? sale['id']?.toString() ?? 'N/A';
+
+    // Concaténation du nom et prénom
+    final nom = sale['passager_nom'] ?? '';
+    final prenom = sale['passager_prenom'] ?? '';
+    final passenger = '$nom $prenom'.trim().isEmpty ? 'Client inconnu' : '$nom $prenom';
+
+    // Ton API ne renvoie pas le nom du trajet complet ici, tu peux adapter selon tes besoins
+    final route = 'Trajet standard'; // À modifier si tu as les noms des gares dans l'API
+
+    // Nettoyage de la date (ex: 2026-03-12T00:00:00.000000Z -> 12/03/2026)
+    String date = '--';
+    if (sale['date_voyage'] != null) {
+      try {
+        final parsedDate = DateTime.parse(sale['date_voyage']);
+        date = DateFormat('dd/MM/yyyy').format(parsedDate);
+      } catch (e) {
+        date = sale['date_voyage'].toString().substring(0, 10);
+      }
+    }
+
+    final time = sale['heure_depart'] ?? '--';
+    final seat = sale['seat_number']?.toString() ?? '-';
+
+    // Formatage propre du montant (enlève les .00 si présent)
+    final amountDouble = num.tryParse(sale['montant'].toString()) ?? 0;
+    final amount = NumberFormat('#,###', 'fr_FR').format(amountDouble);
+
+    final status = sale['statut'] ?? 'en attente';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -338,12 +477,11 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── ID + badge statut ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      sale['id'],
+                      id,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -351,13 +489,12 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    _buildStatusBadge(sale['status']),
+                    _buildStatusBadge(status),
                   ],
                 ),
                 const Gap(8),
-                // ── Nom du passager ──
                 Text(
-                  sale['passenger'],
+                  passenger,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -365,7 +502,6 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   ),
                 ),
                 const Gap(6),
-                // ── Trajet ──
                 Row(
                   children: [
                     const Icon(
@@ -376,7 +512,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                     const Gap(6),
                     Expanded(
                       child: Text(
-                        sale['route'],
+                        route,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),
@@ -387,7 +523,6 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   ],
                 ),
                 const Gap(4),
-                // ── Date & heure ──
                 Row(
                   children: [
                     const Icon(
@@ -397,7 +532,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                     ),
                     const Gap(6),
                     Text(
-                      '${sale['date']} • ${sale['time']}',
+                      '$date • $time',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF94A3B8),
@@ -407,7 +542,6 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   ],
                 ),
                 const Gap(10),
-                // ── Place + montant ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -421,7 +555,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Place ${sale['seat']}',
+                        'Place $seat',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -430,7 +564,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                       ),
                     ),
                     Text(
-                      '${sale['amount']} FCFA',
+                      '$amount FCFA',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
@@ -447,8 +581,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
     );
   }
 
-  // ── Modal détails ──────────────────────────────────────────────────────────
-  void _showSaleDetails(BuildContext context, Map<String, dynamic> sale) {
+  void _showSaleDetails(BuildContext context, dynamic sale) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -456,11 +589,42 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
       builder: (context) => _buildSaleDetailsContent(context, sale),
     );
   }
+  Widget _buildSaleDetailsContent(BuildContext context, dynamic sale) {
+    // 🟢 1. Mapping sécurisé avec les VRAIES clés de ton API
+    final id = sale['reference']?.toString() ?? sale['id']?.toString() ?? 'N/A';
 
-  Widget _buildSaleDetailsContent(
-    BuildContext context,
-    Map<String, dynamic> sale,
-  ) {
+    // Concaténation du nom et prénom pour le passager
+    final nom = sale['passager_nom']?.toString() ?? '';
+    final prenom = sale['passager_prenom']?.toString() ?? '';
+    final passenger = '$nom $prenom'.trim().isEmpty ? 'Client inconnu' : '$nom $prenom';
+
+    // Ton API ne renvoyant pas les noms des gares dans ce payload, on met une valeur par défaut
+    final route = 'Trajet standard';
+
+    // Formatage de la date (ex: 2026-03-12T00:00:00.000000Z -> 12/03/2026)
+    String date = '--';
+    if (sale['date_voyage'] != null) {
+      try {
+        final parsedDate = DateTime.parse(sale['date_voyage'].toString());
+        date = DateFormat('dd/MM/yyyy').format(parsedDate);
+      } catch (e) {
+        // En cas d'erreur de parsing, on prend juste la partie YYYY-MM-DD
+        date = sale['date_voyage'].toString().substring(0, 10);
+      }
+    }
+
+    // Récupération de l'heure et de la place
+    final time = sale['heure_depart']?.toString() ?? '--';
+    final seat = sale['seat_number']?.toString() ?? '-';
+
+    // Formatage propre du montant (enlève les .00 inutiles et ajoute les espaces)
+    final amountDouble = num.tryParse(sale['montant'].toString()) ?? 0;
+    final amount = NumberFormat('#,###', 'fr_FR').format(amountDouble);
+
+    // Récupération du statut (ex: "confirmee")
+    final status = sale['statut']?.toString() ?? 'en attente';
+
+    // 🟢 2. Le reste de l'UI reste identique, les variables sont maintenant pleines !
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -496,23 +660,21 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
-                _buildStatusBadge(sale['status']),
+                _buildStatusBadge(status),
               ],
             ),
             const Gap(24),
-            _buildDetailRow('N° Billet', sale['id'], isHighlight: true),
+            _buildDetailRow('N° Billet', id, isHighlight: true),
             const Divider(height: 32, color: Color(0xFFEEEEEE)),
-            _buildDetailRow('Passager', sale['passenger']),
+            _buildDetailRow('Passager', passenger),
             const Gap(16),
-            _buildDetailRow('Trajet', sale['route']),
+            _buildDetailRow('Trajet', route),
             const Gap(16),
-            if (sale['date'] != null) ...[
-              _buildDetailRow('Date', sale['date']),
-              const Gap(16),
-              _buildDetailRow('Heure', sale['time']),
-              const Gap(16),
-            ],
-            _buildDetailRow('Place', sale['seat']),
+            _buildDetailRow('Date', date),
+            const Gap(16),
+            _buildDetailRow('Heure', time),
+            const Gap(16),
+            _buildDetailRow('Place', seat),
             const Divider(height: 32, color: Color(0xFFEEEEEE)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -526,7 +688,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   ),
                 ),
                 Text(
-                  '${sale['amount']} FCFA',
+                  '$amount FCFA',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -565,10 +727,10 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   }
 
   Widget _buildDetailRow(
-    String label,
-    String value, {
-    bool isHighlight = false,
-  }) {
+      String label,
+      String value, {
+        bool isHighlight = false,
+      }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -593,7 +755,15 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   }
 
   Widget _buildStatusBadge(String status) {
-    final isConfirmed = status == 'confirmed';
+    // 🟢 On nettoie la chaîne pour éviter les bugs liés aux espaces ou aux majuscules
+    final cleanStatus = status.trim().toLowerCase();
+
+    // 🟢 On gère toutes les variations possibles de "confirmé" venant du backend
+    final isConfirmed = cleanStatus == 'confirmed' ||
+        cleanStatus == 'confirmé' ||
+        cleanStatus == 'confirmée' ||
+        cleanStatus == 'confirmee';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -601,6 +771,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
+        // Le texte qu'on affiche à l'écran
         isConfirmed ? 'Confirmé' : 'En attente',
         style: TextStyle(
           fontSize: 11,
@@ -614,7 +785,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
   }
 }
 
-// ── Horloge digitale ───────────────────────────────────────────────────────
+// ── Horloge digitale (Inchgée) ─────────────────────────────────────────────
 class _DigitalClock extends StatefulWidget {
   const _DigitalClock();
   @override

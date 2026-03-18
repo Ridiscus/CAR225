@@ -4,6 +4,10 @@ import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../auth/presentation/screens/login_screen.dart';
+import '../../data/datasources/agent_remote_data_source.dart';
+import '../../data/repositories/agent_repository_impl.dart';
 import '../providers/agent_profile_provider.dart';
 import 'agent_personal_info_screen.dart';
 import 'agent_change_password_screen.dart';
@@ -17,10 +21,7 @@ class AgentProfileScreen extends StatefulWidget {
 
 class _AgentProfileScreenState extends State<AgentProfileScreen> {
   // 1. VARIABLES D'ÉTAT & DONNÉES
-  final String _firstName = 'Fabiola';
-  final String _lastName = 'Kouassi';
   final String _role = 'AGENT';
-  final String _company = 'UTB';
   bool _notificationEnabled = false;
 
   final ImagePicker _picker = ImagePicker();
@@ -34,6 +35,10 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
   @override
   void initState() {
     super.initState();
+    // 🟢 On déclenche la récupération du profil dès l'ouverture
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AgentProfileProvider>().fetchProfile();
+    });
   }
 
   // 3. LOGIQUE & ACTIONS
@@ -74,7 +79,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
-                color: Colors.black.withValues(alpha: 0.85),
+                color: Colors.black.withOpacity(0.85),
               ),
             ),
             Hero(
@@ -94,7 +99,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withOpacity(0.3),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -179,19 +184,59 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      barrierDismissible: false, // Empêche de fermer en cliquant à côté pendant le chargement
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Déconnexion'),
         content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showSnackBar(message: 'Déconnexion réussie');
+            onPressed: () async {
+              // 1. On ferme la boîte de dialogue
+              Navigator.pop(dialogContext);
+
+              // 2. On affiche un petit indicateur de chargement global (optionnel mais UX friendly)
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              );
+
+              try {
+                // 3. On instancie le repo et on appelle l'API
+                final repo = AgentRepositoryImpl(
+                  remoteDataSource: AgentRemoteDataSourceImpl(),
+                );
+
+                await repo.logout();
+
+                if (mounted) {
+                  // 4. On ferme le loader
+                  Navigator.pop(context);
+
+                  // 5. On redirige vers l'écran de Login en vidant la pile de navigation
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  // En cas d'erreur (ex: pas de réseau), on ferme le loader
+                  Navigator.pop(context);
+                  // On redirige quand même par sécurité car on a vidé le cache local
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        (route) => false,
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -204,6 +249,51 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     );
   }
 
+
+  Future<void> _launchPhone(String phone) async {
+    // On enlève les espaces pour s'assurer que le dialer le lise bien
+    final String cleanPhone = phone.replaceAll(' ', '');
+    final Uri phoneUri = Uri(
+      scheme: 'tel',
+      path: cleanPhone,
+    );
+
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    } else {
+      debugPrint("Impossible d'ouvrir le clavier téléphonique.");
+    }
+  }
+
+  String? _encodeQueryParameters(Map<String, String> params) {
+    return params.entries
+        .map((MapEntry<String, String> e) =>
+    '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+  }
+
+  // 🟢 La fonction de lancement mise à jour
+  Future<void> _launchEmail(String email) async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: email,
+      // On remplit l'objet (sujet) ici de manière sécurisée
+      query: _encodeQueryParameters(<String, String>{
+        'subject': 'Demande de support - Car225',
+        // Optionnel : tu peux même pré-remplir le corps du message !
+        // 'body': 'Bonjour l\'équipe Car225,\n\nJ\'ai besoin d\'aide concernant : '
+      }),
+    );
+
+    if (await canLaunchUrl(emailUri)) {
+      await launchUrl(emailUri);
+    } else {
+      debugPrint("Impossible d'ouvrir l'application d'e-mail.");
+      // Tu pourrais afficher un ScaffoldMessenger (SnackBar) ici pour informer l'utilisateur
+    }
+  }
+
+// 🟢 3. Ta méthode mise à jour
   void _showSupportModal() {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -238,7 +328,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -281,18 +371,26 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 ),
               ),
               const Gap(24),
+
+              // 🟢 4. Ajout des actions dans les onTap
               _buildContactTile(
                 icon: Icons.alternate_email_rounded,
                 label: 'Par Email',
-                value: 'support@car225.ci',
-                onTap: () {},
+                value: 'contact@car225.com',
+                onTap: () {
+                  Navigator.pop(context); // Optionnel: fermer la modale avant d'ouvrir l'app externe
+                  _launchEmail('contact@car225.com');
+                },
               ),
               const Gap(12),
               _buildContactTile(
                 icon: Icons.phone_in_talk_rounded,
                 label: 'Par Téléphone',
                 value: '+225 01 02 03 04 05',
-                onTap: () {},
+                onTap: () {
+                  Navigator.pop(context); // Optionnel: fermer la modale avant d'ouvrir le dialer
+                  _launchPhone('+225 01 02 03 04 05');
+                },
               ),
               const Gap(24),
               SizedBox(
@@ -321,10 +419,35 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     );
   }
 
-  // 4. COMPOSANTS UI (Helper Méthodes)
+
   Widget _buildPremiumHeader() {
-    final pickedImage = context.watch<AgentProfileProvider>().profileImage;
+    // 🟢 On écoute le provider pour récupérer les données et l'image locale
+    final provider = context.watch<AgentProfileProvider>();
+    final pickedImage = provider.profileImage;
+    final data = provider.profileData;
+    final isLoading = provider.isLoadingProfile;
+
     final double topPadding = MediaQuery.of(context).padding.top;
+
+    // 🛠️ RÉPARATION DE L'URL DE L'IMAGE (Même logique que l'autre écran)
+    String? rawImageUrl = data?['profile_picture_url']?.toString();
+    String? finalImageUrl;
+
+    if (rawImageUrl != null && rawImageUrl.trim().isNotEmpty) {
+      if (rawImageUrl.startsWith('http')) {
+        finalImageUrl = rawImageUrl;
+      } else {
+        final String baseUrl = 'https://jingly-lindy-unminding.ngrok-free.dev';
+        finalImageUrl = rawImageUrl.startsWith('/')
+            ? '$baseUrl$rawImageUrl'
+            : '$baseUrl/$rawImageUrl';
+      }
+    }
+
+    // 🟢 Extraction sécurisée des données avec valeurs par défaut pendant le chargement
+    final String firstName = data?['prenom'] ?? (isLoading ? '...' : 'Agent');
+    final String lastName = data?['name'] ?? (isLoading ? '...' : 'Anonyme');
+    final String company = data?['compagnie']?['name'] ?? (isLoading ? '...' : 'Non définie');
 
     return Stack(
       children: [
@@ -348,8 +471,8 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0.1),
-                Colors.black.withValues(alpha: 0.8),
+                Colors.black.withOpacity(0.1),
+                Colors.black.withOpacity(0.8),
               ],
             ),
           ),
@@ -373,23 +496,23 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: Colors.white.withOpacity(0.5),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withOpacity(0.3),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
                           ],
                           image: DecorationImage(
+                            // 🟢 LOGIQUE DE L'IMAGE INTELLIGENTE
                             image: pickedImage != null
-                                ? FileImage(pickedImage)
-                                : const AssetImage(
-                                        'assets/images/agent_profile.png',
-                                      )
-                                      as ImageProvider,
+                                ? FileImage(pickedImage) as ImageProvider
+                                : (finalImageUrl != null
+                                ? NetworkImage(finalImageUrl) as ImageProvider
+                                : const AssetImage('assets/images/agent_profile.png')),
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -419,9 +542,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 ],
               ),
               const Gap(20),
-              // Nom et Prénoms (Blanc)
+              // Nom et Prénoms (Dynamique)
               Text(
-                '$_firstName $_lastName',
+                '$firstName $lastName'.toUpperCase(),
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -430,7 +553,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 ),
               ),
               const Gap(8),
-              // Badge Rôle (Orange UTB)
+              // Badge Rôle (Statique ou dynamique selon ton API)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -441,14 +564,14 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Text(
-                  _role,
+                  _role, // On garde "AGENT" en dur car c'est le rôle
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -458,11 +581,11 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 ),
               ),
               const Gap(10),
-              // Entreprise (Blanc cassé)
+              // Entreprise (Dynamique)
               Text(
-                'EMPLOYÉ PAR $_company'.toUpperCase(),
+                'EMPLOYÉ PAR $company'.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.5,
@@ -486,13 +609,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.2),
+              color: Colors.grey.withOpacity(0.2),
               width: 1,
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -541,7 +664,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               trailing ??
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.grey.withValues(alpha: 0.5),
+                    color: AppColors.grey.withOpacity(0.5),
                     size: 22,
                   ),
             ],
@@ -573,7 +696,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 24),
@@ -654,7 +777,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: AppColors.greyLight.withValues(alpha: 0.5),
+        color: AppColors.greyLight.withOpacity(0.5),
       ),
     );
   }

@@ -1,4 +1,4 @@
-import 'package:fpdart/fpdart.dart';
+/*import 'package:fpdart/fpdart.dart';
 import 'package:car225/core/error/failures.dart';
 import '../entities/scanned_ticket.dart';
 import '../repositories/agent_repository.dart';
@@ -11,4 +11,4 @@ class ScanTicketUseCase {
   Future<Either<Failure, ScannedTicket>> call(String qrCode) async {
     return await repository.scanTicket(qrCode);
   }
-}
+}*/

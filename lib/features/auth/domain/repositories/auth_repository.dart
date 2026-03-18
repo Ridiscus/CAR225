@@ -32,6 +32,8 @@ abstract class AuthRepository {
   });
   // 🟢 NOUVELLE MÉTHODE
   Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload);
+  // À ajouter dans abstract class AuthRepository
+  Future<Map<String, dynamic>> getHostessDashboard();
 
   // ✅ MODIFIE AUSSI CELLE-CI pour être cohérent
   Future<AuthResponseModel> register(RegisterRequestModel params);
@@ -206,6 +208,18 @@ class AuthRepositoryImpl implements AuthRepository {
     // Tu peux ajouter de la logique ici plus tard si besoin (sauvegarde locale, etc.)
     return await remoteDataSource.bookTicket(payload);
   }
+
+  @override
+  Future<Map<String, dynamic>> getHostessDashboard() async {
+    try {
+      // On délègue simplement l'appel à la source de données (RemoteDataSource)
+      return await remoteDataSource.getHostessDashboard();
+    } catch (e) {
+      // On fait remonter l'erreur pour que l'UI (le HomeScreen) puisse l'attraper
+      rethrow;
+    }
+  }
+
 
 
 

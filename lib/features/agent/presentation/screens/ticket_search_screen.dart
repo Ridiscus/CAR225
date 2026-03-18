@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import '../widgets/custom_app_bar.dart';
+import 'scan_result_screen.dart';
+import 'package:flutter/cupertino.dart';
 
 class TicketSearchScreen extends StatefulWidget {
   const TicketSearchScreen({super.key});
@@ -12,8 +14,6 @@ class TicketSearchScreen extends StatefulWidget {
 class _TicketSearchScreenState extends State<TicketSearchScreen> {
   // 1. VARIABLES D'ÉTAT & CONTROLLERS
   final TextEditingController _searchController = TextEditingController();
-  bool _hasSearched = false;
-  bool _isLoading = false;
 
   // 2. CYCLE DE VIE (Lifecycle)
   @override
@@ -23,23 +23,16 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
   }
 
   // 3. LOGIQUE & ACTIONS
-  void _performSearch(String query) async {
+  void _performSearch(String query) {
     if (query.isEmpty) return;
-
-    setState(() {
-      _isLoading = true;
-      _hasSearched = false;
-    });
-
-    // Simulation d'une recherche (1 seconde)
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _hasSearched = true;
-      });
-    }
+    _searchController.clear();
+    // Navigation immédiate vers l'écran de résultat
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (context) => ScanResultScreen(ticketReference: query),
+      ),
+    );
   }
 
   // 4. COMPOSANTS UI (Helper Méthodes)
@@ -47,13 +40,6 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
     return TextField(
       controller: _searchController,
       onSubmitted: _performSearch,
-      onChanged: (value) {
-        if (value.isEmpty) {
-          setState(() {
-            _hasSearched = false;
-          });
-        }
-      },
       decoration: InputDecoration(
         hintText: 'Entrez la référence du billet',
         hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
@@ -71,7 +57,7 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(25),
           borderSide: BorderSide(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             width: 2,
           ),
         ),
@@ -84,243 +70,99 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        children: [
-          const Gap(60),
-          Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFECEFF1)),
-            ),
-            child: const Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: Color(0xFFCFD8DC),
-            ),
-          ),
-          const Gap(24),
-          const Text(
-            'Aucune recherche effectuée',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF263238),
-            ),
-          ),
-          const Gap(10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Saisissez un numéro de billet ou le nom d\'un client pour voir les détails de sa réservation.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF90A4AE),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchResults() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Résultat trouvé',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF263238),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'VALIDE',
-                style: TextStyle(
-                  color: Color(0xFF2E7D32),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const Gap(25),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFFF0F2F5)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow(
-                Icons.person_outline_rounded,
-                'PASSAGER',
-                'Bakayoko Moussa',
-              ),
-              _buildDivider(),
-              _buildDetailRow(
-                Icons.confirmation_number_outlined,
-                'N° BILLET',
-                _searchController.text.toUpperCase(),
-              ),
-              _buildDivider(),
-              _buildDetailRow(
-                Icons.location_on_outlined,
-                'DÉPART',
-                'Gare de Yamoussoukro',
-              ),
-              _buildDivider(),
-              _buildDetailRow(
-                Icons.flag_outlined,
-                'DESTINATION',
-                'Gare d\'Abidjan (Adjamé)',
-              ),
-              _buildDivider(),
-              _buildDetailRow(
-                Icons.calendar_today_outlined,
-                'DATE & HEURE',
-                'Aujourd\'hui • 14:00',
-              ),
-              _buildDivider(),
-              _buildDetailRow(
-                Icons.airline_seat_recline_normal_outlined,
-                'PLACE & CLASSE',
-                'Siège #14',
-              ),
-            ],
+        const Text(
+          'RECHERCHES RÉCENTES',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 1.2,
           ),
         ),
+        const Gap(16),
+        _buildRecentSearchItem('TKT-2026-882', 'Aujourd\'hui'),
+        _buildRecentSearchItem('TKT-2026-105', 'Hier'),
+        _buildRecentSearchItem('TKT-2026-094', 'Il y a 2 jours'),
         const Gap(40),
+        const Text(
+          'CONSEILS DE RECHERCHE',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 1.2,
+          ),
+        ),
+        const Gap(16),
+        _buildTipItem(
+          Icons.info_outline_rounded,
+          'Utilisez la référence complète du billet pour un résultat précis.',
+        ),
+        _buildTipItem(
+          Icons.history_rounded,
+          'L\'historique des recherches est conservé localement.',
+        ),
       ],
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 22),
+  Widget _buildRecentSearchItem(String reference, String date) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: ListTile(
+        onTap: () => _performSearch(reference),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF1F5F9),
+            shape: BoxShape.circle,
           ),
-          const Gap(16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Color(0xFFB0BEC5),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const Gap(2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF263238),
-                  ),
-                ),
-              ],
-            ),
+          child: const Icon(Icons.history, color: Color(0xFF64748B), size: 20),
+        ),
+        title: Text(
+          reference,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontSize: 15,
           ),
-        ],
+        ),
+        subtitle: Text(
+          date,
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: Color(0xFFCBD5E1),
+        ),
       ),
     );
   }
 
-  Widget _buildDivider() {
-    return const Divider(color: Color.fromARGB(230, 232, 229, 229), height: 24);
-  }
-
-  Widget _buildLoader() {
-    return Center(
-      child: Column(
+  Widget _buildTipItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         children: [
-          const Gap(60),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                height: 80,
-                width: 80,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppColors.primary.withOpacity(0.1),
-                  ),
-                ),
+          Icon(icon, size: 18, color: AppColors.primary.withOpacity(0.6)),
+          const Gap(12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 13,
+                height: 1.4,
               ),
-              const SizedBox(
-                height: 50,
-                width: 50,
-                child: CircularProgressIndicator(
-                  strokeWidth: 4,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
-              ),
-              Icon(
-                Icons.search_rounded,
-                color: AppColors.primary.withOpacity(0.5),
-                size: 24,
-              ),
-            ],
-          ),
-          const Gap(30),
-          const Text(
-            'Recherche en cours...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF78909C),
-              letterSpacing: 0.5,
-            ),
-          ),
-          const Gap(8),
-          Text(
-            'Nous vérifions la base de données',
-            style: TextStyle(
-              fontSize: 13,
-              color: const Color(0xFF78909C).withValues(alpha: 0.6),
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -347,7 +189,7 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -363,12 +205,7 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
                           const Gap(25),
                           _buildSearchField(),
                           const Gap(40),
-                          if (_isLoading)
-                            _buildLoader()
-                          else if (_hasSearched)
-                            _buildSearchResults()
-                          else
-                            _buildEmptyState(),
+                          _buildEmptyState(),
                         ],
                       ),
                     ),
@@ -381,4 +218,329 @@ class _TicketSearchScreenState extends State<TicketSearchScreen> {
       ),
     );
   }
+}*/
+
+
+
+import 'package:car225/features/agent/presentation/screens/scan_result_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+import 'package:car225/core/theme/app_colors.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/datasources/agent_remote_data_source.dart';
+import '../../data/repositories/agent_repository_impl.dart';
+import '../widgets/custom_app_bar.dart';
+import 'package:flutter/cupertino.dart';
+
+class TicketSearchScreen extends StatefulWidget {
+  const TicketSearchScreen({super.key});
+  @override
+  State<TicketSearchScreen> createState() => _TicketSearchScreenState();
+}
+
+
+class _TicketSearchScreenState extends State<TicketSearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  // 🟢 Initialisation du Repository
+  late final AgentRepositoryImpl _repository;
+  bool _isSearching = false;
+  List<String> _recentSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+    _repository = AgentRepositoryImpl(remoteDataSource: AgentRemoteDataSourceImpl());
+  }
+
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 🟢 LOGIQUE DE RECHERCHE CONNECTÉE À L'API
+  /*void _performSearch(String query) async {
+    if (query.isEmpty || _isSearching) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isSearching = true);
+
+    try {
+      // On utilise la méthode que tu as déjà dans ton repository
+      // Note : On n'a pas besoin de récupérer le résultat ici car le ScanResultScreen
+      // fait déjà son propre fetch au initState via la référence.
+
+      setState(() => _isSearching = false);
+
+      // On navigue vers l'écran de résultat
+      // ⚠️ Note : Comme c'est une recherche manuelle "hors contexte scan",
+      // on peut passer des IDs par défaut ou null si ton ScanResultScreen le permet.
+      if (mounted) {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => ScanResultScreen(
+              ticketReference: query.trim().toUpperCase(),
+              isManual: true,
+              vehiculeId: 0, // Id temporaire ou à récupérer si nécessaire
+              programmeId: 0, // Id temporaire
+            ),
+          ),
+        );
+      }
+
+      _searchController.clear();
+
+    } catch (e) {
+      setState(() => _isSearching = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur : ${e.toString().replaceAll("Exception: ", "")}"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }*/
+
+  void _performSearch(String query) async {
+    final cleanQuery = query.trim().toUpperCase();
+    if (cleanQuery.isEmpty) return;
+
+    // 🟢 Sauvegarder la recherche localement
+    await _saveSearch(cleanQuery);
+
+    FocusScope.of(context).unfocus();
+
+    // Navigation vers le résultat (ton code précédent)
+    if (mounted) {
+      Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (context) => ScanResultScreen(
+            ticketReference: cleanQuery,
+            isManual: true,
+            vehiculeId: 0,
+            programmeId: 0,
+          ),
+        ),
+      );
+    }
+    _searchController.clear();
+  }
+
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      // On récupère la liste, sinon une liste vide
+      _recentSearches = prefs.getStringList('recent_tickets') ?? [];
+    });
+  }
+
+  Future<void> _saveSearch(String reference) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // On nettoie la liste : on enlève si elle existe déjà (pour la remettre en haut)
+    _recentSearches.remove(reference);
+    // On l'ajoute au début
+    _recentSearches.insert(0, reference);
+
+    // On garde seulement les 5 dernières recherches
+    if (_recentSearches.length > 5) {
+      _recentSearches = _recentSearches.sublist(0, 5);
+    }
+
+    await prefs.setStringList('recent_tickets', _recentSearches);
+    setState(() {});
+  }
+
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: const CustomAppBar(
+        title: 'Rechercher un billet',
+        showLeading: false,
+      ),
+      body: Stack(
+        children: [
+          GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Gap(30),
+                    const Text(
+                      'Veuillez saisir la référence du billet ci-dessous',
+                      style: TextStyle(color: Color(0xFF78909C), fontSize: 14),
+                    ),
+                    const Gap(25),
+                    _buildSearchField(),
+                    if (_isSearching) // 🟢 Petit indicateur de chargement
+                      const Padding(
+                        padding: EdgeInsets.only(top: 20),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    const Gap(40),
+                    _buildEmptyState(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // 4. COMPOSANTS UI (Helper Méthodes)
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      onSubmitted: _performSearch,
+      decoration: InputDecoration(
+        hintText: 'Entrez la référence du billet',
+        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+        prefixIcon: const Icon(
+          Icons.search_rounded,
+          color: AppColors.primary,
+          size: 28,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 15,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(25),
+          borderSide: BorderSide(
+            color: Colors.black.withOpacity(0.1),
+            width: 2,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(25),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_recentSearches.isNotEmpty) ...[
+          const Text(
+            'RECHERCHES RÉCENTES',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF94A3B8),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const Gap(16),
+          // 🟢 On génère les items à partir de la liste SharedPreferences
+          ..._recentSearches.map((ref) => _buildRecentSearchItem(ref, 'Recherche récente')).toList(),
+          const Gap(40),
+        ],
+
+        const Text(
+          'CONSEILS DE RECHERCHE',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 1.2,
+          ),
+        ),
+        const Gap(16),
+        _buildTipItem(
+          Icons.info_outline_rounded,
+          'Utilisez la référence complète du billet pour un résultat précis.',
+        ),
+        _buildTipItem(
+          Icons.history_rounded,
+          'L\'historique des recherches est conservé localement.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentSearchItem(String reference, String date) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: ListTile(
+        onTap: () => _performSearch(reference),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF1F5F9),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.history, color: Color(0xFF64748B), size: 20),
+        ),
+        title: Text(
+          reference,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Text(
+          date,
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: Color(0xFFCBD5E1),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary.withOpacity(0.6)),
+          const Gap(12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

@@ -1,163 +1,321 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
-import '../providers/driver_provider.dart';
 import 'package:car225/core/providers/user_provider.dart';
+import 'package:car225/features/driver/presentation/widgets/custom_app_bar.dart';
+import 'package:car225/features/driver/presentation/widgets/success_modal.dart';
+import '../providers/driver_provider.dart';
 
-class DriverPersonalInfoScreen extends StatelessWidget {
+class DriverPersonalInfoScreen extends StatefulWidget {
   const DriverPersonalInfoScreen({super.key});
+  @override
+  State<DriverPersonalInfoScreen> createState() =>
+      _DriverPersonalInfoScreenState();
+}
+
+class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  bool _isLoading = false;
 
   @override
-  Widget build(BuildContext context) {
-    final driverProvider = Provider.of<DriverProvider>(context);
-    final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.user;
+  void initState() {
+    super.initState();
+    final user = context.read<UserProvider>().user;
+    _emailController = TextEditingController(
+      text: user?.email ?? 'chauffeur@car225.ci',
+    );
+    _phoneController = TextEditingController(text: '+225 07 00 00 00 00');
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Informations Personnelles",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 19,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _handleUpdate() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
+
+    // Simulation d'appel API
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      SuccessModal.show(
+        context: context,
+        message:
+            'Vos informations personnelles ont été mises à jour avec succès.',
+        onPressed: () => Navigator.pop(context),
+      );
+    }
+  }
+
+  Widget _buildInfoField({
+    required IconData icon,
+    required String label,
+    String? value,
+    TextEditingController? controller,
+    bool isEnabled = false,
+    String? Function(String?)? validator,
+  }) {
+    return FormField<String>(
+      initialValue: controller?.text ?? value,
+      validator: validator,
+      builder: (state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.2),
-                    width: 4,
+            Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Color.fromARGB(255, 56, 57, 58),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const Gap(10),
+            TextFormField(
+              initialValue: controller == null ? value : null,
+              controller: controller,
+              enabled: isEnabled,
+              onChanged: (v) {
+                state.didChange(v);
+                if (state.hasError) {
+                  state.validate();
+                }
+              },
+              style: TextStyle(
+                color: isEnabled
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+                fontSize: 16,
+              ),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: isEnabled ? Colors.white : const Color(0xFFF1F5F9),
+                prefixIcon: Icon(
+                  icon,
+                  color: isEnabled
+                      ? AppColors.primary
+                      : const Color(0xFF94A3B8),
+                  size: 22,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 16,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0),
+                    width: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFCBD5E1),
+                    width: 1,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Colors.redAccent),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Colors.redAccent,
+                    width: 2,
+                  ),
+                ),
+                errorStyle: const TextStyle(height: 0, fontSize: 0),
+              ),
+            ),
+            if (state.hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 16,
+                      color: Colors.redAccent,
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: Text(
+                        state.errorText!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: CircleAvatar(
-                  radius: 54,
-                  backgroundColor: const Color(0xFFF5F5F5),
-                  backgroundImage: driverProvider.profileImage != null
-                      ? FileImage(driverProvider.profileImage!)
-                      : const AssetImage('assets/images/driver_profile.png')
-                            as ImageProvider,
-                  child: null,
-                ),
               ),
-            ),
-            const Gap(40),
-            _buildDisabledField(
-              icon: Icons.person_outline_rounded,
-              label: 'NOM',
-              value: user?.name ?? "Non défini",
-            ),
-            const Gap(20),
-            _buildDisabledField(
-              icon: Icons.person_outline_rounded,
-              label: 'PRÉNOM',
-              value: user?.prenom ?? "Non défini",
-            ),
-            const Gap(20),
-            _buildDisabledField(
-              icon: Icons.badge_outlined,
-              label: 'ID CHAUFFEUR',
-              value: "CH-2024-001", // Valeur simulée pour l'instant
-            ),
-            const Gap(20),
-            _buildDisabledField(
-              icon: Icons.work_outline,
-              label: 'RÔLE',
-              value: "Chauffeur",
-            ),
-            const Gap(40),
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.amber, size: 20),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Text(
-                      "Ces informations sont gérées par l'administration. Contactez-les pour toute modification.",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.amber[900],
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildDisabledField({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF607D8B),
-            letterSpacing: 1.2,
-          ),
-        ),
-        const Gap(8),
-        TextFormField(
-          initialValue: value,
-          enabled: false,
-          style: const TextStyle(
-            color: Color(0xFF263238),
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFFF8F9FA),
-            prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: Color(0xFFECEFF1)),
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<UserProvider>().user;
+    final pickedImage = context.watch<DriverProvider>().profileImage;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: CustomAppBar(
+        title: 'Informations Personnelles',
+        leadingIcon: Icons.arrow_back,
+        leadingOnPressed: () => Navigator.pop(context),
+      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+              physics: const BouncingScrollPhysics(),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 66,
+                          backgroundColor: Colors.white,
+                          backgroundImage: pickedImage != null
+                              ? FileImage(pickedImage)
+                              : const AssetImage(
+                                      'assets/images/driver_profile.png',
+                                    )
+                                    as ImageProvider,
+                        ),
+                      ),
+                    ),
+                    const Gap(45),
+                    _buildInfoField(
+                      icon: Icons.badge_outlined,
+                      label: 'IDENTIFIANT UNIQUE',
+                      value: 'CH-2026-001',
+                    ),
+                    const Gap(24),
+                    _buildInfoField(
+                      icon: Icons.person_outline_rounded,
+                      label: 'NOM COMPLET',
+                      value: user != null
+                          ? '${user.name} ${user.prenom}'
+                          : 'Chauffeur',
+                    ),
+                    const Gap(24),
+                    _buildInfoField(
+                      icon: Icons.email_outlined,
+                      label: 'ADRESSE E-MAIL',
+                      controller: _emailController,
+                      isEnabled: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'L\'adresse e-mail est obligatoire';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Veuillez entrer un e-mail valide';
+                        }
+                        return null;
+                      },
+                    ),
+                    const Gap(24),
+                    _buildInfoField(
+                      icon: Icons.phone_outlined,
+                      label: 'NUMÉRO DE TÉLÉPHONE',
+                      controller: _phoneController,
+                      isEnabled: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Le numéro de téléphone est obligatoire';
+                        }
+                        return null;
+                      },
+                    ),
+                    const Gap(40),
+                  ],
+                ),
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 18),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          child: SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleUpdate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'ENREGISTRER LES MODIFICATIONS',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

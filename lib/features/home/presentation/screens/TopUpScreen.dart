@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -16,34 +19,177 @@ class TopUpScreen extends StatefulWidget {
 
 class _TopUpScreenState extends State<TopUpScreen> {
   // --- ETAT ---
-  int _selectedOperator = -1; // -1 = aucun, 0 = Orange, 1 = MTN, etc.
-  int _amount = 5000; // Montant par défaut
+  // On a supprimé _selectedOperator qui ne sert plus à rien
+  int _amount = 100; // Montant par défaut
   final int _step = 500;
   bool _isLoading = false;
+  late TextEditingController _amountController;
 
-  late TextEditingController _amountController; // 1. Le contrôleur
+
+  // --- 🔗 VARIABLES POUR LES DEEP LINKS ---
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
-    // 2. Initialisation avec la valeur par défaut
     _amountController = TextEditingController(text: _amount.toString());
+
+    // Initialiser l'écouteur de liens au démarrage de l'écran
+    _initDeepLinks();
   }
 
   @override
   void dispose() {
-    _amountController.dispose(); // 3. Nettoyage
+    _amountController.dispose();
+    // ⚠️ IMPORTANT : Annuler l'écoute pour éviter les fuites de mémoire
+    _linkSubscription?.cancel();
     super.dispose();
   }
 
-  // --- LOGIQUE MISE A JOUR ---
+  // --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
 
-  // Fonction centrale pour mettre à jour la valeur ET le champ texte
+    // 1. Cas où l'application était COMPLÈTEMENT FERMÉE et est réveillée par le lien
+    final initialUri = await _appLinks.getInitialLink();
+    if (initialUri != null) {
+      _handleDeepLink(initialUri);
+    }
+
+    // 2. Cas où l'application était juste EN ARRIÈRE-PLAN (le cas le plus fréquent avec Wave)
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      print("Erreur Deep Link: $err");
+    });
+  }
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  /*void _handleDeepLink(Uri uri) {
+    print("🔗 Lien reçu : $uri");
+
+    // On vérifie que c'est bien notre scheme (car225://) et notre host (payment)
+    if (uri.scheme == 'car225' && uri.host == 'payment') {
+
+      // Si le backend redirige vers car225://payment/success
+      if (uri.path == '/success') {
+        _showTopNotification("Paiement réussi ! 🎉 Ton wallet est rechargé.");
+
+        // 💡 BONUS : Ici tu peux appeler une fonction pour rafraîchir le solde
+        // de l'utilisateur depuis l'API !
+
+      }
+      // Si le backend redirige vers car225://payment/error ou /cancel
+      else if (uri.path == '/error' || uri.path == '/cancel') {
+        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
+      }
+    }
+  }*/
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  void _handleDeepLink(Uri uri) {
+    print("🔗 Lien reçu : $uri");
+    if (!mounted) return; // Sécurité pour éviter les crashs de contexte
+
+    // On vérifie que c'est bien notre scheme (car225) et notre host (payment)
+    if (uri.scheme == 'car225' && uri.host == 'payment') {
+
+      // 💡 CORRECTION ICI : On lit le paramètre "?success=true" ou "?success=false"
+      final isSuccess = uri.queryParameters['success'] == 'true';
+      final isCancel = uri.queryParameters['cancel'] == 'true'; // Au cas où le backend envoie cancel=true
+
+      if (isSuccess) {
+        // 1. 🔄 Rafraîchir le solde du Wallet en arrière-plan
+        context.read<UserProvider>().loadUser();
+
+        // 2. 🎉 Afficher la belle modale de Succès
+        showDialog(
+            context: context,
+            barrierDismissible: false, // Force l'utilisateur à cliquer sur le bouton
+            builder: (BuildContext dialogContext) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Column(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green, size: 70),
+                    Gap(15),
+                    Text("Paiement Réussi !", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
+                  ],
+                ),
+                content: const Text(
+                  "Ton compte CAR 225 a été rechargé avec succès. Ton nouveau solde est disponible.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14),
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 45,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      ),
+                      onPressed: () {
+                        // 3. 🔙 On ferme la modale
+                        Navigator.pop(dialogContext);
+                        // 4. 🔙 On ramène l'utilisateur à l'écran du Wallet
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Génial", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              );
+            }
+        );
+
+      } else {
+        // ❌ Gérer l'erreur ou l'annulation si success n'est pas "true"
+        showDialog(
+            context: context,
+            builder: (BuildContext dialogContext) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Column(
+                  children: [
+                    Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 70),
+                    Gap(15),
+                    Text("Paiement Échoué", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
+                  ],
+                ),
+                content: const Text(
+                  "Le paiement n'a pas pu aboutir ou a été annulé. Aucun montant n'a été débité.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14),
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 45,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      ),
+                      onPressed: () => Navigator.pop(dialogContext), // On ferme juste la modale
+                      child: const Text("Réessayer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              );
+            }
+        );
+      }
+    }
+  }
+
+  // --- LOGIQUE MISE A JOUR ---
   void _updateAmount(int newAmount) {
     setState(() {
       _amount = newAmount;
-      // On met à jour le texte seulement si on utilise les boutons
-      // (pour ne pas gêner si l'utilisateur est en train de taper)
       _amountController.text = _amount.toString();
     });
   }
@@ -62,21 +208,16 @@ class _TopUpScreenState extends State<TopUpScreen> {
     _updateAmount(_amount + value);
   }
 
-  // Nouvelle fonction appelée quand l'utilisateur tape au clavier
   void _onAmountTyped(String value) {
     if (value.isEmpty) {
       setState(() => _amount = 0);
       return;
     }
-    // On nettoie l'entrée (au cas où) et on convertit
     int? parsed = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
     if (parsed != null) {
       setState(() => _amount = parsed);
     }
   }
-
-
-
 
   void _showTopNotification(String message, {bool isError = false}) {
     if (!mounted) return;
@@ -94,12 +235,11 @@ class _TopUpScreenState extends State<TopUpScreen> {
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
             duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutBack, // Le rebond est conservé pour le mouvement
+            curve: Curves.easeOutBack,
             builder: (context, value, child) {
               return Transform.translate(
-                offset: Offset(0, -20 * (1 - value)), // Effet de glissement
+                offset: Offset(0, -20 * (1 - value)),
                 child: Opacity(
-                  // ✅ CORRECTION ICI : On force la valeur entre 0 et 1
                   opacity: value.clamp(0.0, 1.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -143,63 +283,61 @@ class _TopUpScreenState extends State<TopUpScreen> {
     Future.delayed(const Duration(seconds: 3), () => overlayEntry.remove());
   }
 
-
-
-  // --- 🚀 LOGIQUE PAIEMENT BACKEND ---
+  // --- 🚀 LOGIQUE PAIEMENT BACKEND (WAVE) ---
   Future<void> _initiateDeposit() async {
-    // 1. Validation locale : On vérifie qu'un opérateur est choisi
-    if (_selectedOperator == -1) {
-      _showTopNotification("Veuillez sélectionner un opérateur", isError: true);
+    // 1. Validation locale : On vérifie que le montant est valide
+    if (_amount <= 0) {
+      _showTopNotification("Veuillez entrer un montant valide", isError: true);
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 2. Récupération Token
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
-      // 3. Config Dio
       final dio = Dio(BaseOptions(
         baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        connectTimeout: const Duration(seconds: 15), // Augmenté un peu pour le mobile
+        connectTimeout: const Duration(seconds: 15),
       ));
 
-      // 4. Données (Payload)
-      // J'envoie l'amount. J'ajoute aussi l'opérateur au cas où ton backend
-      // voudrait l'enregistrer pour des stats, sinon il sera juste ignoré par Laravel.
+      // 4. Données (Payload Wave)
       final data = {
         'amount': _amount,
-        'operator_id': _selectedOperator, // Optionnel
-        'payment_method': 'cinetpay'      // Optionnel
+        'payment_method': 'wave',
       };
 
       print("📤 Envoi vers /user/wallet/recharge : $data");
 
-      // 5. Appel API
       final response = await dio.post('/user/wallet/recharge', data: data);
 
       print("📥 Réponse Backend : ${response.data}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        final String? paymentUrl = response.data['payment_url'];
 
-        // --- CORRECTION ICI ---
-        // On va chercher dans payment_details
-        final paymentDetails = response.data['payment_details'];
-        final paymentUrl = paymentDetails != null ? paymentDetails['payment_url'] : null;
-
-        if (paymentUrl != null && paymentUrl.toString().isNotEmpty) {
-          _showTopNotification("Redirection vers le paiement... 🚀");
+        if (paymentUrl != null && paymentUrl.isNotEmpty) {
+          _showTopNotification("Redirection vers Wave... 🚀");
           await Future.delayed(const Duration(milliseconds: 500));
           await _launchPaymentUrl(paymentUrl);
         } else {
-          throw Exception("L'URL de paiement est introuvable dans la réponse.");
+          final paymentDetails = response.data['payment_details'];
+          final fallbackUrl = paymentDetails != null ? paymentDetails['payment_url'] : null;
+
+          if (fallbackUrl != null && fallbackUrl.toString().isNotEmpty) {
+            _showTopNotification("Redirection vers Wave... 🚀");
+            await Future.delayed(const Duration(milliseconds: 500));
+            await _launchPaymentUrl(fallbackUrl);
+          } else {
+            throw Exception("L'URL de paiement Wave est introuvable dans la réponse.");
+          }
         }
       }
     } catch (e) {
@@ -210,7 +348,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
         if (e.type == DioExceptionType.connectionTimeout) {
           message = "Vérifiez votre connexion internet.";
         } else if (e.response != null) {
-          // Gestion des erreurs Laravel (400, 422, 500)
           print("Erreur Data: ${e.response?.data}");
           if (e.response?.data is Map && e.response?.data['message'] != null) {
             message = e.response?.data['message'];
@@ -238,20 +375,14 @@ class _TopUpScreenState extends State<TopUpScreen> {
   }
 
 
-
-
-
-
   @override
   Widget build(BuildContext context) {
-    // --- 1. RECUPERATION DE L'UTILISATEUR ---
     final userProvider = context.watch<UserProvider>();
     final user = userProvider.user;
 
     final String userName = user != null ? "${user.name} ${user.prenom}" : "Membre CAR 225";
     final String? userPhotoUrl = user?.photoUrl;
 
-    // --- VARIABLES DE THEME ---
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -270,8 +401,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
         ),
       ),
 
-      // --- BOUTON PAYER CORRIGÉ ---
-      // ✅ On ajoute SafeArea ici pour "pousser" le bouton au-dessus de la barre Android
+      // --- BOUTON PAYER ---
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -279,9 +409,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed: (_isLoading || _selectedOperator == -1 || _amount <= 0) ? null : _initiateDeposit,
+              // ✅ Le bouton est cliquable dès que le montant est > 0
+              onPressed: (_isLoading || _amount <= 0) ? null : _initiateDeposit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: (_selectedOperator == -1 || _amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
+                backgroundColor: (_amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 elevation: 5,
               ),
@@ -475,65 +606,53 @@ class _TopUpScreenState extends State<TopUpScreen> {
             ),
             const Gap(30),
 
-            // --- 2. OPERATEURS ---
+            // --- 2. MOYEN DE PAIEMENT (WAVE UNIQUE) ---
             Text("MOYEN DE PAIEMENT", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold)),
             const Gap(15),
 
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 1.6,
-              children: [
-                _buildSelectableOperator(
-                  index: 0,
-                  color: cardColor,
+            // ✅ Carte Unique pour Wave
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF5EC2F2).withOpacity(0.1), // Bleu léger de Wave
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFF5EC2F2), width: 2),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                leading: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(15.0),
-                    child: Image.asset("assets/images/om.png", fit: BoxFit.contain),
+                    padding: const EdgeInsets.all(8.0),
+                    child: Image.asset(
+                      "assets/images/wavee.png", // Assure-toi que cette image existe
+                      fit: BoxFit.contain,
+                      errorBuilder: (c, o, s) => const Icon(Icons.waves, color: Colors.blue),
+                    ),
                   ),
                 ),
-                _buildSelectableOperator(
-                  index: 1,
-                  color: const Color(0xFFFFCC00),
-                  isBrandColor: true,
-                  child: Padding(
-                    padding: const EdgeInsets.all(15.0),
-                    child: Image.asset("assets/images/MTNmoney.png", fit: BoxFit.contain),
-                  ),
+                title: const Text(
+                  "Paiement Mobile",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                _buildSelectableOperator(
-                  index: 2,
-                  color: const Color(0xFF5EC2F2),
-                  isBrandColor: true,
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Image.asset("assets/images/wavee.png", fit: BoxFit.contain),
-                  ),
+                subtitle: const Text(
+                  "Sécurisé par Wave",
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
                 ),
-                _buildSelectableOperator(
-                  index: 3,
-                  color: cardColor,
-                  isBrandColor: false,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: Image.asset("assets/images/moov.png", width: double.infinity, height: double.infinity, fit: BoxFit.cover),
-                  ),
-                ),
-              ],
+                trailing: const Icon(Icons.check_circle, color: Color(0xFF5EC2F2)),
+              ),
             ),
+
             const Gap(80),
           ],
         ),
       ),
     );
   }
-
-
-
-
 
   // --- WIDGET HELPER : CHIP STYLE "GLASS" ---
   Widget _buildGlassChip(BuildContext context, String label, int value) {
@@ -545,10 +664,8 @@ class _TopUpScreenState extends State<TopUpScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            // Fond blanc semi-transparent
             color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(15),
-            // Bordure subtile
             border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
           ),
           child: Text(
@@ -558,84 +675,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
                 fontWeight: FontWeight.bold,
                 fontSize: 13
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-
-
-
-
-
-
-  // --- WIDGET HELPER : CHIP MONTANT ---
-  Widget _buildAmountChip(BuildContext context, String label, int value) {
-    return InkWell(
-      onTap: () => _addAmount(value),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-        decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1)
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  // --- WIDGET HELPER : CARTE OPÉRATEUR ---
-  Widget _buildSelectableOperator({
-    required int index,
-    required Color color,
-    required Widget child,
-    bool isBrandColor = false,
-  }) {
-    final isSelected = _selectedOperator == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () => setState(() => _selectedOperator = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        transform: isSelected ? Matrix4.identity().scaled(1.02) : Matrix4.identity(),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFE64A19) : Colors.transparent,
-            width: isSelected ? 3 : 0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? const Color(0xFFE64A19).withOpacity(0.4)
-                  : Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-              blurRadius: isSelected ? 15 : 10,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: ColorFiltered(
-          colorFilter: isSelected
-              ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
-              : const ColorFilter.matrix(<double>[
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0, 0, 0, 1, 0,
-          ]),
-          child: Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-              child: child
           ),
         ),
       ),

@@ -70,5 +70,20 @@
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Cette application a besoin de votre position pour signaler le lieu exact de l'accident aux secours.</string>
 
+
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>com.ton_entreprise.car225</string> <key>CFBundleURLSchemes</key>
+            <array>
+                <string>car225</string> </array>
+        </dict>
+    </array>
+
+
+
 </dict>
 </plist>

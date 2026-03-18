@@ -70,6 +70,7 @@ class SearchResultsScreen extends StatefulWidget {
   void _setupDependenciesAndFetch() {
     final dio = Dio(BaseOptions(
       baseUrl: 'https://car225.com/api/',
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'Content-Type': 'application/json'},

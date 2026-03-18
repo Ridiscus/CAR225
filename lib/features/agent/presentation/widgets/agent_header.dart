@@ -8,16 +8,12 @@ import '../providers/agent_profile_provider.dart';
 import '../screens/agent_profile_screen.dart';
 
 class AgentHeader extends StatefulWidget {
-  final String agentName;
-  final String agentRole;
-  final String profileImage;
   final bool initialIsOnline;
 
+  // On a retiré agentName, agentRole et profileImage car
+  // on les récupère maintenant dynamiquement depuis l'API !
   const AgentHeader({
     super.key,
-    this.agentName = 'Fabiola Kouassi',
-    this.agentRole = 'Agent UTB',
-    this.profileImage = 'assets/images/agent_profile.png',
     this.initialIsOnline = true,
   });
 
@@ -36,21 +32,46 @@ class _AgentHeaderState extends State<AgentHeader> {
 
   @override
   Widget build(BuildContext context) {
-    // On écoute les changements de l'image de profil via le Provider
-    final profileProvider = Provider.of<AgentProfileProvider>(context);
+    // 🟢 1. On écoute le provider pour récupérer les vraies données de l'agent
+    final profileProvider = context.watch<AgentProfileProvider>();
+    final data = profileProvider.profileData;
     final pickedImage = profileProvider.profileImage;
+    final isLoading = profileProvider.isLoadingProfile;
+
+    // 🟢 2. Extraction dynamique du Nom et de l'Entreprise
+    final String firstName = data?['prenom'] ?? (isLoading ? '...' : 'Agent');
+    final String lastName = data?['name'] ?? '';
+    final String fullName = '$firstName $lastName'.trim();
+
+    final String companyName = data?['compagnie']?['name'] ?? 'Compagnie';
+    final String roleText = 'Agent $companyName';
+
+    // 🛠️ 3. RÉPARATION DE L'URL DE L'IMAGE DU BACKEND
+    String? rawImageUrl = data?['profile_picture_url']?.toString();
+    String? finalImageUrl;
+
+    if (rawImageUrl != null && rawImageUrl.trim().isNotEmpty) {
+      if (rawImageUrl.startsWith('http')) {
+        finalImageUrl = rawImageUrl;
+      } else {
+        const String baseUrl = 'https://jingly-lindy-unminding.ngrok-free.dev';
+        finalImageUrl = rawImageUrl.startsWith('/')
+            ? '$baseUrl$rawImageUrl'
+            : '$baseUrl/$rawImageUrl';
+      }
+    }
 
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(24, topPadding + 5, 24, 25),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
+            AppColors.primary.withOpacity(0.85),
           ],
         ),
       ),
@@ -85,34 +106,34 @@ class _AgentHeaderState extends State<AgentHeader> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
+                              color: Colors.white.withOpacity(0.3),
                               width: 2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
+                                color: Colors.black.withOpacity(0.2),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: ClipOval(
+                            // 🟢 LOGIQUE D'IMAGE INTELLIGENTE APPLIQUÉE À TON CLIP OVAL
                             child: pickedImage != null
                                 ? Image.file(pickedImage, fit: BoxFit.cover)
+                                : (finalImageUrl != null
+                                ? Image.network(
+                              finalImageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildFallbackIcon(),
+                            )
                                 : Image.asset(
-                                    widget.profileImage,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                Icons.person,
-                                                color: Colors.grey,
-                                                size: 25,
-                                              ),
-                                            ),
-                                  ),
+                              'assets/images/agent_profile.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildFallbackIcon(),
+                            )),
                           ),
                         ),
                         // Status indicator dot
@@ -142,12 +163,14 @@ class _AgentHeaderState extends State<AgentHeader> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.agentName,
+                            fullName, // 🟢 Affiche "THE WAYNE"
                             style: const TextStyle(
                               fontSize: 18,
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const Gap(4),
                           Container(
@@ -156,17 +179,19 @@ class _AgentHeaderState extends State<AgentHeader> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              widget.agentRole.toUpperCase(),
+                              roleText.toUpperCase(), // 🟢 Affiche "AGENT UNION DES TRANSPORTS DE BOUAKE"
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                                 letterSpacing: 0.5,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -193,9 +218,9 @@ class _AgentHeaderState extends State<AgentHeader> {
                     });
                   },
                   activeThumbColor: const Color(0xFF4CAF50),
-                  activeTrackColor: Colors.white.withValues(alpha: 0.3),
+                  activeTrackColor: Colors.white.withOpacity(0.3),
                   inactiveThumbColor: const Color(0xFFC62828),
-                  inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
+                  inactiveTrackColor: Colors.white.withOpacity(0.3),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -203,7 +228,7 @@ class _AgentHeaderState extends State<AgentHeader> {
               Text(
                 _isOnline ? 'En ligne' : 'Hors ligne',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: Colors.white.withOpacity(0.9),
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.3,
@@ -212,6 +237,18 @@ class _AgentHeaderState extends State<AgentHeader> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // Petit widget d'aide si l'image plante
+  Widget _buildFallbackIcon() {
+    return Container(
+      color: Colors.grey.shade200,
+      child: const Icon(
+        Icons.person,
+        color: Colors.grey,
+        size: 25,
       ),
     );
   }

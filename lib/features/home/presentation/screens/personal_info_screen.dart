@@ -24,6 +24,7 @@ class PersonalInfoScreen extends StatefulWidget {
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   // --- CONTROLLERS ---
   // Infos Perso
+  final _codeIdController = TextEditingController();
   final _nomController = TextEditingController();
   final _prenomController = TextEditingController();
   final _emailController = TextEditingController();
@@ -60,41 +61,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
 
-  // 1. CHARGEMENT
-  /*Future<void> _loadUserData() async {
-    try {
-      final user = await _repo.getUserProfile();
-
-      setState(() {
-        _nomController.text = user.name;
-        _prenomController.text = user.prenom;
-        _emailController.text = user.email;
-        _contactController.text = user.contact;
-
-        _nomUrgenceController.text = user.nomUrgence ?? "";
-        _prenomUrgenceController.text = user.prenomUrgence ?? "";
-        _contactUrgenceController.text = user.contactUrgence ?? "";
-
-        // 🔴 AVANT (C'est ça qui plante, ça prend l'URL brute "storage/...") :
-        // _currentPhotoUrl = user.photoUrl;
-
-        // 🟢 APRÈS (Utilise ton getter magique qui ajoute https://...) :
-        _currentPhotoUrl = user.fullPhotoUrl;
-
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showTopNotification("Impossible de charger les infos : $e", isError: true);
-    }
-  }*/
-
-
   Future<void> _loadUserData() async {
     try {
       final user = await _repo.getUserProfile();
 
       setState(() {
+        // 🟢 NOUVEAU : On charge le code ID
+        _codeIdController.text = user.codeId ?? "Non défini";
         _nomController.text = user.name;
         _prenomController.text = user.prenom;
         _emailController.text = user.email;
@@ -127,66 +100,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       setState(() => _selectedImage = File(image.path));
     }
   }
-
-
-
-  // 3. UPDATE (Avec Validation)
-  /*Future<void> _updateProfile() async {
-    // 🛡️ VALIDATION DES CHAMPS AVANT ENVOI
-    if (_nomController.text.trim().isEmpty || _prenomController.text.trim().isEmpty) {
-      _showTopNotification("Le nom et le prénom sont obligatoires", isError: true);
-      return;
-    }
-
-    // 🟢 VALIDATION CONTACT PERSO : 10 Chiffres
-    if (_contactController.text.trim().length != 10) {
-      _showTopNotification("Le numéro de contact doit contenir exactement 10 chiffres", isError: true);
-      return;
-    }
-
-    // 🟢 VALIDATION URGENCE : 10 Chiffres
-    if (_contactUrgenceController.text.trim().length != 10) {
-      _showTopNotification("Le numéro d'urgence doit contenir exactement 10 chiffres", isError: true);
-      return;
-    }
-
-    setState(() => _isSaving = true);
-
-    try {
-      await _repo.updateUserProfile(
-        name: _nomController.text.trim(),
-        prenom: _prenomController.text.trim(),
-        email: _emailController.text.trim(),
-        contact: _contactController.text.trim(),
-        nomUrgence: _nomUrgenceController.text.trim(),
-        prenomUrgence: _prenomUrgenceController.text.trim(),
-        contactUrgence: _contactUrgenceController.text.trim(),
-        photoPath: _selectedImage?.path,
-      );
-
-      if (mounted) {
-        await context.read<UserProvider>().loadUser();
-      }
-
-      if (!mounted) return;
-
-      // ✅ SUCCÈS
-      _showTopNotification("Profil mis à jour avec succès !", isError: false);
-
-      // Petit délai pour laisser l'utilisateur voir la notif avant de fermer
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) Navigator.pop(context);
-
-    } catch (e) {
-      if (!mounted) return;
-      // ❌ ERREUR API
-      // On nettoie le message d'erreur pour qu'il soit lisible (retire "Exception:")
-      final message = e.toString().replaceAll("Exception: ", "");
-      _showTopNotification(message, isError: true);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }*/
 
 
   Future<void> _updateProfile() async {
@@ -369,6 +282,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _buildSectionTitle("Informations Personnelles"),
             const Gap(15),
 
+            // 🟢 NOUVEAU CHAMP CODE ID (Grisé)
+            _buildModernInput(context, "Code ID", _codeIdController, "assets/images/user.png", readOnly: true),
+            const Gap(15),
+
             Row(
               children: [
                 Expanded(child: _buildModernInput(context, "Nom", _nomController, "assets/images/user.png")),
@@ -489,12 +406,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
 
-
   // Widget Input Moderne (Style Inscription)
-  Widget _buildModernInput(BuildContext context, String hint, TextEditingController controller, String imagePath, {bool isPhone = false, bool isEmail = false}) {
+  Widget _buildModernInput(BuildContext context, String hint, TextEditingController controller, String imagePath, {bool isPhone = false, bool isEmail = false, bool readOnly = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
+
+    // 🎨 DESIGN GRISÉ SI LECTURE SEULE
+    final fillColor = readOnly
+        ? (isDark ? Colors.grey[900] : Colors.grey[300]) // Plus sombre/gris si readOnly
+        : (isDark ? Colors.grey[800] : const Color(0xFFF5F5F5));
+
     final iconColor = Colors.grey[500];
+    final textColor = readOnly ? Colors.grey : (isDark ? Colors.white : Colors.black87);
 
     return Container(
       decoration: BoxDecoration(
@@ -503,11 +425,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       ),
       child: TextField(
         controller: controller,
-        // 💡 Force le clavier numérique si isPhone, email si isEmail, text sinon
+        readOnly: readOnly, // 🔒 Empêche la saisie
         keyboardType: isPhone ? TextInputType.phone : (isEmail ? TextInputType.emailAddress : TextInputType.text),
-        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+        style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
 
-        // 🛡️ BLOQUER LA SAISIE PHYSIQUEMENT (Chiffres uniquement et 10 max)
         inputFormatters: isPhone
             ? [
           FilteringTextInputFormatter.digitsOnly,

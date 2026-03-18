@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -28,10 +31,21 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   int? userWalletBalance;
   bool isLoadingBalance = true;
 
+  // 🔗 Ajoute ces deux lignes :
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+
   @override
   void initState() {
     super.initState();
     _fetchRealWalletBalance();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel(); // ⚠️ Toujours annuler l'écoute !
+    super.dispose();
   }
 
   // --- 1. RÉCUPÉRATION DU SOLDE RÉEL ---
@@ -43,6 +57,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
 
       final dio = Dio(BaseOptions(
         baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -67,11 +82,245 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     }
   }
 
+  // --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
+  /*Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      print("Erreur Deep Link: $err");
+    });
+  }
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  void _handleDeepLink(Uri uri) {
+    print("🔗 Lien de retour Wave reçu : $uri");
+
+    if (uri.scheme == 'car225' && uri.host == 'payment') {
+      if (uri.path == '/success') {
+        // 1. On affiche la petite notification verte en haut
+        if (mounted) {
+          _showTopNotification("Paiement réussi ! 🎉");
+        }
+
+        // 2. On attend un tout petit peu (pour que l'animation de retour à l'app se finisse bien)
+        // et on affiche la grosse pop-up de succès qui contient le bouton de redirection.
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _showSuccessDialog();
+          }
+        });
+
+      }
+      else if (uri.path == '/error' || uri.path == '/cancel') {
+        if (mounted) {
+          _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
+        }
+      }
+    }
+  }*/
+
+// --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // On écoute UNIQUEMENT le flux en temps réel.
+    // On retire le getInitialLink() qui cause ton bug à l'ouverture de la page.
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      print("⚠️ Erreur Deep Link Stream: $err");
+    });
+  }
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  void _handleDeepLink(Uri uri) {
+    // 1. On vérifie d'abord que le lien est bien un lien de NOTRE application
+    // Remplace 'car225' et 'payment' par ce que tu as configuré dans ton AndroidManifest.xml
+    if (uri.scheme != 'car225' || uri.host != 'payment') {
+      print("⚠️ Lien ignoré car il n'appartient pas au flow de paiement : $uri");
+      return;
+    }
+
+    final urlString = uri.toString().toLowerCase();
+    print("🔗 LIEN DE RETOUR PAIEMENT INTERCEPTÉ : $urlString");
+
+    // 2. On cherche si le chemin indique un succès
+    if (uri.path.contains('success') || urlString.contains('success')) {
+      if (mounted) {
+        _showTopNotification("Paiement réussi ! 🎉");
+      }
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _showSuccessDialog();
+        }
+      });
+    }
+    // 3. On cherche si le chemin indique une erreur/annulation
+    else if (uri.path.contains('error') || uri.path.contains('cancel') || urlString.contains('fail')) {
+      if (mounted) {
+        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
+      }
+    }
+  }
+
+  // --- 3. VÉRIFICATION SÉCURISÉE DU PAIEMENT CÔTÉ SERVEUR ---
+  /*Future<void> _verifyPayment(String transactionId) async {
+    // Optionnel : on remet isSubmitting à true pour bloquer le bouton "Payer" au cas où
+    setState(() => isSubmitting = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final dio = Dio(BaseOptions(
+        //baseUrl: 'https://car225.com/api/',
+        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      ));
+
+      print("⏳ Vérification du paiement auprès du serveur pour : $transactionId");
+
+      // ⚠️ À MODIFIER : Mets ici la vraie route de ton API Laravel pour vérifier le paiement
+      final response = await dio.get('/payment/verify/$transactionId');
+
+      if (response.statusCode == 200) {
+        // Le serveur confirme : l'argent est bien là ! 💰
+        print("✅ Paiement validé par le serveur !");
+        if (mounted) {
+          _showTopNotification("Paiement validé avec succès ! 🎉");
+
+          // On attend un tout petit peu pour l'animation et on affiche la pop-up
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _showSuccessDialog();
+          });
+        }
+      } else {
+        // Le serveur n'a pas validé la transaction
+        if (mounted) {
+          _showTopNotification("Le paiement n'a pas pu être validé.", isError: true);
+        }
+      }
+    } catch (e) {
+      print("❌ ERREUR VÉRIFICATION PAIEMENT : $e");
+      if (mounted) {
+        _showTopNotification("Impossible de contacter le serveur pour vérifier le paiement.", isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => isSubmitting = false);
+    }
+  }
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
+  void _handleDeepLink(Uri uri) {
+    if (uri.scheme != 'car225' || uri.host != 'payment') {
+      return;
+    }
+
+    final urlString = uri.toString().toLowerCase();
+    print("🔗 LIEN DE RETOUR PAIEMENT INTERCEPTÉ : $urlString");
+
+    // 1. On vérifie si c'est un succès
+    if (uri.queryParameters['success'] == 'true' || urlString.contains('success')) {
+
+      // Extraction du transactionid proprement grâce à Uri
+      final transactionId = uri.queryParameters['transactionid'];
+
+      if (transactionId != null && transactionId.isNotEmpty) {
+        // Au lieu d'afficher direct le succès, on fait patienter l'utilisateur
+        if (mounted) {
+          _showTopNotification("Vérification de votre paiement...");
+        }
+
+        // Et on lance la vérification serveur ! 🛡️
+        _verifyPayment(transactionId);
+
+      } else {
+        // Fallback bizarre : Wave a renvoyé success mais sans ID (très rare)
+        print("⚠️ Succès sans transaction_id reçu.");
+        if (mounted) _showTopNotification("Paiement reçu, vérification en attente.");
+      }
+    }
+    // 2. On vérifie si c'est une erreur
+    else if (uri.path.contains('error') || uri.queryParameters['cancel'] == 'true' || urlString.contains('fail')) {
+      if (mounted) {
+        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
+      }
+    }
+  }*/
+
+  void _showTopNotification(String message, {bool isError = false}) {
+    if (!mounted) return;
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 60.0,
+        left: 20.0,
+        right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(0, -20 * (1 - value)),
+                child: Opacity(
+                  opacity: value.clamp(0.0, 1.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF222222),
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          )
+                        ]
+                    ),
+                    child: Row(
+                        children: [
+                          Icon(
+                              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+                              color: isError ? Colors.redAccent : Colors.greenAccent,
+                              size: 24
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Text(
+                                  message,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)
+                              )
+                          )
+                        ]
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () => overlayEntry.remove());
+  }
 
 
-  // --- 2. ENVOI PAIEMENT (VERSION BLINDÉE) ---
+  // --- 2. ENVOI PAIEMENT (VERSION BLINDÉE WAVE & WALLET) ---
   Future<void> _processPayment(String methodKey) async {
-    //Navigator.pop(context); // Fermer le modal
     setState(() => isSubmitting = true);
 
     try {
@@ -80,6 +329,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
 
       final dio = Dio(BaseOptions(
         baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -94,22 +344,25 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
       String rawDate = finalData['date_voyage'].toString();
       finalData['date_voyage'] = rawDate.contains('T') ? rawDate.split('T')[0] : rawDate.split(' ')[0];
 
-      if (finalData['date_retour'] != null) {
+      if (finalData['date_retour'] != null && finalData['date_retour'].toString().isNotEmpty) {
         String rawRetour = finalData['date_retour'].toString();
         finalData['date_retour'] = rawRetour.contains('T') ? rawRetour.split('T')[0] : rawRetour.split(' ')[0];
-      }
-
-      // 2. Sécurisation du flag Aller-Retour (Bool -> Int)
-      // Certains backends préfèrent 1/0 à true/false
-      if (finalData['is_aller_retour'] == true || finalData['is_aller_retour'] == 'true') {
-        finalData['is_aller_retour'] = 1;
       } else {
-        finalData['is_aller_retour'] = 0;
+        // Clean up empty date_retour
+        finalData.remove('date_retour');
       }
 
-      // 3. Nettoyage Passagers
+      // 2. Sécurisation du flag Aller-Retour (Booléen requis par l'API Wave)
+      bool isAllerRetour = false;
+      if (finalData['is_aller_retour'] == true || finalData['is_aller_retour'] == 1 || finalData['is_aller_retour'] == 'true') {
+        isAllerRetour = true;
+      }
+      finalData['is_aller_retour'] = isAllerRetour;
+
+      // 3. Nettoyage Passagers et Extraction des sièges
       List<dynamic> passengers = List.from(finalData['passagers']);
       List<Map<String, dynamic>> cleanPassengers = [];
+      List<int> mainSeats = [];
 
       for (var p in passengers) {
         Map<String, dynamic> pMap = Map.from(p);
@@ -119,28 +372,45 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
           pMap.remove('email');
         }
 
-        // Vérification console pour être sûr
-        if (finalData['is_aller_retour'] == 1) {
-          print("👮 Passager ${pMap['nom']} - Siège Aller: ${pMap['seat_number']} | Retour: ${pMap['seat_number_return']}");
+        // Assurer que le siège est un entier
+        int currentSeat = int.tryParse(pMap['seat_number'].toString()) ?? 0;
+        pMap['seat_number'] = currentSeat;
+        mainSeats.add(currentSeat);
+
+        // Renommer seat_number_return en return_seat_number (comme demandé par la nouvelle API Wave)
+        if (isAllerRetour && pMap.containsKey('seat_number_return')) {
+          int returnSeat = int.tryParse(pMap['seat_number_return'].toString()) ?? 0;
+          pMap['return_seat_number'] = returnSeat;
+          pMap.remove('seat_number_return');
         }
 
         cleanPassengers.add(pMap);
       }
       finalData['passagers'] = cleanPassengers;
 
-      // 4. Paiement
-      finalData['payment_method'] = methodKey.toLowerCase() == 'carpay' ? 'wallet' : 'cinetpay';
+      // Ajouter le tableau global des sièges si nécessaire (basé sur le premier JSON)
+      // Note: L'API Aller-Retour ne montre pas le tableau "seats", mais le premier oui.
+      // On l'ajoute par sécurité si ce n'est pas un aller-retour.
+      if (!isAllerRetour) {
+        finalData['seats'] = mainSeats;
+      }
 
-      // 🛑 DEBUG CRITIQUE : Vérifie cette ligne dans ta console avant l'envoi
+      // 4. Paiement (Remplacement de cinetpay par wave)
+      finalData['payment_method'] = methodKey.toLowerCase() == 'carpay' ? 'wallet' : 'wave';
+
+      // 🛑 DEBUG CRITIQUE : Vérifie cette ligne dans ta console
       print("🚀 PAYLOAD FINAL ENVOYÉ API : $finalData");
 
       final response = await dio.post('/user/reservations', data: finalData);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Wave payment flow
         if (response.data['requires_payment'] == true && response.data['payment_details'] != null) {
-          final String url = response.data['payment_details']['payment_url'];
+          // Wave usually returns a wave_launch_url or similar. Adjust the key based on the actual response.
+          final String url = response.data['payment_details']['payment_url'] ?? response.data['payment_details']['wave_launch_url'];
           await _launchPaymentUrl(url);
         } else {
+          // Wallet or successful booking without external redirect
           if (mounted) _showSuccessDialog();
         }
       }
@@ -148,19 +418,19 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     } catch (e) {
       print("❌ ERREUR API : $e");
       if (e is DioException && e.response != null) {
-        print("❌ RÉPONSE ERREUR : ${e.response?.data}"); // Regarde ici si l'API te renvoie une erreur précise
-        String userMsg = "Erreur de validation.";
+        print("❌ RÉPONSE ERREUR : ${e.response?.data}");
+        String userMsg = "Erreur lors de la réservation.";
 
         if (e.response?.statusCode == 422 && e.response?.data['errors'] != null) {
           final errors = e.response?.data['errors'] as Map;
           userMsg = errors.values.first[0].toString();
-        } else {
-          userMsg = e.response?.data['message'] ?? "Erreur inconnue";
+        } else if (e.response?.data['message'] != null) {
+          userMsg = e.response?.data['message'];
         }
 
         if(mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Oups: $userMsg"), backgroundColor: Colors.red)
+              SnackBar(content: Text(userMsg), backgroundColor: Colors.red)
           );
         }
       } else {
@@ -176,13 +446,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }
 
 
-
-
-
-
-
-
-
   Future<void> _launchPaymentUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -194,35 +457,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     }
   }
 
-  void _showTopNotification(String message) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 60.0, left: 20.0, right: 20.0,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-            decoration: BoxDecoration(
-              color: const Color(0xFF222222),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.info_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13), textAlign: TextAlign.center, maxLines: 2)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 3), () { if(mounted) overlayEntry.remove(); });
-  }
   void _showPaymentMethodSelector(BuildContext context, int totalAmount) {
     final int currentBalance = userWalletBalance ?? 0;
     final bool hasEnoughFunds = currentBalance >= totalAmount;
@@ -297,8 +531,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                     ),
 
                   const Gap(15),
-
-                  // 2. OPTION MOBILE MONEY (CinetPay / Wave / Orange)
+                  // 2. OPTION MOBILE MONEY (WAVE)
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade300),
@@ -308,17 +541,17 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                       onTap: () {
                         Navigator.pop(modalContext);
-                        _processPayment("CINETPAY");
+                        _processPayment("WAVE"); // <-- Changed from CINETPAY
                       },
                       // 🎨 IMAGE FLATICON MOBILE PAYMENT
                       leading: Image.asset(
-                        "assets/images/digital-wallet.png", // Image représentant Orange/MTN/Wave
+                        "assets/images/digital-wallet.png", // Idéalement, mets le logo de Wave ici
                         width: 45,
                         height: 45,
-                        errorBuilder: (c,o,s) => const Icon(Icons.smartphone, color: Colors.orange, size: 35),
+                        errorBuilder: (c,o,s) => const Icon(Icons.waves, color: Colors.blue, size: 35),
                       ),
-                      title: const Text("Paiement Mobile", style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text("Orange, MTN, Moov, Wave", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      title: const Text("Paiement via Wave", style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: const Text("Payer en toute sécurité avec Wave", style: TextStyle(fontSize: 12, color: Colors.grey)),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                     ),
                   ),
@@ -332,91 +565,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     );
   }
 
-  /*void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 60),
-            const Gap(10),
-            const Text("Réservation Réussie !", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const Gap(10),
-            const Text(
-              "Votre billet a été réservé avec succès.\nVous pouvez le retrouver dans l'onglet Billets.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const Gap(20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const MainScreen()), (route) => false);
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                ),
-                child: const Text("OK, Retour accueil", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }*/
-
-
-/*  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 60),
-            const Gap(10),
-            const Text("Réservation Réussie !", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const Gap(10),
-            const Text(
-              "Votre billet a été réservé avec succès.\nVous pouvez le retrouver dans l'onglet Billets.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const Gap(20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // ✅ CORRECTION ICI : on ajoute initialIndex: 1
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const MainScreen(initialIndex: 1)
-                      ),
-                          (route) => false
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                ),
-                child: const Text("OK, Voir mes billets", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }*/
 
 
   void _showSuccessDialog() {
@@ -581,18 +729,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 ),
               ),
             ),
-
-
-          /*child: SizedBox(
-            width: double.infinity, height: 55,
-            child: ElevatedButton(
-              onPressed: isSubmitting ? null : () => _showPaymentMethodSelector(context, total),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 0),
-              child: isSubmitting
-                  ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text("Payer ${_formatCurrency(total)}", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ),*/
         ),
       ),
       body: SingleChildScrollView(

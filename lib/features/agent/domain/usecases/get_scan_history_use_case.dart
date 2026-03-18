@@ -1,4 +1,4 @@
-import 'package:fpdart/fpdart.dart';
+/*import 'package:fpdart/fpdart.dart';
 import 'package:car225/core/error/failures.dart';
 import '../entities/scanned_ticket.dart';
 import '../repositories/agent_repository.dart';
@@ -10,3 +10,4 @@ class GetScanHistoryUseCase {
     return await repository.getScanHistory();
   }
 }
+*/

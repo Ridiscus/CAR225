@@ -173,16 +173,23 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
           Expanded(
             child: isLoading
                 ? _buildLoadingState()
-                : (filtered.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-              key: const PageStorageKey('hostess_history_scroll'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) =>
-                  _buildHistoryItem(context, filtered[index]),
-            )),
+                : RefreshIndicator(
+              // 🟢 Le widget magique qui gère le rafraîchissement
+              onRefresh: _applyFilter,
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              child: filtered.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                key: const PageStorageKey('hostess_history_scroll'),
+                // 🟢 Important: ça force la liste à être scrollable même s'il y a peu d'éléments
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) =>
+                    _buildHistoryItem(context, filtered[index]),
+              ),
+            ),
           ),
         ],
       ),
@@ -369,22 +376,29 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 70),
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
-            child: const Icon(Icons.search_off_rounded, size: 64, color: Color(0xFF94A3B8)),
+    // 🟢 Utilisation d'un ListView avec AlwaysScrollableScrollPhysics
+    // pour permettre le Pull-to-Refresh même quand c'est vide !
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        const Gap(70), // Un peu d'espace en haut
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
+                child: const Icon(Icons.search_off_rounded, size: 64, color: Color(0xFF94A3B8)),
+              ),
+              const Gap(24),
+              const Text('Aucune vente trouvée', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              const Gap(8),
+              const Text('Essayez une autre période de temps ou tirez pour rafraîchir.', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+            ],
           ),
-          const Gap(24),
-          const Text('Aucune vente trouvée', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-          const Gap(8),
-          const Text('Essayez une autre période de temps.', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

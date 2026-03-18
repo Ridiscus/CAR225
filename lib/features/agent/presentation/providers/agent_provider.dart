@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 import '../../domain/entities/scanned_ticket.dart';
 import '../../domain/entities/boarding_summary.dart';
 import '../../domain/usecases/scan_ticket_use_case.dart';
@@ -91,3 +91,4 @@ class AgentProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+*/

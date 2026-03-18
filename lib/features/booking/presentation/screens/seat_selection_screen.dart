@@ -70,44 +70,47 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
 
   void _initControllers() {
-    // 1. On récupère l'utilisateur connecté avec context.read (méthode moderne sans erreur)
+    // 1. On récupère l'utilisateur connecté
     final userProvider = context.read<UserProvider>();
     final user = userProvider.user;
 
     for (int i = 0; i < widget.passengerCount; i++) {
+      // Les contrôleurs classiques
       final nomCtrl = TextEditingController();
       final prenomCtrl = TextEditingController();
       final telCtrl = TextEditingController();
       final emailCtrl = TextEditingController();
-      final urgenceCtrl = TextEditingController();
+
+      // 👇 2. LES 3 NOUVEAUX CONTRÔLEURS D'URGENCE 👇
+      final nomUrgenceCtrl = TextEditingController();
+      final lienUrgenceCtrl = TextEditingController();
+      final telUrgenceCtrl = TextEditingController();
 
       if (user != null) {
-        // 2. On gère les nulls proprement grâce à tes champs de UserModel
-        String nomU = user.nomUrgence ?? "";
-        String prenomU = user.lienParenteUrgence ?? "";
-        String contactU = user.contactUrgence ?? "";
-
-        String contactUrgenceComplet = "$nomU $prenomU $contactU".trim();
+        // On pré-remplit les infos d'urgence pour TOUS les passagers
+        nomUrgenceCtrl.text = user.nomUrgence ?? "";
+        lienUrgenceCtrl.text = user.lienParenteUrgence ?? "";
+        telUrgenceCtrl.text = user.contactUrgence ?? "";
 
         if (i == 0) {
-          // 🙎‍♂️ PASSAGER 1 : On pré-remplit tout
+          // 🙎‍♂️ PASSAGER 1 : On pré-remplit aussi ses infos personnelles
           nomCtrl.text = user.name;
           prenomCtrl.text = user.prenom;
           telCtrl.text = user.contact;
           emailCtrl.text = user.email;
-          urgenceCtrl.text = contactUrgenceComplet;
-        } else {
-          // 👥 AUTRES PASSAGERS : Uniquement le contact d'urgence
-          urgenceCtrl.text = contactUrgenceComplet;
         }
       }
 
+      // 3. On ajoute le tout dans la liste avec les BONNES clés
       _passengerControllers.add({
         "nom": nomCtrl,
         "prenom": prenomCtrl,
         "telephone": telCtrl,
         "email": emailCtrl,
-        "urgence": urgenceCtrl,
+        // 👇 MAPTAGE EXACT ATTENDU PAR L'UI 👇
+        "nom_urgence": nomUrgenceCtrl,
+        "lien_urgence": lienUrgenceCtrl,
+        "tel_urgence": telUrgenceCtrl,
       });
     }
   }
@@ -123,6 +126,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
     final dio = Dio(BaseOptions(
       baseUrl: 'https://car225.com/api/',
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     ));
@@ -361,11 +365,50 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                               ),
                               const Gap(15),
 
-                              _buildTextField(
+                              /*_buildTextField(
                                   context, "Contact d'urgence",
                                   controller: controllers["urgence"]!,
                                   imagePath: "assets/images/health-insurance.png"
+                              ),*/
+
+                              // --- SECTION URGENCE ---
+                              const Gap(10),
+                              Text(
+                                  "CONTACT D'URGENCE (SOS)",
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600], letterSpacing: 1.0)
                               ),
+                              const Gap(15),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                      flex: 3,
+                                      child: _buildTextField(
+                                          context,
+                                          "Nom & Prénom",
+                                          controller: controllers["nom_urgence"]!, // Nouveau contrôleur
+                                          imagePath: "assets/images/health-insurance.png"
+                                      )
+                                  ),
+                                  //const Gap(10),
+                                  /*Expanded(
+                                      flex: 2,
+                                      // Le nouveau Dropdown adapté pour la modale
+                                      child: _buildModalDropdown(context, controllers["lien_urgence"]!)
+                                  ),*/
+                                ],
+                              ),
+                              const Gap(15),
+
+                              _buildTextField(
+                                  context,
+                                  "Numéro d'urgence",
+                                  controller: controllers["tel_urgence"]!, // Nouveau contrôleur
+                                  imagePath: "assets/images/phone-call.png",
+                                  isPhone: true,
+                                  keyboardType: TextInputType.phone
+                              ),
+
                             ],
                           );
                         },
@@ -416,53 +459,56 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     );
   }
 
+  // 🟢 NOUVEAU WIDGET : Dropdown pour la modale passagers
+  Widget _buildModalDropdown(BuildContext context, TextEditingController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
+    final iconColor = Colors.grey[500];
+
+    final List<String> liensParente = [
+      'Père', 'Mère', 'Frère', 'Soeur', 'Conjoint(e)', 'Enfant', 'Ami(e)', 'Autre'
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Image.asset("assets/images/user.png", width: 18, height: 18, color: iconColor),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+        ),
+        hint: Text("Lien", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+        // Si le contrôleur a déjà une valeur valide, on l'affiche, sinon null
+        value: controller.text.isNotEmpty && liensParente.contains(controller.text) ? controller.text : null,
+        dropdownColor: fillColor,
+        icon: Icon(Icons.keyboard_arrow_down, color: iconColor, size: 20),
+        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+        isExpanded: true,
+        items: liensParente.map((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value, overflow: TextOverflow.ellipsis),
+          );
+        }).toList(),
+        onChanged: (newValue) {
+          if (newValue != null) {
+            // On met à jour le contrôleur directement quand l'utilisateur choisit une option
+            controller.text = newValue;
+          }
+        },
+      ),
+    );
+  }
+
 // ---------------------------------------------------------------------------
 // 👇 WIDGET HELPER MIS À JOUR (VERSION IMAGE)
 // ---------------------------------------------------------------------------
-  /*Widget _buildTextField(BuildContext context, String label, {
-    required TextEditingController controller,
-    String? imagePath, // ✅ Changé de IconData à String
-    TextInputType keyboardType = TextInputType.text,
-    String? hint,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final fillColor = isDark ? Colors.grey[800] : Colors.grey[100]; // Un peu plus clair que blanc pur souvent mieux
-    final borderColor = isDark ? Colors.transparent : Colors.grey.shade300;
-    final iconColor = Colors.grey;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor)),
-        const Gap(6),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: TextStyle(color: textColor),
-          validator: (value) => value == null || value.isEmpty ? "Requis" : null,
-          decoration: InputDecoration(
-            // ✅ Image à la place de l'icône
-            prefixIcon: imagePath != null
-                ? Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Image.asset(imagePath, width: 20, height: 20, color: iconColor),
-            )
-                : null,
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-            filled: true,
-            fillColor: fillColor,
-          ),
-        ),
-      ],
-    );
-  }*/
-
 
   Widget _buildTextField(
       BuildContext context,
@@ -591,32 +637,37 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     // -----------------------------------------------------------
     // 3. 🔴 LOGIQUE NORMALE (RÉSERVATION CLASSIQUE)
     // -----------------------------------------------------------
-    // Le code ci-dessous ne s'exécute que si isModificationMode == false
 
     List<Map<String, dynamic>> passengersData = [];
 
     for (int i = 0; i < widget.passengerCount; i++) {
-      // ... Ta logique existante de boucle passagers ...
       final controllers = _passengerControllers[i];
+
+      // Comme l'API n'a pas de champ "lien_urgence", on fusionne le nom et le lien.
+      // Exemple : "DOE Bob (Père)"
+      String nomUrgenceComplet = "${controllers["nom_urgence"]!.text} (${controllers["lien_urgence"]!.text})";
 
       final Map<String, dynamic> passager = {
         "nom": controllers["nom"]!.text,
         "prenom": controllers["prenom"]!.text,
         "email": controllers["email"]!.text,
         "telephone": controllers["telephone"]!.text,
-        "urgence": controllers["urgence"]!.text,
+
+        // 👇 MAPTAGE EXACT POUR L'API 👇
+        "urgence": controllers["tel_urgence"]!.text, // Le numéro
+        "nom_passager_urgence": nomUrgenceComplet, // Le nom + le lien
+
         "seat_number": sortedSeatsAller[i],
       };
 
       if (widget.program.isAllerRetour && i < sortedSeatsRetour.length) {
-        passager["seat_number_return"] = sortedSeatsRetour[i];
+        passager["return_seat_number"] = sortedSeatsRetour[i]; // Bien utiliser return_seat_number
       }
       passengersData.add(passager);
     }
 
     String? dateRetourFinal;
     if (widget.program.isAllerRetour) {
-      // ... Ta logique existante de date retour ...
       dateRetourFinal = widget.dateRetourChoisie;
       if (dateRetourFinal == null) {
         DateTime dateDepart = DateTime.parse(widget.program.dateDepart);
@@ -625,16 +676,14 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       }
     }
 
-
-
     // PAYLOAD FINAL RÉSERVATION
     final bookingData = {
       "programme_id": widget.program.id,
       "date_voyage": widget.program.dateDepart,
       "nombre_places": widget.passengerCount,
-      "seats": sortedSeatsAller,
-      if (widget.program.isAllerRetour) "seats_retour": sortedSeatsRetour,
-      if (widget.returnProgram != null) "return_programme_id": widget.returnProgram!.id,
+      "seats": sortedSeatsAller, // Utile pour le résumé/aller simple
+      if (widget.program.isAllerRetour && widget.returnProgram != null)
+        "programme_retour_id": widget.returnProgram!.id, // ⚠️ CORRIGÉ ICI (programme_retour_id)
       "passagers": passengersData,
       "is_aller_retour": widget.program.isAllerRetour,
       if (dateRetourFinal != null) "date_retour": dateRetourFinal,
@@ -654,6 +703,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       );
     }
   }
+
+
 
 
   // ---------------------------------------------------------------------------

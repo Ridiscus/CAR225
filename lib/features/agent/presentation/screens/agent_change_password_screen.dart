@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
+import 'package:provider/provider.dart'; // N'oublie pas l'import de Provider
 import 'package:car225/core/theme/app_colors.dart';
+import '../providers/agent_profile_provider.dart';
 import "../widgets/custom_app_bar.dart";
+import "../widgets/success_modal.dart";
+// 🟢 Ajoute ici l'import de ton provider, par exemple :
+// import '../providers/agent_profile_provider.dart';
 
 class AgentChangePasswordScreen extends StatefulWidget {
   const AgentChangePasswordScreen({super.key});
@@ -17,13 +22,15 @@ class _AgentChangePasswordScreenState extends State<AgentChangePasswordScreen> {
   final _oldPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
   bool _obscureOld = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  String? _oldPasswordError;
 
-  // 2. CYCLE DE VIE (Lifecycle)
+  // 2. CYCLE DE VIE
   @override
   void dispose() {
     _oldPasswordController.dispose();
@@ -34,114 +41,168 @@ class _AgentChangePasswordScreenState extends State<AgentChangePasswordScreen> {
 
   // 3. LOGIQUE & ACTIONS
   void _handleSubmit() async {
-    if (_oldPasswordController.text.isEmpty ||
-        _newPasswordController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
-      _showSnackBar('Veuillez remplir tous les champs', isError: true);
-      return;
-    }
+    // On réinitialise l'erreur d'affichage
+    setState(() => _oldPasswordError = null);
 
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      _showSnackBar(
-        'Les nouveaux mots de passe ne correspondent pas',
-        isError: true,
-      );
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
-    // Simulation d'appel API (2 secondes)
-    await Future.delayed(const Duration(seconds: 2));
+    // 🟢 VRAI APPEL API VIA LE PROVIDER
+    final provider = context.read<AgentProfileProvider>(); // Adapte le nom de ton Provider si besoin
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _showSnackBar('Mot de passe mis à jour avec succès');
-      Navigator.pop(context);
+    final result = await provider.changePassword(
+      currentPassword: _oldPasswordController.text,
+      newPassword: _newPasswordController.text,
+      confirmPassword: _confirmPasswordController.text,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    // Si c'est un succès (HTTP 200/201)
+    if (result['success'] == true) {
+      SuccessModal.show(
+        context: context,
+        message: 'Votre mot de passe a été modifié avec succès.',
+        onPressed: () {
+          Navigator.pop(context); // Ferme la modale
+          //Navigator.pop(context); // Quitte l'écran de changement de mdp
+        },
+      );
+    } else {
+      // 🟢 Si le backend renvoie une erreur (ex: mauvais mot de passe)
+      setState(() {
+        _oldPasswordError = result['message'];
+      });
+      // Force le formulaire à se redessiner pour afficher le message en rouge
+      _formKey.currentState!.validate();
     }
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    // Nettoyer les messages précédents pour éviter l'empilement
-    ScaffoldMessenger.of(context).clearSnackBars();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.redAccent : AppColors.secondary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(20),
-      ),
-    );
-  }
-
-  // 4. COMPOSANTS UI (Helper Méthodes)
+  // 4. COMPOSANTS UI
   Widget _buildPasswordField({
     required String label,
     required TextEditingController controller,
     required bool obscure,
     required VoidCallback onToggle,
+    String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFFB0BEC5),
-            letterSpacing: 1.2,
-          ),
-        ),
-        const Gap(10),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFECEFF1)),
-          ),
-          child: TextField(
-            controller: controller,
-            obscureText: obscure,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF263238),
-            ),
-            decoration: InputDecoration(
-              hintText: '••••••••',
-              hintStyle: const TextStyle(color: Color(0xFFCFD8DC)),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 15,
-              ),
-              prefixIcon: const Icon(
-                Icons.lock_outline,
+    return FormField<String>(
+      initialValue: controller.text,
+      validator: validator,
+      builder: (state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
                 color: Color(0xFFB0BEC5),
-                size: 22,
+                letterSpacing: 1.2,
               ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  obscure
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: const Color(0xFFB0BEC5),
+            ),
+            const Gap(10),
+            TextFormField(
+              controller: controller,
+              obscureText: obscure,
+              onChanged: (v) {
+                state.didChange(v);
+                if (state.hasError) {
+                  state.validate();
+                }
+              },
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF263238),
+              ),
+              decoration: InputDecoration(
+                hintText: '••••••••',
+                hintStyle: const TextStyle(color: Color(0xFFCFD8DC)),
+                filled: true,
+                fillColor: const Color(0xFFF8F9FA),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
+                prefixIcon: const Icon(
+                  Icons.lock_outline,
+                  color: Color(0xFFB0BEC5),
                   size: 22,
                 ),
-                onPressed: onToggle,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: const Color(0xFFB0BEC5),
+                    size: 22,
+                  ),
+                  onPressed: onToggle,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Color(0xFFECEFF1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Colors.redAccent),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Colors.redAccent,
+                    width: 1.5,
+                  ),
+                ),
+                errorStyle: const TextStyle(height: 0, fontSize: 0),
               ),
             ),
-          ),
-        ),
-      ],
+            if (state.hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 16,
+                      color: Colors.redAccent,
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: Text(
+                        state.errorText!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
-  // 5. MÉTHODE BUILD (Assemblage Final)
+  // 5. MÉTHODE BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,59 +217,86 @@ class _AgentChangePasswordScreenState extends State<AgentChangePasswordScreen> {
         behavior: HitTestBehavior.opaque,
         child: Stack(
           children: [
-            // --- BACKGROUND DECORATORS ---
             SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Modifier le mot de passe',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: -0.8,
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Modifier le mot de passe',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.8,
+                        ),
                       ),
-                    ),
-                    const Gap(12),
-                    const Text(
-                      'Votre nouveau mot de passe doit être différent des anciens mots de passe utilisés précédemment.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                        height: 1.5,
+                      const Gap(12),
+                      const Text(
+                        'Votre nouveau mot de passe doit être différent des anciens mots de passe utilisés précédemment.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                          height: 1.5,
+                        ),
                       ),
-                    ),
-                    const Gap(32),
-                    _buildPasswordField(
-                      label: 'Mot de passe actuel',
-                      controller: _oldPasswordController,
-                      obscure: _obscureOld,
-                      onToggle: () =>
-                          setState(() => _obscureOld = !_obscureOld),
-                    ),
-                    const Gap(24),
-                    _buildPasswordField(
-                      label: 'Nouveau mot de passe',
-                      controller: _newPasswordController,
-                      obscure: _obscureNew,
-                      onToggle: () =>
-                          setState(() => _obscureNew = !_obscureNew),
-                    ),
-                    const Gap(24),
-                    _buildPasswordField(
-                      label: 'Confirmer le nouveau mot de passe',
-                      controller: _confirmPasswordController,
-                      obscure: _obscureConfirm,
-                      onToggle: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                    const Gap(120),
-                  ],
+                      const Gap(32),
+                      _buildPasswordField(
+                        label: 'Mot de passe actuel',
+                        controller: _oldPasswordController,
+                        obscure: _obscureOld,
+                        onToggle: () =>
+                            setState(() => _obscureOld = !_obscureOld),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ce champ est obligatoire';
+                          }
+                          // 🟢 Affiche l'erreur de l'API ici (si le provider a renvoyé success: false)
+                          return _oldPasswordError;
+                        },
+                      ),
+                      const Gap(24),
+                      _buildPasswordField(
+                        label: 'Nouveau mot de passe',
+                        controller: _newPasswordController,
+                        obscure: _obscureNew,
+                        onToggle: () =>
+                            setState(() => _obscureNew = !_obscureNew),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ce champ est obligatoire';
+                          }
+                          if (value.length < 6) {
+                            return 'Minimum 6 caractères';
+                          }
+                          return null;
+                        },
+                      ),
+                      const Gap(24),
+                      _buildPasswordField(
+                        label: 'Confirmer le nouveau mot de passe',
+                        controller: _confirmPasswordController,
+                        obscure: _obscureConfirm,
+                        onToggle: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ce champ est obligatoire';
+                          }
+                          if (value != _newPasswordController.text) {
+                            return 'Les mots de passe ne correspondent pas';
+                          }
+                          return null;
+                        },
+                      ),
+                      const Gap(120),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -227,28 +315,28 @@ class _AgentChangePasswordScreenState extends State<AgentChangePasswordScreen> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 8,
-                shadowColor: AppColors.primary.withValues(alpha: 0.3),
+                shadowColor: AppColors.primary.withOpacity(0.3),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
               child: _isLoading
                   ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 3,
-                      ),
-                    )
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
                   : const Text(
-                      'Mettre à jour le mot de passe',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                'Mettre à jour le mot de passe',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
           ),
         ),

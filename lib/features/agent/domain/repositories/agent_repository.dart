@@ -1,31 +1,33 @@
-import 'package:fpdart/fpdart.dart';
-import 'package:car225/core/error/failures.dart';
-import '../entities/scanned_ticket.dart';
-import '../entities/boarding_summary.dart';
+
+
+// ⚠️ Vérifie l'import ici aussi !
+import '../../data/models/programme_model.dart';
+import '../../data/models/agent_dashboard_data.dart';
+import '../../data/models/ticket_reservation_model.dart';
+import '../../data/models/ticket_scan.dart';
 
 abstract class AgentRepository {
-  /// Scanne un ticket via son code QR/Barre
-  Future<Either<Failure, ScannedTicket>> scanTicket(String qrCode);
+  // 🟢 AJOUTE CECI
+  Future<Map<String, dynamic>> logout();
 
-  /// Récupère l'historique des scans de l'agent
-  Future<Either<Failure, List<ScannedTicket>>> getScanHistory();
+  // 🟢 AJOUTE CECI
+  Future<Map<String, dynamic>> getProfile();
 
-  /// Récupère le résumé de l'embarquement actuel (nombre de passagers attendus vs scannés)
-  Future<Either<Failure, BoardingSummary>> getBoardingSummary(String travelId);
-
-  /// Met à jour les informations personnelles de l'agent
-  Future<Either<Failure, Unit>> updatePersonalInfo({
-    required String firstName,
-    required String lastName,
-    required String phone,
-  });
-
-  /// Met à jour le mot de passe de l'agent
-  Future<Either<Failure, Unit>> updatePassword({
-    required String oldPassword,
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
     required String newPassword,
+    required String confirmPassword,
   });
 
-  /// Met à jour la photo de profil de l'agent
-  Future<Either<Failure, String>> updateProfilePicture(String imagePath);
+  // 🟢 AJOUTE LA SIGNATURE ICI
+  Future<List<TicketScan>> getScanHistory({DateTime? date});
+  Future<AgentDashboardData> getDashboardData();
+  Future<TicketReservationModel> searchTicket(String qrCode);
+  Future<TicketReservationModel> searchTicketByReference(String reference);
+  Future<Map<String, dynamic>> confirmBoarding({
+    required String reference,
+    required int vehiculeId,
+    required int programmeId,
+  });
+  Future<List<ProgrammeModel>> getTodayProgrammes();
 }

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
 import '../../../hostess/models/sale_model.dart';
@@ -31,6 +30,7 @@ abstract class AuthRemoteDataSource {
   });
   // 🟢 NOUVELLE MÉTHODE
   Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload);
+  Future<Map<String, dynamic>> getHostessDashboard();
 
   // Ajoute ceci dans la classe abstraite AuthRemoteDataSource :
   Future<Map<String, dynamic>> verifyPasswordOtp(String email, String otpCode);
@@ -338,6 +338,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> getHostessDashboard() async {
+    try {
+      print("🚀 [GET REQUÊTE] Vers: /hotesse/dashboard");
+
+      // C'est un GET, donc pas de payload (data)
+      final response = await dio.get('/hotesse/dashboard');
+
+      print("✅ [GET SUCCÈS] Code: ${response.statusCode}");
+      print("📥 [GET RÉPONSE] ${response.data}");
+
+      return response.data;
+    } catch (e) {
+      print("❌ [GET ERREUR] $e");
+      // On intercepte l'erreur du backend pour voir ce qui cloche
+      if (e is DioException) {
+        print("🚨 [GET DÉTAILS BACKEND] ${e.response?.statusCode} - ${e.response?.data}");
+      }
+      rethrow;
+    }
+  }
 
 
 

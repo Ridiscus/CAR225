@@ -186,6 +186,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   void _initData() async {
     final dio = Dio(BaseOptions(
       baseUrl: 'https://car225.com/api/',
+      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       headers: {'Content-Type': 'application/json'},
     ));
 
@@ -292,6 +293,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       if (token != null) {
         final dioAlert = Dio(BaseOptions(
           baseUrl: 'https://car225.com/api/',
+          //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
           headers: {'Authorization': 'Bearer $token'},
         ));
         final alertRepo = AlertRepository(dio: dioAlert);

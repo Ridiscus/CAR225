@@ -1,10 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../data/models/programme_model.dart';
+import '../../data/models/ticket_scan.dart';
+import '../providers/agent_profile_provider.dart';
 import '../widgets/agent_header.dart';
-import 'program_details_screen.dart';
 import 'agent_history_screen.dart';
+import 'all_programs_screen.dart';
+import '../../data/datasources/agent_remote_data_source.dart';
+import '../../data/repositories/agent_repository_impl.dart';
 
 class AgentHomeScreen extends StatefulWidget {
   const AgentHomeScreen({super.key});
@@ -12,80 +21,93 @@ class AgentHomeScreen extends StatefulWidget {
   State<AgentHomeScreen> createState() => _AgentHomeScreenState();
 }
 
+// Dans _AgentHomeScreenState
 class _AgentHomeScreenState extends State<AgentHomeScreen> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  int _scannedTodayCount = 0;
+  List<ProgrammeModel> _todayProgrammes = []; // Seule liste pour les programmes
+  late final AgentRepositoryImpl _repository;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = AgentRepositoryImpl(remoteDataSource: AgentRemoteDataSourceImpl());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AgentProfileProvider>().fetchProfile();
+      _fetchData();
+    });
+  }
+  Future<void> _fetchData() async {
+    print('🔄 [UI] Lancement de _fetchData() depuis AgentHomeScreen');
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      print('⏳ [UI] Lancement en parallèle de getScanHistory et getTodayProgrammes...');
+
+      // 🟢 On ne garde que les deux requêtes valides !
+      final results = await Future.wait([
+        _repository.getScanHistory(date: DateTime.now()),
+        _repository.getTodayProgrammes(),
+      ]);
+
+      print('✅ [UI] Future.wait terminé ! Les deux requêtes ont répondu.');
+
+      if (mounted) {
+        setState(() {
+          final todayScans = results[0] as List<TicketScan>;
+          _scannedTodayCount = todayScans.length;
+          print('📊 [UI] Historique appliqué : $_scannedTodayCount scans aujourd\'hui');
+          _todayProgrammes = results[1] as List<ProgrammeModel>;
+          print('🚌 [UI] Programmes appliqués : ${_todayProgrammes.length} trajets prévus');
+
+          _isLoading = false;
+        });
+        print('✨ [UI] Interface mise à jour avec succès.');
+      } else {
+        print('⚠️ [UI] Le widget n\'est plus monté, on annule le setState.');
+      }
+    } catch (e) {
+      print('❌ [UI] Erreur attrapée dans _fetchData() : $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll("Exception: ", ""); // Nettoie le texte affiché à l'agent
+          _isLoading = false;
+        });
+        print('⚠️ [UI] Interface mise à jour avec l\'état d\'erreur.');
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
         children: [
           SafeArea(
-            top: false,
+            top: Platform.isAndroid ? false : false,
+            bottom: Platform.isAndroid ? true : false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- HEADER PORTAIL AGENT ---
                 const AgentHeader(),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Gap(20),
-                        // --- STATISTICS SECTION ---
-                        const Text(
-                          'Statistiques des billets',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const Gap(20),
-                        _buildStatsRow(),
-                        const Gap(20),
-
-                        // --- NEXT DEPARTURES TITLE ---
-                        const Text(
-                          'Programmes du jour',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-
-                        const Gap(20),
-
-                        // --- DEPARTURES LIST ---
-                        _buildDepartureCard(
-                          from: 'Abidjan',
-                          to: 'Yamoussoukro',
-                          departureTime: '14:30',
-                          arrivalTime: '17:45',
-                          departureStation: 'Gare du Nord (Adjame)',
-                          arrivalStation: 'Gare Centrale (YAKRO)',
-                          busId: '#225',
-                          driverName: 'Kouassi Jean-Marc',
-                          driverPhone: '+225 07 12 34 56 78',
-                        ),
-                        _buildDepartureCard(
-                          from: 'Abidjan',
-                          to: 'Bouaké',
-                          departureTime: '15:45',
-                          arrivalTime: '21:00',
-                          departureStation: 'Gare de Bassam',
-                          arrivalStation: 'Gare de Bouaké-Sud',
-                          busId: '#228',
-                          driverName: '', // Simule l'absence de chauffeur
-                        ),
-                        const Gap(20),
-                      ],
-                    ),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      : _errorMessage != null
+                      ? _buildErrorState()
+                  // 🟢 AJOUT DU REFRESH INDICATOR ICI
+                      : RefreshIndicator(
+                    onRefresh: _fetchData, // Appelle notre méthode globale
+                    color: AppColors.primary,
+                    backgroundColor: Colors.white,
+                    child: _buildContent(),
                   ),
                 ),
               ],
@@ -96,43 +118,153 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 60),
+          const Gap(16),
+          Text(
+            _errorMessage ?? "Erreur de chargement",
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+          const Gap(20),
+          ElevatedButton(
+            onPressed: _fetchData,
+            child: const Text("Réessayer"),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Gap(20),
+          const Text(
+            'Statistiques des billets',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1E293B),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const Gap(20),
+          _buildStatsRow(),
+          const Gap(20),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Programmes du jour',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (context) => const AllProgramsScreen(),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: const Row(
+                  children: [
+                    Text('Voir tout', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    Gap(4),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 10, fontWeight: FontWeight.w900),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Gap(12),
+
+          if (_todayProgrammes.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("Aucun programme prévu pour aujourd'hui."),
+              ),
+            )
+          else
+            ..._todayProgrammes.take(2).map((program) {
+              return _buildDepartureCard(
+                // 🟢 On utilise tes getters pour nettoyer la chaîne (enlève ", Côte d'Ivoire")
+                from: program.depart,
+                to: program.arrivee,
+
+                // 🟢 On utilise les vraies données de l'API
+                departureTime: program.heureDepart ?? 'N/A',
+                arrivalTime: program.heureArrivee ?? '--:--',
+                departureStation: program.gareDepart ?? 'Inconnue',
+                arrivalStation: program.gareArrivee ?? 'Inconnue',
+                busId: program.immatriculation ?? 'BUS',
+                driverName: program.chauffeurNom, // Nullable, c'est géré par _buildDepartureCard
+              );
+            }).toList(),
+
+          const Gap(20),
+        ],
+      ),
+    );
+  }
+
+
+
   Widget _buildStatsRow() {
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
             label: 'BILLETS SCANNÉS',
-            value: '1,240',
+            value: _scannedTodayCount.toString(),
             valueColor: const Color(0xFF2E7D32),
             icon: Icons.qr_code_scanner_rounded,
             iconBgColor: const Color(0xFFE8F5E9),
             iconColor: const Color(0xFF2E7D32),
-            trend: '+12%',
+            trend: '', // Optionnel
             isPositive: true,
             onTap: () {
               Navigator.push(
                 context,
-                CupertinoPageRoute(
-                  builder: (context) => const AgentHistoryScreen(),
-                ),
-              );
+                CupertinoPageRoute(builder: (context) => const AgentHistoryScreen()),
+              ).then((_) => _fetchData());
             },
           ),
         ),
         const Gap(15),
         Expanded(
           child: _buildStatCard(
-            label: 'À SCANNER',
-            value: '12',
+            label: 'DÉPARTS AUJOURD\'HUI', // 🟢 On change le libellé
+            value: _todayProgrammes.length.toString(), // 🟢 On affiche le nombre de bus prévus
             valueColor: AppColors.primary,
-            icon: Icons.receipt_long_rounded,
-            iconBgColor: const Color(0xFFFFF3E0),
-            iconColor: const Color(0xFFEF6C00),
-            trend: '-5%',
-            isPositive: false,
-            onTap: () {
-              // Action pour les billets à scanner si nécessaire
-            },
+            icon: Icons.directions_bus_filled_rounded, // 🟢 Nouvelle icône
+            iconBgColor: const Color(0xFFE3F2FD),
+            iconColor: const Color(0xFF1565C0),
+            trend: '',
+            isPositive: true,
+            onTap: () {},
           ),
         ),
       ],
@@ -154,10 +286,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color.fromARGB(255, 214, 214, 220),
-          width: 1.5,
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
@@ -170,15 +306,15 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               child: Icon(
                 icon,
                 size: 80,
-                color: iconColor.withValues(alpha: 0.1),
+                color: iconColor.withOpacity(0.1),
               ),
             ),
             Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                splashColor: iconColor.withValues(alpha: 0.05),
-                highlightColor: iconColor.withValues(alpha: 0.02),
+                splashColor: iconColor.withOpacity(0.05),
+                highlightColor: iconColor.withOpacity(0.02),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -245,7 +381,14 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -253,17 +396,26 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              _showProgramActionsBottomSheet(
-                context: context,
-                from: from,
-                to: to,
-                departureTime: departureTime,
-                busId: busId,
-                departureStation: departureStation,
-                arrivalStation: arrivalStation,
-                isAssigned: isAssigned,
-                driverName: driverName,
-              );
+              if (isAssigned) {
+                _showProgramActionsBottomSheet(
+                  context: context,
+                  from: from,
+                  to: to,
+                  departureTime: departureTime,
+                  arrivalTime: arrivalTime,
+                  busId: busId,
+                  departureStation: departureStation,
+                  arrivalStation: arrivalStation,
+                  isAssigned: isAssigned,
+                  driverName: driverName,
+                );
+              } else {
+                _showAssignmentErrorBottomSheet(
+                  context: context,
+                  from: from,
+                  to: to,
+                );
+              }
             },
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -279,7 +431,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: AppColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -328,8 +480,11 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: const Color(
+                        0xFFF8FAFC,
+                      ), // Gardé clair pour le contraste interne
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFEDF2F7)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -362,6 +517,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     required String from,
     required String to,
     required String departureTime,
+    required String arrivalTime,
     required String busId,
     required String departureStation,
     required String arrivalStation,
@@ -373,219 +529,319 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 30),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+          bottom: true,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const Gap(24),
-              // Trip Overview Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.departure_board_rounded,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
-                  ),
-                  const Gap(16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$from ➔ $to',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E293B),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        Text(
-                          '$departureTime • $busId • $departureStation',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const Gap(32),
+                const Gap(32),
 
-              // Condition Check Box
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isAssigned
-                      ? const Color(0xFFF0FDF4)
-                      : const Color(0xFFFFFBFA),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isAssigned
-                        ? const Color(0xFFDCFCE7)
-                        : const Color(0xFFFEE4E2),
-                    width: 1.5,
+                // --- TICKET HEADER ---
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isAssigned
-                              ? Icons.check_circle_rounded
-                              : Icons.warning_amber_rounded,
-                          color: isAssigned
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFFD92D20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.directions_bus_filled_rounded,
+                          color: Colors.white,
                           size: 24,
                         ),
-                        const Gap(12),
-                        Expanded(
-                          child: Text(
-                            isAssigned
-                                ? 'Chauffeur assigné : $driverName'
-                                : 'Chauffeur non assigné',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isAssigned
-                                  ? const Color(0xFF166534)
-                                  : const Color(0xFF912018),
+                      ),
+                      const Gap(16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              busId,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1E293B),
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                          ),
+                            Text(
+                              "Programme de voyage",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    if (!isAssigned) ...[
-                      const Gap(12),
-                      const Text(
-                        'Vous ne pouvez pas entamer les scans tant qu\'aucun chauffeur n\'est assigné à ce programme.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF912018),
-                          height: 1.4,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFDCFCE7)),
+                        ),
+                        child: const Text(
+                          "ASSIGNÉ",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF166534),
+                          ),
                         ),
                       ),
                     ],
+                  ),
+                ),
+                const Gap(24),
+
+                // --- ROUTE TIMELINE ---
+                IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      _buildRouteStep(
+                        label: "DÉPART",
+                        city: from,
+                        time: departureTime,
+                        station: departureStation,
+                        icon: Icons.trip_origin_rounded,
+                        color: AppColors.primary,
+                        showLine: true,
+                      ),
+                      _buildRouteStep(
+                        label: "ARRIVÉE",
+                        city: to,
+                        time: arrivalTime,
+                        station: arrivalStation,
+                        icon: Icons.location_on_rounded,
+                        color: Colors.orange[800]!,
+                        showLine: false,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Gap(32),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const Gap(24),
+
+                // --- SECONDARY INFO GRID ---
+                Row(
+                  children: [
+                    _buildModernGridItem(
+                      Icons.person_pin_rounded,
+                      "Chauffeur",
+                      driverName ?? "Non assigné",
+                      const Color(0xFF1976D2),
+                    ),
+                    const Gap(16),
+                    _buildModernGridItem(
+                      Icons.people_alt_rounded,
+                      "Occupation",
+                      "28 / 50 Places",
+                      const Color(0xFFEF6C00),
+                    ),
                   ],
                 ),
-              ),
-              const Gap(32),
 
-              // Action Buttons
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: isAssigned
-                      ? () {
-                          Navigator.pop(context);
-                          // Navigation vers l'écran de scan ici
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey[200],
-                    disabledForegroundColor: Colors.grey[400],
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    'DÉMARRER LES SCANS',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-              const Gap(12),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (context) => ProgramDetailsScreen(
-                          from: from,
-                          to: to,
-                          time: departureTime,
-                          busId: busId,
-                          type: 'Standard',
-                          departureStation: departureStation,
-                          arrivalStation: arrivalStation,
-                          duration: '3h 15min',
-                          driverName: driverName ?? 'Non assigné',
-                          driverPhone: '+225 00 00 00 00 00',
-                          licensePlate: 'En attente',
-                          price: '5 000 FCFA',
-                          passengersCount: isAssigned ? '28' : '0',
-                          totalSeats: '50',
-                          tripDate: 'Lundi 02 Mars 2026',
-                        ),
+                const Gap(32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 231, 62, 36),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF64748B),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      "FERMER",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'VOIR LES DÉTAILS COMPLETS',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCityInfo(String city, {bool isEnd = false}) {
-    return Text(
-      city,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w900,
-        color: Color(0xFF1E293B),
-        letterSpacing: -0.5,
+  Widget _buildRouteStep({
+    required String label,
+    required String city,
+    required String time,
+    required String station,
+    required IconData icon,
+    required Color color,
+    required bool showLine,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color.withOpacity(0.2)),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              if (showLine)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    decoration: BoxDecoration(color: Colors.orange[400]),
+                  ),
+                ),
+            ],
+          ),
+          const Gap(16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey[400],
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(4),
+                Text(
+                  city,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  station,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                    height: 1.2,
+                  ),
+                ),
+                const Gap(16),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernGridItem(
+      IconData icon,
+      String label,
+      String value,
+      Color color,
+      ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const Gap(12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey[500],
+              ),
+            ),
+            const Gap(2),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -635,4 +891,116 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       ),
     );
   }
+
+  void _showAssignmentErrorBottomSheet({
+    required BuildContext context,
+    required String from,
+    required String to,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: SafeArea(
+          bottom: true,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Gap(30),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBFA),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFEE4E2),
+                      width: 8,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFD92D20),
+                    size: 40,
+                  ),
+                ),
+                const Gap(24),
+                const Text(
+                  "Chauffeur non assigné",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const Gap(12),
+                Text(
+                  "Le programme $from ➔ $to n'a pas encore de chauffeur. Vous ne pourrez voir les détails du programme qu'une fois l'assignation effectuée par l'administration.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const Gap(32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      "COMPRIS",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCityInfo(String city, {bool isEnd = false}) {
+    return Text(
+      city,
+      style: const TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w500,
+        color: Color(0xFF1E293B),
+        letterSpacing: -0.5,
+      ),
+    );
+  }
+
 }

@@ -65,20 +65,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
 
-
-
-
-
-  /*@override
-  void initState() {
-    super.initState();
-    // ✅ On demande au Provider de rafraîchir les données quand on arrive sur cette page
-    // (Juste au cas où, c'est une sécurité)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserProvider>().loadUser();
-    });
-  }*/
-
   // Navigation vers l'édition
   void _navigateToEdit() {
     Navigator.push(

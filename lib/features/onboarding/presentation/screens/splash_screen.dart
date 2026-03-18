@@ -189,17 +189,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   // Vérifie si le token existe dans le téléphone
-  /*Future<void> _checkLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-
-    // Si le token n'est pas null et pas vide, on considère que c'est connecté
-    if (mounted) {
-      setState(() {
-        _isConnected = token != null && token.isNotEmpty;
-      });
-    }
-  }*/
 
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -215,30 +204,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   // Gère la redirection finale
-  /*void _handleNavigation() {
-    // Si l'utilisateur a quitté l'appli pendant le splash, on arrête
-    if (!mounted) return;
-
-    // CHOIX DE LA PAGE DE DESTINATION NORMAL
-    final Widget destination = _isConnected
-        ? const MainScreen()       // Si connecté -> Dashboard
-        : const OnboardingScreen(); // Si pas connecté -> Onboarding
-
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => destination,
-        transitionDuration: const Duration(milliseconds: 800),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const curve = Curves.easeInOut;
-          return FadeTransition(
-            opacity: animation.drive(Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: curve))),
-            child: child,
-          );
-        },
-      ),
-    );
-  }*/
-
   void _handleNavigation() {
     if (!mounted) return;
 

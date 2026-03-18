@@ -323,7 +323,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
     return Stack(
       children: [
-        // ── Image de Fond ──
+        // â”€â”€ Image de Fond â”€â”€
         Container(
           height: 300 + topPadding,
           width: double.infinity,
@@ -334,7 +334,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             ),
           ),
         ),
-        // ── Dégradé noir protecteur ──
+        // â”€â”€ Dégradé noir protecteur â”€â”€
         Container(
           height: 300 + topPadding,
           width: double.infinity,
@@ -349,7 +349,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             ),
           ),
         ),
-        // ── Contenu du profil ──
+        // â”€â”€ Contenu du profil â”€â”€
         Container(
           width: double.infinity,
           padding: EdgeInsets.only(top: topPadding + 40, bottom: 40),
@@ -379,13 +379,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             ),
                           ],
                           image: DecorationImage(
-                            image: driverProvider.profileImage != null
-                                ? FileImage(driverProvider.profileImage!)
-                                : const AssetImage(
-                                        'assets/images/driver_profile.png',
-                                      )
-                                      as ImageProvider,
-                            fit: BoxFit.cover,
+                          image: driverProvider.profileImage != null
+                              ? FileImage(driverProvider.profileImage!)
+                              : (driverProvider.profile?.profilePictureUrl != null
+                                      ? NetworkImage("https://jingly-lindy-unminding.ngrok-free.dev${driverProvider.profile!.profilePictureUrl}")
+                                      : const AssetImage('assets/images/driver_profile.png'))
+                                  as ImageProvider,
+                          fit: BoxFit.cover,
                           ),
                         ),
                       ),
@@ -416,7 +416,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               const Gap(20),
               // Nom et Prénoms (Blanc)
               Text(
-                user != null ? "${user.name} ${user.prenom}" : "Chauffeur",
+                driverProvider.profile != null
+                    ? "${driverProvider.profile!.name} ${driverProvider.profile!.prenom}"
+                    : (user != null ? "${user.name} ${user.prenom}" : "Chauffeur"),
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -455,7 +457,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               const Gap(10),
               // Email
               Text(
-                (user?.email ?? "chauffeur@car225.ci").toUpperCase(),
+                (driverProvider.profile?.email ?? user?.email ?? "chauffeur@car225.ci").toUpperCase(),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 11,
@@ -756,3 +758,4 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     );
   }
 }
+

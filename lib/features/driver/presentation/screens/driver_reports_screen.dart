@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:io';
 import '../providers/driver_provider.dart';
+import '../../data/models/voyage_model.dart';
 import '../widgets/driver_header.dart';
 import '../widgets/success_modal.dart';
 
@@ -265,6 +266,12 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _getLocation();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final driverProvider = Provider.of<DriverProvider>(context);
 
@@ -288,6 +295,53 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (driverProvider.selectedTripForReport != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                                  const Gap(8),
+                                  Text(
+                                    "SIGNALER POUR LE VOYAGE #${driverProvider.selectedTripForReport!.id}",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    onPressed: () => driverProvider.setSelectedTripForReport(null),
+                                    icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                              const Gap(10),
+                              Text(
+                                "${driverProvider.selectedTripForReport!.departureStation} → ${driverProvider.selectedTripForReport!.arrivalStation}",
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              Text(
+                                "${driverProvider.selectedTripForReport!.carRegistration} • ${driverProvider.selectedTripForReport!.scheduledDepartureTime.day}/${driverProvider.selectedTripForReport!.scheduledDepartureTime.month}",
+                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Gap(30),
+                      ],
                       _buildSectionHeader("1", "Type d'incident"),
                       const Gap(15),
                       SingleChildScrollView(
@@ -752,7 +806,7 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
     await provider.submitReport(
       type: _selectedType!,
       description: _descriptionController.text,
-      tripId: provider.currentTrip?.id ?? "N/A",
+      tripId: provider.currentTrip?.id.toString() ?? "N/A",
       image: _imageFile,
       latitude: _currentPosition?.latitude,
       longitude: _currentPosition?.longitude,
@@ -779,3 +833,4 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
     );
   }
 }
+

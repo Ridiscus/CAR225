@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
@@ -169,7 +169,7 @@ class _DriverChangePasswordScreenState
                       ),
                     )
                   : const Text(
-                      'METTRE À JOUR LE MOT DE PASSE',
+                      'METTRE à€ JOUR LE MOT DE PASSE',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
@@ -224,7 +224,7 @@ class _DriverChangePasswordScreenState
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
-                hintText: '••••••••',
+                hintText: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
                 hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -303,3 +303,4 @@ class _DriverChangePasswordScreenState
     );
   }
 }
+

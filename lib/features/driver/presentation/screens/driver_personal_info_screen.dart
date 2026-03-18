@@ -25,10 +25,11 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
   void initState() {
     super.initState();
     final user = context.read<UserProvider>().user;
+    final profile = context.read<DriverProvider>().profile;
     _emailController = TextEditingController(
-      text: user?.email ?? 'chauffeur@car225.ci',
+      text: profile?.email ?? user?.email ?? 'chauffeur@car225.ci',
     );
-    _phoneController = TextEditingController(text: '+225 07 00 00 00 00');
+    _phoneController = TextEditingController(text: profile?.contact ?? '+225 07 00 00 00 00');
   }
 
   @override
@@ -182,7 +183,9 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
-    final pickedImage = context.watch<DriverProvider>().profileImage;
+    final driverProvider = context.watch<DriverProvider>();
+    final profile = driverProvider.profile;
+    final pickedImage = driverProvider.profileImage;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -218,13 +221,15 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
                         ),
                         child: CircleAvatar(
                           radius: 66,
-                          backgroundColor: Colors.white,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: pickedImage != null
                               ? FileImage(pickedImage)
-                              : const AssetImage(
-                                      'assets/images/driver_profile.png',
-                                    )
-                                    as ImageProvider,
+                              : (profile?.profilePictureUrl != null && profile!.profilePictureUrl!.isNotEmpty
+                                  ? NetworkImage(profile.profilePictureUrl!)
+                                  : const AssetImage('assets/images/driver_profile.png')) as ImageProvider,
+                          child: (pickedImage == null && (profile?.profilePictureUrl == null || profile!.profilePictureUrl!.isEmpty))
+                              ? const Icon(Icons.person, size: 80, color: AppColors.primary)
+                              : null,
                         ),
                       ),
                     ),
@@ -232,31 +237,22 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
                     _buildInfoField(
                       icon: Icons.badge_outlined,
                       label: 'IDENTIFIANT UNIQUE',
-                      value: 'CH-2026-001',
+                      value: profile?.codeId ?? 'CH-2026-001',
                     ),
                     const Gap(24),
                     _buildInfoField(
                       icon: Icons.person_outline_rounded,
                       label: 'NOM COMPLET',
-                      value: user != null
-                          ? '${user.name} ${user.prenom}'
-                          : 'Chauffeur',
+                      value: profile != null
+                          ? '${profile.name} ${profile.prenom}'
+                          : (user != null ? '${user.name} ${user.prenom}' : 'Chauffeur'),
                     ),
                     const Gap(24),
                     _buildInfoField(
                       icon: Icons.email_outlined,
                       label: 'ADRESSE E-MAIL',
                       controller: _emailController,
-                      isEnabled: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'L\'adresse e-mail est obligatoire';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Veuillez entrer un e-mail valide';
-                        }
-                        return null;
-                      },
+                      isEnabled: false,
                     ),
                     const Gap(24),
                     _buildInfoField(
@@ -319,3 +315,4 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
     );
   }
 }
+

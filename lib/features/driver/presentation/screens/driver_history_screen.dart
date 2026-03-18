@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
-import '../../models/trip_model.dart';
+import '../../data/models/voyage_model.dart';
 import '../widgets/driver_header.dart';
 
 class DriverHistoryScreen extends StatefulWidget {
@@ -20,14 +20,25 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
   final List<Map<String, String>> _filterOptions = [
     {"label": "Tous", "value": "Tous"},
-    {"label": "Effectués", "value": "completed"},
-    {"label": "Annulés", "value": "cancelled"},
+    {"label": "Confirmés", "value": "confirmé"},
+    {"label": "En cours", "value": "en_cours"},
+    {"label": "Effectués", "value": "terminé"},
+    {"label": "En attente", "value": "en_attente"},
+    {"label": "Annulés", "value": "annulé"},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DriverProvider>().loadVoyagesHistory();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final driverProvider = Provider.of<DriverProvider>(context);
-    List<TripModel> trips = driverProvider.historyTrips;
+    List<VoyageModel> trips = driverProvider.historyTrips;
 
     // Filtrage par date si sélectionnée
     if (_selectedDate != null) {
@@ -40,7 +51,13 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
     // Filtrage par statut
     if (_selectedFilter != "Tous") {
-      trips = trips.where((t) => t.status == _selectedFilter).toList();
+      trips = trips.where((t) {
+        final currentStatut = (t.status).toLowerCase();
+        final filter = _selectedFilter.toLowerCase();
+        // Supporte avec ou sans accent pour plus de sécurité
+        return currentStatut == filter || 
+               currentStatut.replaceAll('é', 'e') == filter.replaceAll('é', 'e');
+      }).toList();
     }
 
     return Scaffold(
@@ -275,9 +292,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     );
   }
 
-  Widget _buildHistoryItem(TripModel trip) {
+  Widget _buildHistoryItem(VoyageModel trip) {
     final dateFormat = DateFormat('dd/MM/yyyy');
-    final isCancelled = trip.status == 'cancelled';
+    final isCancelled = trip.status == 'annulé';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -315,12 +332,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "${trip.departureStation} ➔ ${trip.arrivalStation}",
+                  "${trip.departureStation} âž” ${trip.arrivalStation}",
                   style: const TextStyle(fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  "Le ${dateFormat.format(trip.scheduledDepartureTime)} • ${trip.carRegistration}",
+                  "Le ${dateFormat.format(trip.scheduledDepartureTime)} â€¢ ${trip.carRegistration}",
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],
@@ -332,7 +349,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     );
   }
 
-  void _showTripDetails(BuildContext context, TripModel trip) {
+  void _showTripDetails(BuildContext context, VoyageModel trip) {
     final timeFormat = DateFormat('HH:mm');
     showModalBottomSheet(
       context: context,
@@ -421,9 +438,36 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   }
 
   Widget _buildStatusBadge(String status) {
-    final isCancelled = status == 'cancelled';
-    final color = isCancelled ? Colors.red : AppColors.secondary;
-    final label = isCancelled ? "Annulé" : "Terminé";
+    Color color;
+    String label;
+    switch (status) {
+      case 'annulé':
+      case 'cancelled':
+        color = Colors.red;
+        label = "Annulé";
+        break;
+      case 'en_cours':
+      case 'started':
+        color = Colors.blue;
+        label = "En cours";
+        break;
+      case 'terminé':
+      case 'completed':
+        color = AppColors.secondary;
+        label = "Terminé";
+        break;
+      case 'confirmé':
+        color = Colors.green;
+        label = "Confirmé";
+        break;
+      case 'en_attente':
+        color = Colors.orange;
+        label = "En attente";
+        break;
+      default:
+        color = Colors.grey;
+        label = status.toUpperCase();
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -441,7 +485,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     );
   }
 
-  Widget _buildItineraryView(TripModel trip, DateFormat timeFormat) {
+  Widget _buildItineraryView(VoyageModel trip, DateFormat timeFormat) {
     return IntrinsicHeight(
       child: Row(
         children: [
@@ -567,3 +611,4 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     );
   }
 }
+

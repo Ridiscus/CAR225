@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
-import '../../models/trip_model.dart';
+import '../../data/models/voyage_model.dart';
 import '../widgets/driver_header.dart';
 
 class DriverDashboardScreen extends StatelessWidget {
@@ -52,10 +52,7 @@ class DriverDashboardScreen extends StatelessWidget {
                         const Gap(10),
                         if (driverProvider.currentTrip != null) ...[
                           InkWell(
-                            onTap: () => _showTripDetailsSheet(
-                              context,
-                              driverProvider.currentTrip!,
-                            ),
+                            onTap: () => driverProvider.setIndex(1),
                             borderRadius: BorderRadius.circular(20),
                             child: _buildTripCard(
                               context,
@@ -78,9 +75,9 @@ class DriverDashboardScreen extends StatelessWidget {
 
                         const Gap(35),
 
-                        // TRAJETS À VENIR
+                        // TRAJETS à€ VENIR
                         const Text(
-                          "VOYAGES À VENIR",
+                          "VOYAGES à€ VENIR",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.grey,
@@ -96,8 +93,7 @@ class DriverDashboardScreen extends StatelessWidget {
                                 (trip) => Padding(
                                   padding: const EdgeInsets.only(bottom: 15.0),
                                   child: InkWell(
-                                    onTap: () =>
-                                        _showTripDetailsSheet(context, trip),
+                                    onTap: () => driverProvider.setIndex(1),
                                     borderRadius: BorderRadius.circular(15),
                                     child: _buildUpcomingCard(trip),
                                   ),
@@ -118,6 +114,7 @@ class DriverDashboardScreen extends StatelessWidget {
                               child: const Text("Voir tout le planning"),
                             ),
                           ),
+                        const Gap(120),
                       ],
                     ),
                   ),
@@ -177,272 +174,7 @@ class DriverDashboardScreen extends StatelessWidget {
     );
   }
 
-  void _showTripDetailsSheet(BuildContext context, TripModel trip) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildTripDetailsContent(context, trip),
-    );
-  }
-
-  Widget _buildTripDetailsContent(BuildContext context, TripModel trip) {
-    final fullDateFormat = DateFormat('EEEE dd MMMM yyyy', 'fr_FR');
-    final timeFormat = DateFormat('HH:mm');
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const Gap(25),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Détails du Voyage",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                _buildStatusBadge(trip.status),
-              ],
-            ),
-            const Gap(8),
-            Text(
-              fullDateFormat.format(trip.scheduledDepartureTime),
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-            const Gap(30),
-
-            // Itinerary
-            IntrinsicHeight(
-              child: Row(
-                children: [
-                  Column(
-                    children: [
-                      const Gap(5),
-                      const Icon(
-                        Icons.circle,
-                        color: AppColors.primary,
-                        size: 10,
-                      ),
-                      Expanded(
-                        child: Container(
-                          width: 2,
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      const Icon(
-                        Icons.location_on,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                      const Gap(5),
-                    ],
-                  ),
-                  const Gap(16),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildStationDetailItem(
-                          label: "Départ",
-                          station: trip.departureStation,
-                          time: timeFormat.format(trip.scheduledDepartureTime),
-                        ),
-                        const Gap(25),
-                        _buildStationDetailItem(
-                          label: "Destination",
-                          station: trip.arrivalStation,
-                          time: timeFormat.format(trip.scheduledArrivalTime),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Gap(30),
-            const Divider(),
-            const Gap(25),
-
-            // Vehicle & Passenger Info
-            Row(
-              children: [
-                _buildInfoCircle(Icons.directions_bus_outlined),
-                const Gap(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Véhicule",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      Text(
-                        trip.carRegistration,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildInfoCircle(Icons.people_outline_rounded),
-                const Gap(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Passagers",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      Text(
-                        "${trip.passengersCount}/${trip.totalSeats}",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const Gap(25),
-
-            // Fare Info
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: AppColors.secondary.withValues(alpha: 0.1),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.payments_outlined,
-                        color: AppColors.secondary,
-                      ),
-                      const Gap(12),
-                      Text(
-                        "Tarif du trajet",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    "${trip.price.toInt()} FCFA",
-                    style: const TextStyle(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Gap(35),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                ),
-                child: const Text("FERMER"),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStationDetailItem({
-    required String label,
-    required String station,
-    required String time,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
-            ),
-            Text(
-              station,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-            ),
-          ],
-        ),
-        Text(
-          time,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            color: AppColors.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCircle(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, color: AppColors.primary, size: 24),
-    );
-  }
-
-  Widget _buildUpcomingCard(TripModel trip) {
+  Widget _buildUpcomingCard(VoyageModel trip) {
     final dayFormat = DateFormat('EEEE dd MMM', 'fr_FR');
     final timeFormat = DateFormat('HH:mm');
 
@@ -484,7 +216,7 @@ class DriverDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  "${trip.departureStation} ➔ ${trip.arrivalStation}",
+                  "${trip.departureStation} âž” ${trip.arrivalStation}",
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -499,7 +231,7 @@ class DriverDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTripCard(BuildContext context, dynamic trip) {
+  Widget _buildTripCard(BuildContext context, VoyageModel trip) {
     final timeFormat = DateFormat('HH:mm');
 
     return Container(
@@ -664,13 +396,24 @@ class DriverDashboardScreen extends StatelessWidget {
     String label;
 
     switch (status) {
+      case 'confirmé':
+        color = Colors.green;
+        label = "Confirmé";
+        break;
+      case 'en_cours':
       case 'started':
         color = Colors.blue;
         label = "En cours";
         break;
+      case 'terminé':
       case 'completed':
         color = AppColors.secondary;
         label = "Terminé";
+        break;
+      case 'annulé':
+      case 'cancelled':
+        color = Colors.red;
+        label = "Annulé";
         break;
       default:
         color = Colors.orange;
@@ -736,9 +479,9 @@ class DriverDashboardScreen extends StatelessWidget {
   Widget _buildActionButtons(
     BuildContext context,
     DriverProvider provider,
-    dynamic trip,
+    VoyageModel trip,
   ) {
-    if (trip.status == 'completed') {
+    if (trip.status == 'terminé') {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -748,7 +491,7 @@ class DriverDashboardScreen extends StatelessWidget {
         ),
         child: const Center(
           child: Text(
-            "Trajet terminé avec succès ! 🎉",
+            "Trajet terminé avec succès ! ðŸŽ‰",
             style: TextStyle(
               color: AppColors.secondary,
               fontWeight: FontWeight.bold,
@@ -761,7 +504,27 @@ class DriverDashboardScreen extends StatelessWidget {
 
     return Column(
       children: [
-        if (trip.status == 'pending')
+        if (trip.status == 'en_attente')
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              onPressed: () => _confirmAction(
+                context,
+                "Confirmer le voyage",
+                "Êtes-vous sûr de vouloir confirmer votre disponibilité pour ce voyage ?",
+                Icons.check_circle_rounded,
+                AppColors.primary,
+                () => provider.confirmVoyage(trip.id),
+              ),
+              label: const Text(
+                "CONFIRMER LE VOYAGE",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ),
+        if (trip.status == 'confirmé')
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -773,7 +536,7 @@ class DriverDashboardScreen extends StatelessWidget {
                 "Êtes-vous sûr de vouloir marquer le départ de ce trajet ? Cela informera les passagers du démarrage effectif.",
                 Icons.play_circle_fill_rounded,
                 AppColors.primary,
-                () => provider.markDeparture(),
+                () => provider.markDeparture(trip.id),
               ),
               label: const Text(
                 "DÉMARRER LE TRAJET",
@@ -781,7 +544,7 @@ class DriverDashboardScreen extends StatelessWidget {
               ),
             ),
           ),
-        if (trip.status == 'started')
+        if (trip.status == 'en_cours' && false) // Bouton retiré à la demande de l'utilisateur
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -796,7 +559,7 @@ class DriverDashboardScreen extends StatelessWidget {
                 "Êtes-vous sûr de vouloir marquer l'arrivée à destination ? Le trajet sera alors clôturé définitivement.",
                 Icons.check_circle_rounded,
                 AppColors.secondary,
-                () => provider.markArrival(),
+                () => provider.markArrival(trip.id),
               ),
               label: const Text(
                 "MARQUER L'ARRIVÉE",
@@ -940,3 +703,4 @@ class DriverDashboardScreen extends StatelessWidget {
     );
   }
 }
+

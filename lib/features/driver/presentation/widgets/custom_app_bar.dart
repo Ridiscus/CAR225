@@ -1,4 +1,4 @@
-import 'package:car225/core/theme/app_colors.dart';
+﻿import 'package:car225/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {

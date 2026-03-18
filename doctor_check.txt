@@ -1,0 +1,39 @@
+﻿[ΓêÜ] Flutter (Channel stable, 3.38.3, on Microsoft Windows [version 10.0.19045.6466], locale fr-FR) [562ms]
+    ΓÇó Flutter version 3.38.3 on channel stable at C:\src\flutter
+    ΓÇó Upstream repository https://github.com/flutter/flutter.git
+    ΓÇó Framework revision 19074d12f7 (4 months ago), 2025-11-20 17:53:13 -0500
+    ΓÇó Engine revision 13e658725d
+    ΓÇó Dart version 3.10.1
+    ΓÇó DevTools version 2.51.1
+    ΓÇó Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-native-assets, omit-legacy-version-file, enable-lldb-debugging
+
+[ΓêÜ] Windows Version (10 Professionnel 64-bit, 22H2, 2009) [2,5s]
+
+[!] Android toolchain - develop for Android devices (Android SDK version 36.1.0) [5,1s]
+    ΓÇó Android SDK at C:\Users\THEWAYNE\AppData\Local\Android\sdk
+    ΓÇó Emulator version 36.2.12.0 (build_id 14214601) (CL:N/A)
+    ΓÇó Platform android-36, build-tools 36.1.0
+    ΓÇó Java binary at: C:\Program Files\Android\Android Studio\jbr\bin\java
+      This JDK is specified in your Flutter configuration.
+      To change the current JDK, run: `flutter config --jdk-dir="path/to/jdk"`.
+    ΓÇó Java version OpenJDK Runtime Environment (build 21.0.8+-14196175-b1038.72)
+    ! Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses
+
+[ΓêÜ] Chrome - develop for the web [142ms]
+    ΓÇó Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[ΓêÜ] Visual Studio - develop Windows apps (Visual Studio Build Tools┬á2019 16.11.44) [141ms]
+    ΓÇó Visual Studio at C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+    ΓÇó Visual Studio Build Tools┬á2019 version 16.11.35731.53
+    ΓÇó Windows 10 SDK version 10.0.19041.0
+
+[ΓêÜ] Connected device (3 available) [270ms]
+    ΓÇó Windows (desktop) ΓÇó windows ΓÇó windows-x64    ΓÇó Microsoft Windows [version 10.0.19045.6466]
+    ΓÇó Chrome (web)      ΓÇó chrome  ΓÇó web-javascript ΓÇó Google Chrome 146.0.7680.80
+    ΓÇó Edge (web)        ΓÇó edge    ΓÇó web-javascript ΓÇó Microsoft Edge 145.0.3800.97
+    ! Device emulator-5554 is offline.
+
+[ΓêÜ] Network resources [1ΓÇ»145ms]
+    ΓÇó All expected network resources are available.
+
+! Doctor found issues in 1 category.

@@ -269,520 +269,737 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
   void initState() {
     super.initState();
     _getLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DriverProvider>().loadSignalements();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final driverProvider = Provider.of<DriverProvider>(context);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Column(
+            children: [
+              const DriverHeader(title: "Signalements", showProfile: false),
+              Container(
+                color: AppColors.primary,
+                child: const TabBar(
+                  indicatorColor: Colors.white,
+                  indicatorWeight: 3,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  tabs: [
+                    Tab(text: "NOUVEAU"),
+                    Tab(text: "HISTORIQUE"),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildNewReportTab(driverProvider),
+                    _buildHistoryTab(driverProvider),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewReportTab(DriverProvider driverProvider) {
+    return SafeArea(
+      top: false,
+      bottom: true,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 25,
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const DriverHeader(title: "Signalements", showProfile: false),
-            Expanded(
-              child: SafeArea(
-                top: false,
-                bottom: true,
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 25,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (driverProvider.selectedTripForReport != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
-                                  const Gap(8),
-                                  Text(
-                                    "SIGNALER POUR LE VOYAGE #${driverProvider.selectedTripForReport!.id}",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12,
-                                      color: AppColors.primary,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  IconButton(
-                                    onPressed: () => driverProvider.setSelectedTripForReport(null),
-                                    icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
-                              const Gap(10),
-                              Text(
-                                "${driverProvider.selectedTripForReport!.departureStation} → ${driverProvider.selectedTripForReport!.arrivalStation}",
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                              ),
-                              Text(
-                                "${driverProvider.selectedTripForReport!.carRegistration} • ${driverProvider.selectedTripForReport!.scheduledDepartureTime.day}/${driverProvider.selectedTripForReport!.scheduledDepartureTime.month}",
-                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                              ),
-                            ],
+            if (driverProvider.selectedTripForReport != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                        const Gap(8),
+                        Text(
+                          "SIGNALER POUR LE VOYAGE #${driverProvider.selectedTripForReport!.id}",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            letterSpacing: 1,
                           ),
                         ),
-                        const Gap(30),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => driverProvider.setSelectedTripForReport(null),
+                          icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
                       ],
-                      _buildSectionHeader("1", "Type d'incident"),
-                      const Gap(15),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
+                    ),
+                    const Gap(10),
+                    Text(
+                      "${driverProvider.selectedTripForReport!.departureStation} → ${driverProvider.selectedTripForReport!.arrivalStation}",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    Text(
+                      "${driverProvider.selectedTripForReport!.carRegistration} • ${driverProvider.selectedTripForReport!.scheduledDepartureTime.day}/${driverProvider.selectedTripForReport!.scheduledDepartureTime.month}",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(30),
+            ],
+            _buildSectionHeader("1", "Type d'incident"),
+            const Gap(15),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: _reportTypes.map((typeObj) {
+                  final type = typeObj["label"] as String;
+                  final icon = typeObj["icon"] as IconData;
+                  bool isSelected = _selectedType == type;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedType = type),
+                      borderRadius: BorderRadius.circular(30),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : Colors.grey[200]!,
+                            width: 1.5,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [],
+                        ),
                         child: Row(
-                          children: _reportTypes.map((typeObj) {
-                            final type = typeObj["label"] as String;
-                            final icon = typeObj["icon"] as IconData;
-                            bool isSelected = _selectedType == type;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: InkWell(
-                                onTap: () =>
-                                    setState(() => _selectedType = type),
-                                borderRadius: BorderRadius.circular(30),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 10,
+                          children: [
+                            Icon(
+                              icon,
+                              size: 18,
+                              color: isSelected ? Colors.white : AppColors.primary,
+                            ),
+                            const Gap(8),
+                            Text(
+                              type,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const Gap(35),
+            _buildSectionHeader("2", "Décrivez la situation"),
+            const Gap(20),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 4,
+              style: const TextStyle(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: "Ex: Le véhicule a une crevaison sur l'autoroute du nord...",
+                hintStyle: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.all(18),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: const BorderSide(
+                    color: Color.fromARGB(255, 211, 210, 210),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const Gap(35),
+            _buildSectionHeader("3", "Preuves & Localisation"),
+            const Gap(20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color.fromARGB(255, 211, 210, 210),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  const Gap(20),
+                  // Photo Section
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "PHOTO DE L'INCIDENT",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black54,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          if (_imageFile != null)
+                            Row(
+                              children: [
+                                InkWell(
+                                  onTap: _showImageSourceDialog,
+                                  child: const Icon(
+                                    Icons.edit_outlined,
+                                    color: Colors.blue,
+                                    size: 20,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : Colors.grey[50],
-                                    borderRadius: BorderRadius.circular(30),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : Colors.grey[200]!,
-                                      width: 1.5,
+                                ),
+                                const Gap(15),
+                                InkWell(
+                                  onTap: () => setState(
+                                    () => _imageFile = null,
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.redAccent,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      const Gap(15),
+                      GestureDetector(
+                        onTap: () => _imageFile == null ? _showImageSourceDialog() : _showImagePreviewDialog(),
+                        child: Container(
+                          width: double.infinity,
+                          height: _imageFile == null ? 100 : 180,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: Colors.grey[200]!,
+                              style: _imageFile == null ? BorderStyle.solid : BorderStyle.none,
+                            ),
+                          ),
+                          child: _imageFile == null
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_a_photo_outlined,
+                                      color: Colors.grey[400],
+                                      size: 24,
                                     ),
-                                    boxShadow: isSelected
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.primary
-                                                  .withValues(alpha: 0.2),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ]
-                                        : [],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        icon,
-                                        size: 18,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : AppColors.primary,
+                                    const Gap(12),
+                                    Text(
+                                      "Ajouter une preuve visuelle",
+                                      style: TextStyle(
+                                        color: Colors.grey[500],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
                                       ),
-                                      const Gap(8),
-                                      Text(
-                                        type,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : Colors.black87,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                          fontSize: 14,
+                                    ),
+                                  ],
+                                )
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    15,
+                                  ),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.file(
+                                        _imageFile!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned(
+                                        right: 10,
+                                        bottom: 10,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.fullscreen_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
                         ),
                       ),
-                      const Gap(35),
-                      _buildSectionHeader("2", "Décrivez la situation"),
-                      const Gap(20),
-                      TextField(
-                        controller: _descriptionController,
-                        maxLines: 4,
-                        style: const TextStyle(fontSize: 15),
-                        decoration: InputDecoration(
-                          hintText:
-                              "Ex: Le véhicule a une crevaison sur l'autoroute du nord...",
-                          hintStyle: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 14,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF9FAFB),
-                          contentPadding: const EdgeInsets.all(18),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(
-                              color: Color.fromARGB(255, 211, 210, 210),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
+                    ],
+                  ),
+                  const Gap(10),
+                  Divider(color: Colors.grey[100], thickness: 1),
+                  const Gap(10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _currentAddress != null ? AppColors.secondary.withValues(alpha: 0.05) : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: _currentAddress != null ? AppColors.secondary.withValues(alpha: 0.1) : Colors.grey[200]!,
                       ),
-                      const Gap(35),
-                      _buildSectionHeader("3", "Preuves & Localisation"),
-                      const Gap(20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color.fromARGB(255, 211, 210, 210),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _currentAddress != null ? AppColors.secondary : Colors.grey[300],
+                            shape: BoxShape.circle,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            const Gap(20),
-                            // Photo Section
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      "PHOTO DE L'INCIDENT",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.black54,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                    if (_imageFile != null)
-                                      Row(
-                                        children: [
-                                          InkWell(
-                                            onTap: _showImageSourceDialog,
-                                            child: const Icon(
-                                              Icons.edit_outlined,
-                                              color: Colors.blue,
-                                              size: 20,
-                                            ),
-                                          ),
-                                          const Gap(15),
-                                          InkWell(
-                                            onTap: () => setState(
-                                              () => _imageFile = null,
-                                            ),
-                                            child: const Icon(
-                                              Icons.delete_outline,
-                                              color: Colors.redAccent,
-                                              size: 20,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                  ],
-                                ),
-                                const Gap(15),
-                                GestureDetector(
-                                  onTap: () => _imageFile == null
-                                      ? _showImageSourceDialog()
-                                      : _showImagePreviewDialog(),
-                                  child: Container(
-                                    width: double.infinity,
-                                    height: _imageFile == null ? 100 : 180,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(15),
-                                      border: Border.all(
-                                        color: Colors.grey[200]!,
-                                        style: _imageFile == null
-                                            ? BorderStyle.solid
-                                            : BorderStyle.none,
-                                      ),
-                                    ),
-                                    child: _imageFile == null
-                                        ? Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.add_a_photo_outlined,
-                                                color: Colors.grey[400],
-                                                size: 24,
-                                              ),
-                                              const Gap(12),
-                                              Text(
-                                                "Ajouter une preuve visuelle",
-                                                style: TextStyle(
-                                                  color: Colors.grey[500],
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        : ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              15,
-                                            ),
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                Image.file(
-                                                  _imageFile!,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                                Positioned(
-                                                  right: 10,
-                                                  bottom: 10,
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(8),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black
-                                                          .withValues(
-                                                            alpha: 0.5,
-                                                          ),
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: const Icon(
-                                                      Icons.fullscreen_rounded,
-                                                      color: Colors.white,
-                                                      size: 20,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Gap(10),
-                            Divider(color: Colors.grey[100], thickness: 1),
-                            // GPS Localisation First (Premium Status Bar)
-                            const Gap(10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _currentAddress != null
-                                    ? AppColors.secondary.withValues(
-                                        alpha: 0.05,
-                                      )
-                                    : Colors.grey[50],
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(
-                                  color: _currentAddress != null
-                                      ? AppColors.secondary.withValues(
-                                          alpha: 0.1,
-                                        )
-                                      : Colors.grey[200]!,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: _currentAddress != null
-                                          ? AppColors.secondary
-                                          : Colors.grey[300],
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.location_on_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                  ),
-                                  const Gap(12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "POSITION ACTUELLE",
-                                          style: TextStyle(
-                                            color: _currentAddress != null
-                                                ? AppColors.secondary
-                                                : Colors.grey[500],
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                        const Gap(2),
-                                        Text(
-                                          _currentAddress ??
-                                              "Recherche de position...",
-                                          style: TextStyle(
-                                            color: _currentAddress != null
-                                                ? Colors.black87
-                                                : Colors.grey[400],
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: _getLocation,
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(10),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.05,
-                                            ),
-                                            blurRadius: 5,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: _isLoadingLocation
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: AppColors.primary,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.my_location_rounded,
-                                              color: AppColors.primary,
-                                              size: 18,
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Gap(30),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.amber.withValues(alpha: 0.3),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.white,
+                            size: 18,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline_rounded,
-                              color: Colors.amber,
-                              size: 20,
-                            ),
-                            const Gap(12),
-                            Expanded(
-                              child: Text(
-                                "Ce signalement sera immédiatement visible par la compagnie et les secours si nécessaire.",
-                                style: TextStyle(
-                                  color: Colors.amber[900],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Gap(30),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: _canSubmit()
-                              ? () => _submitReport(context, driverProvider)
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            elevation: 5,
-                            shadowColor: AppColors.primary.withValues(
-                              alpha: 0.3,
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        const Gap(12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.send_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              Gap(10),
                               Text(
-                                "Envoyer le Signalement",
+                                "POSITION ACTUELLE",
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  color: _currentAddress != null ? AppColors.secondary : Colors.grey[500],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
                                 ),
+                              ),
+                              const Gap(2),
+                              Text(
+                                _currentAddress ?? "Recherche de position...",
+                                style: TextStyle(
+                                  color: _currentAddress != null ? Colors.black87 : Colors.grey[400],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      const Gap(25),
-                    ],
+                        InkWell(
+                          onTap: _getLocation,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: 0.05,
+                                  ),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: _isLoadingLocation
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.my_location_rounded,
+                                    color: AppColors.primary,
+                                    size: 18,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+            const Gap(30),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amber.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.amber,
+                    size: 20,
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Text(
+                      "Ce signalement sera immédiatement visible par la compagnie et les secours si nécessaire.",
+                      style: TextStyle(
+                        color: Colors.amber[900],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Gap(30),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _canSubmit() ? () => _submitReport(context, driverProvider) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  elevation: 5,
+                  shadowColor: AppColors.primary.withValues(
+                    alpha: 0.3,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    Gap(10),
+                    Text(
+                      "Envoyer le Signalement",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const Gap(25),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryTab(DriverProvider provider) {
+    if (provider.isLoading && provider.signalements.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (provider.signalements.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_rounded, size: 60, color: Colors.grey[300]),
+            const Gap(16),
+            Text(
+              "Aucun historique",
+              style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              "Vos signalements s'afficheront ici",
+              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => provider.loadSignalements(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: provider.signalements.length,
+        itemBuilder: (context, index) {
+          final signalement = provider.signalements[index];
+          return _buildSignalementCard(signalement);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSignalementCard(dynamic s) {
+    Color statusColor;
+    String statusLabel;
+    switch (s.statut.toLowerCase()) {
+      case 'traité':
+      case 'resolved':
+        statusColor = Colors.green;
+        statusLabel = "Traité";
+        break;
+      case 'en_cours':
+        statusColor = Colors.blue;
+        statusLabel = "En cours";
+        break;
+      case 'annulé':
+        statusColor = Colors.red;
+        statusLabel = "Annulé";
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusLabel = "Transmis";
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[100]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showSignalementDetails(s),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Text(
+                    s.createdAt,
+                    style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                  ),
+                ],
+              ),
+              const Gap(12),
+              Row(
+                children: [
+                  Icon(_getIconForType(s.type), color: AppColors.primary, size: 20),
+                  const Gap(10),
+                  Text(
+                    s.type,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              const Gap(8),
+              Text(
+                s.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
+              if (s.voyage != null) ...[
+                const Gap(12),
+                const Divider(height: 1),
+                const Gap(8),
+                Row(
+                  children: [
+                    Icon(Icons.directions_bus_filled_outlined, size: 14, color: Colors.grey[400]),
+                    const Gap(6),
+                    Text(
+                      "Voyage #${s.voyage.id}",
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'accident': return Icons.car_crash_rounded;
+      case 'panne': return Icons.build_rounded;
+      case 'retard': return Icons.access_time_filled_rounded;
+      default: return Icons.warning_rounded;
+    }
+  }
+
+  void _showSignalementDetails(dynamic s) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            ),
+            const Gap(24),
+            Text(s.type.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 12, letterSpacing: 1.5)),
+            const Gap(8),
+            Text("Détails du Signalement", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.blueGrey[900])),
+            const Gap(20),
+            Text(s.description, style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87)),
+            const Gap(24),
+            if (s.photo != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: Image.network(
+                  s.photo!.startsWith('http') ? s.photo! : "https://car225.com/storage/${s.photo}",
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 200,
+                    width: double.infinity,
+                    color: Colors.grey[100],
+                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const Gap(24),
+            ],
+            _buildDetailRow(Icons.calendar_today_outlined, "Date", s.createdAt),
+            const Gap(12),
+            if (s.vehicule != null) _buildDetailRow(Icons.directions_bus_rounded, "Véhicule", s.vehicule),
+            const Gap(32),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text("FERMER", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const Gap(10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.grey[400]),
+        const Gap(12),
+        Text("$label : ", style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
     );
   }
 
@@ -797,16 +1014,28 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
   }
 
   void _submitReport(BuildContext context, DriverProvider provider) async {
+    // Déterminer le voyage à utiliser : selectedTripForReport en priorité, sinon currentTrip
+    final trip = provider.selectedTripForReport ?? provider.currentTrip;
+    if (trip == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Aucun voyage actif trouvé pour ce signalement."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    await provider.submitReport(
+    final success = await provider.submitReport(
       type: _selectedType!,
       description: _descriptionController.text,
-      tripId: provider.currentTrip?.id.toString() ?? "N/A",
+      tripId: trip.id.toString(),
       image: _imageFile,
       latitude: _currentPosition?.latitude,
       longitude: _currentPosition?.longitude,
@@ -816,21 +1045,30 @@ class _DriverReportsScreenState extends State<DriverReportsScreen> {
 
     Navigator.pop(context); // Fermer le dialog de chargement
 
-    SuccessModal.show(
-      context: context,
-      title: "Rapport envoyé",
-      message:
-          "Votre signalement a été transmis avec succès et sera traité dans les plus brefs délais.",
-      onPressed: () {
-        setState(() {
-          _selectedType = null;
-          _descriptionController.clear();
-          _imageFile = null;
-          _currentPosition = null;
-          _currentAddress = null;
-        });
-      },
-    );
+    if (success) {
+      SuccessModal.show(
+        context: context,
+        title: "Rapport envoyé",
+        message:
+            "Votre signalement a été transmis avec succès et sera traité dans les plus brefs délais.",
+        onPressed: () {
+          setState(() {
+            _selectedType = null;
+            _descriptionController.clear();
+            _imageFile = null;
+            _currentPosition = null;
+            _currentAddress = null;
+          });
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? "Erreur lors de l'envoi du signalement"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 

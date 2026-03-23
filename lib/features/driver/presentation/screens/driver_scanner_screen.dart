@@ -177,17 +177,18 @@ class _DriverScannerScreenState extends State<DriverScannerScreen>
           // Overlay
           _buildOverlay(),
           
-          Positioned(
-            top: 50,
-            left: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.black54,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
+          if (Navigator.canPop(context))
+            Positioned(
+              top: 50,
+              left: 20,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ),
             ),
-          ),
 
           // Bouton Saisie Manuelle
           Positioned(

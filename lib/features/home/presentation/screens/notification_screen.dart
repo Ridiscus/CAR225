@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:dio/dio.dart';
-
-// Assure-toi que les imports sont bons
+import 'package:car225/core/theme/app_colors.dart';
+import 'package:car225/core/services/networking/api_config.dart';
+import 'package:provider/provider.dart';
+import 'package:car225/core/providers/user_provider.dart'; 
+import 'package:car225/features/driver/presentation/providers/driver_provider.dart';
+import 'package:car225/features/driver/data/models/driver_message_model.dart';
 import '../../../booking/data/models/notification_model.dart';
 import '../../../booking/data/repositories/notification_repository.dart';
-import 'notification_details_screen.dart';
 
 
 
@@ -20,6 +23,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
   // --- ÉTAT ---
   bool _isLoading = true;
   List<NotificationModel> _notifications = [];
+  List<DriverMessageModel> _driverMessages = [];
   String? _errorMessage;
 
   // Pour gérer l'affichage des notifications Overlay
@@ -45,7 +49,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 
     // Configuration Dio + Repo
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
+      baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 15),
       validateStatus: (status) => status! < 500,
     ));
@@ -64,29 +68,55 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 
 
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await _repository.getNotifications();
-      if (mounted) {
-        setState(() {
-          _notifications = data;
-          _isLoading = false;
-        });
+Future<void> _loadData() async {
+  if (!mounted) return;
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
 
-        // 🟢 4. DÉCLENCHER L'ANIMATION UNE FOIS LES DONNÉES CHARGÉES
-        _entranceController.forward(from: 0.0);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = "Impossible de charger les notifications.";
-          _isLoading = false;
-        });
-        _showTopNotification("Erreur de connexion", isError: true);
+  try {
+    final userProvider = context.read<UserProvider>();
+    final driverProvider = context.read<DriverProvider>();
+    final token = userProvider.token;
+
+    // 1. Charger d'abord les messages chauffeur (ceux qui font le badge)
+    // On le fait indépendamment du token des notifications générales
+    await driverProvider.loadMessages().catchError((e) => print("Erreur messages chauffeur: $e"));
+
+    // 2. Tenter de charger les notifications générales si le token existe
+    if (token != null && token.isNotEmpty) {
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ));
+      final repository = NotificationRepository(dio: dio);
+      
+      try {
+        final generalNotifs = await repository.getNotifications();
+        _notifications = generalNotifs;
+      } catch (e) {
+        print("Erreur notifications générales (souvent normal pour un driver): $e");
       }
     }
+
+    if (mounted) {
+      setState(() {
+        _driverMessages = driverProvider.messages; // On synchronise avec le provider
+        _isLoading = false;
+      });
+      _entranceController.forward(from: 0.0);
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      print("Erreur globale chargement: $e");
+    }
   }
+}
 
   // --- GESTION TOP NOTIFICATION (OVERLAY) ---
   void _showTopNotification(String message, {bool isError = true}) {
@@ -238,20 +268,29 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
           const Gap(10),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorState()
-          : _notifications.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-        onRefresh: _loadData,
-        child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 80), // Padding bas pour éviter bugs
-          itemCount: _notifications.length,
+     body: _isLoading
+    ? const Center(child: CircularProgressIndicator())
+    : _errorMessage != null
+        ? _buildErrorState()
+        // MODIFICATION ICI : On vérifie si les DEUX listes sont vides
+        : (_notifications.isEmpty && _driverMessages.isEmpty)
+            ? _buildEmptyState() 
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 80),
+          itemCount: _notifications.length + _driverMessages.length,
           separatorBuilder: (context, index) => const Gap(15),
           itemBuilder: (context, index) {
-            final notif = _notifications[index];
+            // Logique de fusion : on affiche d'abord les messages non lus du chauffeur
+            // (Tu peux adapter l'ordre selon ce que tu préfères)
+            
+            if (index < _driverMessages.length) {
+                final msg = _driverMessages[index];
+                return _buildDriverMessageCard(context, msg, index);
+            }
+            
+            final notif = _notifications[index - _driverMessages.length];
 
             // 🟢 5. CALCUL DE L'ANIMATION EN CASCADE
             final double startDelay = (index % 10) * 0.1;
@@ -522,6 +561,116 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
                     boxShadow: [
                       BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 4)
                     ]
+                ),
+              )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDriverMessageCard(BuildContext context, DriverMessageModel msg, int index) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isRead = msg.isRead;
+
+    return GestureDetector(
+    onTap: () {
+      final driverProvider = context.read<DriverProvider>();
+      
+      // 1. Marquer comme lu
+      driverProvider.markMessageAsRead(msg);
+      
+      // 2. Préparer la redirection vers l'onglet message
+      driverProvider.navigateToMessage(msg);
+      
+      // 3. Retourner à l'écran principal (le Wrapper changera d'onglet tout seul)
+      Navigator.pop(context);
+    },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: isRead
+              ? (isDark ? Colors.grey[900] : Colors.white)
+              : AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isRead ? 0.02 : 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+          border: Border.all(
+            color: isRead ? Colors.transparent : AppColors.primary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 50,
+              width: 50,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.mail_outline_rounded, color: AppColors.primary, size: 24),
+            ),
+            const Gap(15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          msg.subject,
+                          style: TextStyle(
+                            fontWeight: isRead ? FontWeight.normal : FontWeight.w800,
+                            fontSize: 16,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Gap(5),
+                      Text(
+                        "${msg.createdAt.day}/${msg.createdAt.month} à ${msg.createdAt.hour}:${msg.createdAt.minute}",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isRead ? Colors.grey[500] : AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(5),
+                  Text(
+                    msg.message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isRead)
+              Container(
+                margin: const EdgeInsets.only(left: 10, top: 5),
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
                 ),
               )
           ],

@@ -223,12 +223,31 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
-      await remoteDataSource.logout();
+      final prefs = await SharedPreferences.getInstance();
+      final userType = prefs.getString('user_type') ?? 'user';
+
+      print("⏳ [LOGOUT] Type utilisateur: $userType...");
+
+      // Appel de l'API spécifique au rôle
+      if (userType == 'hotesse') {
+        await remoteDataSource.logoutHotesse();
+      } else if (userType == 'chauffeur' || userType == 'driver') {
+        await remoteDataSource.logoutChauffeur();
+      } else {
+        await remoteDataSource.logout();
+      }
+    } catch (e) {
+      print("❌ [LOGOUT REPO ERROR] $e");
     } finally {
+      // Nettoyage local OBLIGATOIRE (même si l'API échoue)
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
+      await prefs.remove('user_type');
+      print("✅ [LOGOUT] Données locales supprimées.");
     }
   }
+
+  // Suppression de logouut (typo) à l'étape suivante...
 
 
   @override
@@ -256,27 +275,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
 
-  @override
-  Future<void> logouut() async {
-    try {
-      // 1. Appeler l'API pour invalider le token côté serveur
-      await remoteDataSource.logoutHotesse();
-
-      // 2. Nettoyer les données locales
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      await prefs.remove('user_type');
-
-      // Optionnel : Si tu stockes d'autres infos (profil, etc.), supprime-les ici
-      // await prefs.remove('user_profile');
-
-      print("✅ [REPO] Token et rôle supprimés localement.");
-
-    } catch (e) {
-      print("❌ [REPO] Erreur lors de la déconnexion : $e");
-      rethrow;
-    }
-  }
 
   @override
   Future<HostessProfileModel> getHostessProfile() async {

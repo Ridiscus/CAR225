@@ -6,6 +6,7 @@ import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
 import '../../data/models/voyage_model.dart';
 import '../widgets/driver_header.dart';
+import 'driver_trips_screen.dart';
 
 class DriverDashboardScreen extends StatelessWidget {
   const DriverDashboardScreen({super.key});
@@ -24,20 +25,24 @@ class DriverDashboardScreen extends StatelessWidget {
                 ? const Center(
                     child: CircularProgressIndicator(color: AppColors.primary),
                   )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Prêt pour votre mission ?",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
+                : RefreshIndicator(
+                    onRefresh: () => driverProvider.fetchAllTrips(),
+                    color: AppColors.primary,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Prêt pour votre mission ?",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                            ),
                           ),
-                        ),
-                        const Gap(25),
+                          const Gap(25),
 
                         // TRAJET EN COURS (SI EXISTE)
                         const Text(
@@ -52,18 +57,12 @@ class DriverDashboardScreen extends StatelessWidget {
                         const Gap(10),
                         if (driverProvider.currentTrip != null) ...[
                           InkWell(
-                            onTap: () => driverProvider.setIndex(1),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverTripsScreen())),
                             borderRadius: BorderRadius.circular(20),
                             child: _buildTripCard(
                               context,
                               driverProvider.currentTrip!,
                             ),
-                          ),
-                          const Gap(20),
-                          _buildActionButtons(
-                            context,
-                            driverProvider,
-                            driverProvider.currentTrip!,
                           ),
                         ] else
                           _buildEmptyState(
@@ -93,7 +92,7 @@ class DriverDashboardScreen extends StatelessWidget {
                                 (trip) => Padding(
                                   padding: const EdgeInsets.only(bottom: 15.0),
                                   child: InkWell(
-                                    onTap: () => driverProvider.setIndex(1),
+                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverTripsScreen())),
                                     borderRadius: BorderRadius.circular(15),
                                     child: _buildUpcomingCard(trip),
                                   ),
@@ -110,7 +109,7 @@ class DriverDashboardScreen extends StatelessWidget {
                         if (driverProvider.upcomingTrips.length > 2)
                           Center(
                             child: TextButton(
-                              onPressed: () => driverProvider.setIndex(1),
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverTripsScreen())),
                               child: const Text("Voir tout le planning"),
                             ),
                           ),
@@ -118,6 +117,7 @@ class DriverDashboardScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                ),
           ),
         ],
       ),
@@ -133,7 +133,7 @@ class DriverDashboardScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
       decoration: BoxDecoration(
-        color: (Colors.grey[50] ?? Colors.white).withValues(alpha: 0.8),
+        color: (Colors.grey[50] ?? Colors.white).withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey[200]!),
       ),
@@ -146,7 +146,7 @@ class DriverDashboardScreen extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -186,7 +186,7 @@ class DriverDashboardScreen extends StatelessWidget {
         border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -242,12 +242,12 @@ class DriverDashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.black.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +261,7 @@ class DriverDashboardScreen extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -272,7 +272,30 @@ class DriverDashboardScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              _buildStatusBadge(trip.status),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildStatusBadge(trip),
+                  if (trip.status == 'en_cours' && trip.tempsRestant != null) ...[
+                    const Gap(8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 14, color: AppColors.primary),
+                        const Gap(4),
+                        Text(
+                          trip.tempsRestant!,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 25),
@@ -292,7 +315,7 @@ class DriverDashboardScreen extends StatelessWidget {
                       child: Container(
                         width: 2,
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.2),
+                          color: AppColors.primary.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(1),
                         ),
                       ),
@@ -311,14 +334,14 @@ class DriverDashboardScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _buildStationInfoOnly(
-                        label: "Gare de Départ",
-                        value: trip.departureStation,
+                        label: "Départ",
+                        value: "${trip.programme?.pointDepart}\n(${trip.departureStation})",
                         time: timeFormat.format(trip.scheduledDepartureTime),
                       ),
                       const Gap(25),
                       _buildStationInfoOnly(
-                        label: "Gare de Destination",
-                        value: trip.arrivalStation,
+                        label: "Destination",
+                        value: "${trip.programme?.pointArrive}\n(${trip.arrivalStation})",
                         time: timeFormat.format(trip.scheduledArrivalTime),
                       ),
                     ],
@@ -344,7 +367,7 @@ class DriverDashboardScreen extends StatelessWidget {
               _buildTripDetailIndicator(
                 icon: Icons.people_outline_rounded,
                 label: "Passagers",
-                value: "${trip.passengersCount}/${trip.totalSeats}",
+                value: "${trip.passengersCount} / ${trip.totalSeats}",
               ),
               _buildTripDetailIndicator(
                 icon: Icons.payments_outlined,
@@ -391,33 +414,27 @@ class DriverDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(VoyageModel trip) {
     Color color;
     String label;
+    final s = trip.status.toLowerCase();
 
-    switch (status) {
-      case 'confirmé':
-        color = Colors.green;
-        label = "Confirmé";
-        break;
-      case 'en_cours':
-      case 'started':
-        color = Colors.blue;
-        label = "En cours";
-        break;
-      case 'terminé':
-      case 'completed':
-        color = AppColors.secondary;
-        label = "Terminé";
-        break;
-      case 'annulé':
-      case 'cancelled':
-        color = Colors.red;
-        label = "Annulé";
-        break;
-      default:
-        color = Colors.orange;
-        label = "En attente";
+    // Priorité au champ d'arrivée réelle proposé par l'utilisateur
+    if (trip.hasArrived || s.contains('termin') || s.contains('complet') || s.contains('arriv')) {
+      color = AppColors.secondary;
+      label = "Terminé";
+    } else if (s.contains('confir')) {
+      color = Colors.green;
+      label = "Confirmé";
+    } else if (s.contains('en_cours') || s.contains('start')) {
+      color = Colors.blue;
+      label = "En cours";
+    } else if (s.contains('annul') || s.contains('cancel')) {
+      color = Colors.red;
+      label = "Annulé";
+    } else {
+      color = Colors.orange;
+      label = "En attente";
     }
 
     return Container(
@@ -473,233 +490,6 @@ class DriverDashboardScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildActionButtons(
-    BuildContext context,
-    DriverProvider provider,
-    VoyageModel trip,
-  ) {
-    if (trip.status == 'terminé') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.secondary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: const Center(
-          child: Text(
-            "Trajet terminé avec succès ! ðŸŽ‰",
-            style: TextStyle(
-              color: AppColors.secondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        if (trip.status == 'en_attente')
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              onPressed: () => _confirmAction(
-                context,
-                "Confirmer le voyage",
-                "Êtes-vous sûr de vouloir confirmer votre disponibilité pour ce voyage ?",
-                Icons.check_circle_rounded,
-                AppColors.primary,
-                () => provider.confirmVoyage(trip.id),
-              ),
-              label: const Text(
-                "CONFIRMER LE VOYAGE",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-          ),
-        if (trip.status == 'confirmé')
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.play_circle_filled_rounded),
-              onPressed: () => _confirmAction(
-                context,
-                "Confirmation du Départ",
-                "Êtes-vous sûr de vouloir marquer le départ de ce trajet ? Cela informera les passagers du démarrage effectif.",
-                Icons.play_circle_fill_rounded,
-                AppColors.primary,
-                () => provider.markDeparture(trip.id),
-              ),
-              label: const Text(
-                "DÉMARRER LE TRAJET",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-          ),
-        if (trip.status == 'en_cours' && false) // Bouton retiré à la demande de l'utilisateur
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_rounded),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-              ),
-              onPressed: () => _confirmAction(
-                context,
-                "Confirmation de l'Arrivée",
-                "Êtes-vous sûr de vouloir marquer l'arrivée à destination ? Le trajet sera alors clôturé définitivement.",
-                Icons.check_circle_rounded,
-                AppColors.secondary,
-                () => provider.markArrival(trip.id),
-              ),
-              label: const Text(
-                "MARQUER L'ARRIVÉE",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _confirmAction(
-    BuildContext context,
-    String title,
-    String message,
-    IconData icon,
-    Color iconColor,
-    VoidCallback onConfirm,
-  ) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, anim1, anim2) => const SizedBox(),
-      transitionBuilder: (context, anim1, anim2, child) {
-        return Transform.scale(
-          scale: anim1.value,
-          child: Opacity(
-            opacity: anim1.value,
-            child: Dialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: iconColor, size: 45),
-                    ),
-                    const Gap(24),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1B2E),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const Gap(12),
-                    Text(
-                      message,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[600],
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Gap(32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.grey[200],
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: Text(
-                              "Annuler",
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Gap(12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              onConfirm();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: iconColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: const Text(
-                              "Confirmer",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

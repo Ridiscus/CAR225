@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:car225/core/services/networking/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
@@ -19,6 +19,7 @@ abstract class AuthRemoteDataSource {
 
   Future<AuthResponseModel> unifiedLogin(UnifiedLoginRequestModel params);
   Future<void> logoutHotesse();
+  Future<void> logoutChauffeur();
   Future<HostessProfileModel> getHostessProfile();
   Future<HostessProfileModel> updateProfile(Map<String, dynamic> data);
   Future<void> changePasswordHotesse(Map<String, dynamic> data);
@@ -72,9 +73,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl() {
     dio = Dio(
       BaseOptions(
-        //baseUrl: 'https://car225.com/api/',
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        //baseUrl: ApiConfig.baseUrl,
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -130,7 +129,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw Exception("Impossible de joindre le serveur. Erreur réseau ou mauvaise URL.");
       }
 
-      throw Exception(e.response?.data['message'] ?? "Identifiants invalides");
+      // 🔴 FIX : On vérifie si data est une Map avant d'accéder à ['message']
+      // Si ngrok est offline, il renvoie du HTML (String), ce qui causait l'erreur
+      // 'String' is not a subtype of type 'int' of 'index'
+      final responseData = e.response?.data;
+      if (responseData is Map<String, dynamic>) {
+        throw Exception(responseData['message'] ?? "Identifiants invalides");
+      } else {
+        throw Exception("Erreur serveur (${e.response?.statusCode}). Le service est peut-être indisponible.");
+      }
     } catch (e) {
       print("🚨 [UNIFIED LOGIN ERROR] Erreur : $e");
       rethrow;
@@ -153,6 +160,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // On log l'erreur mais on ne throw pas forcément d'exception bloquante.
     } catch (e) {
       print("🚨 [LOGOUT ERROR] Erreur : $e");
+    }
+  }
+
+  @override
+  Future<void> logoutChauffeur() async {
+    try {
+      print("⏳ [LOGOUT] Déconnexion du chauffeur...");
+      await dio.post('/chauffeur/logout');
+      print("✅ [LOGOUT] Chauffeur déconnecté.");
+    } catch (e) {
+      print("❌ [LOGOUT CHAUFFEUR ERROR] $e");
     }
   }
 
@@ -414,14 +432,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel> getUserProfile() async {
     try {
-      final response = await dio.get('/user/profile');
+      final prefs = await SharedPreferences.getInstance();
+      final role = prefs.getString('user_type') ?? 'user';
+      
+      String endpoint = '/user/profile';
+      if (role == 'chauffeur') endpoint = '/chauffeur/profile';
+      if (role == 'agent') endpoint = '/agent/profile';
+      if (role == 'hotesse') endpoint = '/hotesse/profile';
+      if (role == 'caisse') endpoint = '/caisse/profile';
 
-      // Gestion robuste de la réponse JSON
-      if (response.data is Map<String, dynamic> && response.data.containsKey('user')) {
-        return UserModel.fromJson(response.data['user']);
-      } else {
-        return UserModel.fromJson(response.data);
+      final response = await dio.get(endpoint);
+
+      // Gestion robuste de la réponse JSON selon le rôle
+      if (response.data is Map<String, dynamic>) {
+        if (response.data.containsKey('user')) return UserModel.fromJson(response.data['user']);
+        if (response.data.containsKey('chauffeur')) return UserModel.fromJson(response.data['chauffeur']);
+        if (response.data.containsKey('agent')) return UserModel.fromJson(response.data['agent']);
+        if (response.data.containsKey('hotesse')) return UserModel.fromJson(response.data['hotesse']);
+        if (response.data.containsKey('profile')) return UserModel.fromJson(response.data['profile']);
       }
+      
+      return UserModel.fromJson(response.data);
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? "Erreur profil");
     }

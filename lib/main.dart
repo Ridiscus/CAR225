@@ -165,8 +165,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/theme_provider.dart';
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
-import 'features/auth/domain/repositories/auth_repository.dart'
-    hide AuthRepositoryImpl;
+import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/booking/data/repositories/notification_repository.dart';
 import 'features/booking/domain/repositories/company_repository.dart';
 import 'features/hostess/presentation/providers/hostess_sales_provider.dart';

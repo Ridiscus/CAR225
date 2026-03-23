@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/driver_profile_model.dart';
+import 'package:car225/core/services/networking/api_config.dart';
 import '../models/voyage_model.dart';
 import '../models/driver_message_model.dart';
 import '../models/signalement_model.dart';
@@ -23,7 +24,7 @@ abstract class DriverRemoteDataSource {
   Future<VoyageModel> confirmVoyage(int voyageId);
   Future<VoyageModel> startVoyage(int voyageId);
   Future<Map<String, dynamic>> completeVoyage(int voyageId);
-  Future<Map<String, dynamic>> cancelVoyage(int voyageId);
+  Future<Map<String, dynamic>> cancelVoyage(int voyageId, {String? reason});
   Future<Map<String, dynamic>> updateLocation(int voyageId, double latitude, double longitude, {double? speed, double? heading});
 
   Future<Map<String, dynamic>> getMessages({int page = 1});
@@ -46,7 +47,7 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
   DriverRemoteDataSourceImpl() {
     dio = Dio(
       BaseOptions(
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -165,7 +166,7 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
   @override
   Future<Map<String, dynamic>> getVoyageHistory({int page = 1}) async {
     try {
-      final response = await dio.get('chauffeur/voyages/historique', queryParameters: {
+      final response = await dio.get('chauffeur/voyages/history', queryParameters: {
         'page': page,
       });
       return response.data;
@@ -211,9 +212,11 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>> cancelVoyage(int voyageId) async {
+  Future<Map<String, dynamic>> cancelVoyage(int voyageId, {String? reason}) async {
     try {
-      final response = await dio.post('chauffeur/voyages/$voyageId/annuler');
+      final response = await dio.post('chauffeur/voyages/$voyageId/annuler', data: {
+        if (reason != null) 'reason': reason,
+      });
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);

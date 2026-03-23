@@ -12,6 +12,7 @@ import '../providers/hostess_profile_provider.dart';
 import 'hostess_personal_info_screen.dart';
 import 'hostess_change_password_screen.dart';
 import 'package:car225/core/utils/page_transitions.dart';
+import 'package:car225/core/services/networking/api_config.dart';
 
 class HostessProfileScreen extends StatefulWidget {
   const HostessProfileScreen({super.key});
@@ -97,7 +98,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
         deviceService: DeviceService(), // Remplace si tu as une injection de dépendance
       );
 
-      await authRepository.logouut();
+      await authRepository.logout();
 
       if (!mounted) return;
 
@@ -528,7 +529,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                             image: pickedImage != null
                                 ? FileImage(pickedImage)
                                 : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                                ? NetworkImage('https://car225.com/storage/${profile.profilePicture}')
+                                ? NetworkImage('${ApiConfig.baseUrl.replaceAll('/api', '')}/storage/${profile.profilePicture}')
                                 : const AssetImage('assets/images/hostess_profile.png'))
                             as ImageProvider,
                             fit: BoxFit.cover,

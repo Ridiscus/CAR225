@@ -1,14 +1,12 @@
-﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
 import 'driver_dashboard_screen.dart';
-import 'driver_trips_screen.dart';
-import 'driver_history_screen.dart';
 import 'driver_reports_screen.dart';
-import 'driver_profile_screen.dart';
+import 'driver_scanner_screen.dart';
+import 'driver_messages_screen.dart';
 
 class DriverMainWrapper extends StatefulWidget {
   const DriverMainWrapper({super.key});
@@ -19,10 +17,9 @@ class DriverMainWrapper extends StatefulWidget {
 class _DriverMainWrapperState extends State<DriverMainWrapper> {
   final List<Widget> _screens = [
     const DriverDashboardScreen(),
-    const DriverTripsScreen(),
-    const DriverHistoryScreen(),
+    const DriverScannerScreen(),
+    const DriverMessagesScreen(),
     const DriverReportsScreen(),
-    const DriverProfileScreen(),
   ];
 
   @override
@@ -34,30 +31,29 @@ class _DriverMainWrapperState extends State<DriverMainWrapper> {
         : AppColors.background;
 
     return Scaffold(
-      extendBody: true,
       backgroundColor: backgroundColor,
+      // 1. On garde extendBody pour l'effet de transparence derrière la courbe
+      extendBody: true, 
       body: IndexedStack(
         index: driverProvider.currentIndex,
         children: _screens,
       ),
+      // 2. On enveloppe la barre dans un SafeArea pour éviter qu'elle ne soit sous le système
       bottomNavigationBar: SafeArea(
-        top: false,
-        bottom: Platform.isAndroid ? true : false,
         child: CurvedNavigationBar(
           index: driverProvider.currentIndex,
-          height: 65.0,
+          height: 60,
+          items: const [
+            Icon(Icons.dashboard_rounded, size: 30, color: Colors.white),
+            Icon(Icons.qr_code_scanner_rounded, size: 30, color: Colors.white),
+            Icon(Icons.mail_rounded, size: 30, color: Colors.white),
+            Icon(Icons.warning_amber_rounded, size: 30, color: Colors.white),
+          ],
           color: AppColors.primary,
           buttonBackgroundColor: AppColors.primary,
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.transparent, 
           animationCurve: Curves.easeInOut,
-          animationDuration: const Duration(milliseconds: 400),
-          items: const <Widget>[
-            Icon(Icons.dashboard_outlined, color: Colors.white),
-            Icon(Icons.directions_bus_outlined, color: Colors.white),
-            Icon(Icons.history, color: Colors.white),
-            Icon(Icons.report_problem_outlined, color: Colors.white),
-            Icon(Icons.person_outline, color: Colors.white),
-          ],
+          animationDuration: const Duration(milliseconds: 300),
           onTap: (index) {
             driverProvider.setIndex(index);
           },

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart' as dio;
 import '../../data/datasources/driver_remote_data_source.dart';
 import '../../data/repositories/driver_repository_impl.dart';
 import '../../data/models/driver_profile_model.dart';
@@ -30,6 +31,8 @@ class DriverProvider extends ChangeNotifier {
     loadCachedImage();
     loadProfile();
     loadDashboard().then((_) => _checkOngoingTracking());
+    loadSignalements();
+    loadMessages();
   }
 
   Timer? _locationTimer;
@@ -133,12 +136,13 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
-  List<VoyageModel> get activeTrips => _todayTrips.where((t) => t.statut == 'en_cours' || t.statut == 'confirmé').toList();
+  List<VoyageModel> get activeTrips => _todayTrips.where((t) => t.statut == 'en_cours' || t.statut == 'confirmé' || t.statut == 'en_attente').toList();
 
   int _currentIndex = 0;
   int get currentIndex => _currentIndex;
 
   void setIndex(int index) {
+    if (_currentIndex == index) return;
     _currentIndex = index;
     notifyListeners();
   }
@@ -168,7 +172,19 @@ class DriverProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+DriverMessageModel? _pendingMessageToOpen;
+DriverMessageModel? get pendingMessageToOpen => _pendingMessageToOpen;
 
+void navigateToMessage(DriverMessageModel message) {
+  _pendingMessageToOpen = message;
+  _currentIndex = 2; // Index de l'onglet Messages
+  notifyListeners();
+}
+
+void clearPendingMessage() {
+  _pendingMessageToOpen = null;
+  // On ne notifie pas forcément ici pour éviter des rebuilds inutiles
+}
   Future<void> loadDashboard() async {
     _setLoading(true);
     _setError(null);
@@ -251,12 +267,37 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> cancelVoyage(int voyageId, {String? reason}) async {
+    _setLoading(true);
+    try {
+      await _repo.cancelVoyage(voyageId, reason: reason);
+      await loadDashboard(); // refresh
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> loadSignalements({int page = 1}) async {
     _setLoading(true);
     try {
       final data = await _repo.getSignalements(page: page);
       if (data['success'] == true) {
-        _signalements = (data['signalements']['data'] ?? data['signalements'] as List)
+        final rawSignalements = data['signalements'];
+        List<dynamic> signalementsList = [];
+        
+        if (rawSignalements is List) {
+          signalementsList = rawSignalements;
+        } else if (rawSignalements is Map) {
+          signalementsList = rawSignalements['data'] is List 
+              ? rawSignalements['data'] 
+              : [rawSignalements];
+        }
+
+        _signalements = signalementsList
             .map<SignalementModel>((v) => SignalementModel.fromJson(v))
             .toList();
       }
@@ -284,9 +325,10 @@ class DriverProvider extends ChangeNotifier {
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
       };
-      // La gestion de fichier multipart est traitée par fromMap(FormData) dans le data source
-      // Mais pour simplifier ici : on omet la photo ou on utilise MultipartFile si c'est implémenté correctement avec dio.
-      // Il faudrait adapter selon le package `dio` si 'photo': await MultipartFile.fromFile(image.path)
+      
+      if (image != null) {
+        data['photo'] = await dio.MultipartFile.fromFile(image.path);
+      }
       
       await _repo.createSignalement(data);
       await loadSignalements(); // refresh
@@ -387,4 +429,3 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 }
-

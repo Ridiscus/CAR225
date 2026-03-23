@@ -63,7 +63,9 @@ class AuthResponseModel {
       contact: json['contact']?.toString(),
       // Le token peut être dans 'token' ou 'access_token' selon le dev
       token: json['token'] ?? json['access_token'],
-      user: json['user'] != null ? UserModel.fromJson(json['user']) : null,
+      user: (json['profile'] != null) 
+          ? UserModel.fromJson(json['profile']) 
+          : (json['user'] != null ? UserModel.fromJson(json['user']) : null),
       role: json['role'],
     );
   }

@@ -37,6 +37,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         children: [
           DriverHeader(
             title: "Mes Voyages",
+            showBack: true,
             showProfile: false,
             actions: [
               IconButton(
@@ -167,7 +168,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                   ),
                 ),
               ),
-              _buildStatusBadge(trip.status),
+              _buildStatusBadge(trip),
             ],
           ),
           const SizedBox(height: 20),
@@ -271,37 +272,31 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(VoyageModel trip) {
     Color color;
     String label;
-    switch (status) {
-      case 'en_cours':
-      case 'started':
-        color = Colors.blue;
-        label = "En cours";
-        break;
-      case 'terminé':
-      case 'completed':
-        color = AppColors.secondary;
-        label = "Terminé";
-        break;
-      case 'confirmé':
-        color = Colors.green;
-        label = "Confirmé";
-        break;
-      case 'annulé':
-      case 'cancelled':
-        color = Colors.red;
-        label = "Annulé";
-        break;
-      default:
-        color = Colors.orange;
-        label = "En attente";
+    final s = trip.status.toLowerCase();
+
+    if (trip.hasArrived || s.contains('termin') || s.contains('complet') || s.contains('arriv')) {
+      color = AppColors.secondary;
+      label = "Terminé";
+    } else if (s.contains('confir')) {
+      color = Colors.green;
+      label = "Confirmé";
+    } else if (s.contains('en_cours') || s.contains('start')) {
+      color = Colors.blue;
+      label = "En cours";
+    } else if (s.contains('annul') || s.contains('cancel')) {
+      color = Colors.red;
+      label = "Annulé";
+    } else {
+      color = Colors.orange;
+      label = "En attente";
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -377,7 +372,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                               "Détails du voyage",
                               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                             ),
-                            _buildStatusBadge(trip.status),
+                            _buildStatusBadge(trip),
                           ],
                         ),
                         const Gap(8),
@@ -406,7 +401,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                                       style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500),
                                     ),
                                     Text(
-                                      "$hours:$minutes:$seconds",
+                                      trip.tempsRestant ?? "$hours:$minutes:$seconds",
                                       style: const TextStyle(
                                         color: AppColors.primary,
                                         fontWeight: FontWeight.bold,
@@ -513,7 +508,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                             _buildDetailBox(
                               Icons.people_outline,
                               "Passagers",
-                              "${trip.passengersCount}/${trip.totalSeats}",
+                              "${trip.passengersCount} / ${trip.totalSeats}",
                             ),
                           ],
                         ),
@@ -601,90 +596,141 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
 
     return Column(
       children: [
-        if (trip.status == 'en_attente')
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              onPressed: () => _confirmAction(
-                context,
-                "Confirmer le voyage",
-                "Êtes-vous sûr de vouloir confirmer votre disponibilité pour ce voyage ?",
-                Icons.check_circle_rounded,
-                AppColors.primary,
-                () {
-                  Navigator.pop(context); // Close sheet
-                  provider.confirmVoyage(trip.id);
-                },
+        if (trip.status == 'en_attente' || trip.status == 'confirmé')
+          Column(
+            children: [
+              if (trip.passengersCount == 0)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+                      const Gap(10),
+                      const Expanded(
+                        child: Text(
+                          "Au moins 1 passager doit être présent pour démarrer.",
+                          style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.play_circle_filled_rounded),
+                  onPressed: trip.passengersCount > 0
+                      ? () {
+                          Navigator.pop(context); // Close sheet
+                          provider.markDeparture(trip.id);
+                        }
+                      : null, // Désactivé si 0 passager
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: trip.passengersCount > 0 ? AppColors.primary : Colors.grey[300],
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  label: const Text("DÉMARRER LE TRAJET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              label: const Text("CONFIRMER LE VOYAGE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-        if (trip.status == 'confirmé')
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.play_circle_filled_rounded),
-              onPressed: () => _confirmAction(
-                context,
-                "Confirmation du Départ",
-                "Êtes-vous sûr de vouloir marquer le départ de ce trajet ?",
-                Icons.play_circle_fill_rounded,
-                AppColors.primary,
-                () {
-                  Navigator.pop(context); // Close sheet
-                  provider.markDeparture(trip.id);
-                },
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              label: const Text("DÉMARRER LE TRAJET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
+            ],
           ),
 
         if (trip.status != 'annulé') ...[
           const Gap(12),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.warning_amber_rounded),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Close sheet
-                provider.setSelectedTripForReport(trip);
-                provider.setIndex(3); // Navigue vers l'onglet Signalements
-              },
-              label: const Text("SIGNALER UN PROBLÈME", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
+          Row(
+            children: [
+              const Gap(10),
+              if (trip.status == 'en_attente' || trip.status == 'confirmé')
+                Expanded(
+                  child: SizedBox(
+                    height: 55,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.cancel_outlined),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      onPressed: () => _showCancelReasonDialog(context, trip),
+                      label: const Text(
+                        "ANNULER",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (trip.status == 'en_cours') ...[
+                Expanded(
+                  child: SizedBox(
+                    height: 55,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.flag_rounded),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      onPressed: () => _confirmFinishTrip(context, trip, provider),
+                      label: const Text(
+                        "TERMINER",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ),
+                const Gap(10),
+                Expanded(
+                  child: SizedBox(
+                    height: 55,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.warning_rounded),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      onPressed: () {
+                         Navigator.pop(context); // Close sheet
+                         provider.setSelectedTripForReport(trip);
+                         provider.setIndex(3); // Go to reports tab
+                      },
+                      label: const Text(
+                        "SIGNALER",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ],
     );
   }
 
-  void _confirmAction(
-    BuildContext context,
-    String title,
-    String message,
-    IconData icon,
-    Color iconColor,
-    VoidCallback onConfirm,
-  ) {
+  void _showCancelReasonDialog(BuildContext context, VoyageModel trip) {
+    final TextEditingController reasonController = TextEditingController();
+    final provider = context.read<DriverProvider>();
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -701,94 +747,98 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
               ),
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.1),
+                        color: Colors.red.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(icon, color: iconColor, size: 36),
+                      child: const Icon(
+                        Icons.cancel_rounded,
+                        color: Colors.red,
+                        size: 40,
+                      ),
                     ),
                     const Gap(20),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
+                    const Text(
+                      "Annuler le Voyage",
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
                       ),
                     ),
-                    const Gap(12),
-                    Text(
-                      message,
+                    const Gap(10),
+                    const Text(
+                      "Veuillez indiquer le motif de l'annulation. Ce motif sera transmis à la gare.",
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
+                        color: Colors.black54,
                         fontSize: 14,
-                        color: Color(0xFF64748B),
-                        height: 1.5,
                       ),
                     ),
-                    const Gap(32),
+                    const Gap(20),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: "Ex : Panne de véhicule, Problème personnel...",
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[200]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[200]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                      ),
+                    ),
+                    const Gap(24),
                     Row(
                       children: [
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                            ),
-                            child: const Text(
-                              "ANNULER",
-                              style: TextStyle(
-                                color: Color(0xFF64748B),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: const Text("RETOUR"),
                           ),
                         ),
                         const Gap(12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
+                              final reason = reasonController.text.trim();
+                              if (reason.length < 5) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Le motif doit faire au moins 5 caractères")),
+                                );
+                                return;
+                              }
                               Navigator.pop(context); // Close dialog
-                              onConfirm();
+                              final success = await provider.cancelVoyage(trip.id, reason: reason);
+                              if (success && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Voyage annulé avec succès")),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: iconColor,
+                              backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text(
-                              "CONFIRMER",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                            child: const Text("ANNULER"),
                           ),
                         ),
                       ],
@@ -802,6 +852,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       },
     );
   }
+
 
   Widget _buildSheetStationRow(String label, String station, String time) {
     return Row(
@@ -857,6 +908,111 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _confirmFinishTrip(BuildContext context, VoyageModel trip, DriverProvider provider) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        return Transform.scale(
+          scale: anim1.value,
+          child: Opacity(
+            opacity: anim1.value,
+            child: Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.flag_rounded,
+                        color: Colors.purple,
+                        size: 40,
+                      ),
+                    ),
+                    const Gap(20),
+                    const Text(
+                      "Arrivée à destination ?",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Gap(10),
+                    const Text(
+                      "Voulez-vous vraiment terminer ce voyage ? Cette action est définitive.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Gap(24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text(
+                              "NON, PAS ENCORE",
+                              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const Gap(12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              Navigator.pop(context); // Close dialog
+                              Navigator.pop(context); // Close sheet
+                              await provider.markArrival(trip.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Voyage terminé ! Vous êtes maintenant disponible."),
+                                    backgroundColor: Colors.purple,
+                                  ),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              "OUI, TERMINER",
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

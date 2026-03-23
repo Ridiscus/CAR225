@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:car225/core/services/networking/api_config.dart';
 import 'package:provider/provider.dart';
 import 'package:gap/gap.dart';
 import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/core/providers/user_provider.dart';
-import '../providers/driver_provider.dart';
-import '../screens/driver_scanner_screen.dart';
-import '../screens/driver_messages_screen.dart';
+import 'package:car225/features/driver/presentation/providers/driver_provider.dart';
+import 'package:car225/features/driver/presentation/screens/driver_profile_screen.dart';
+import 'package:car225/features/driver/presentation/screens/driver_history_screen.dart';
+import 'package:car225/features/home/presentation/screens/notification_screen.dart';
 
 class DriverHeader extends StatelessWidget {
   final String title;
@@ -29,7 +31,7 @@ class DriverHeader extends StatelessWidget {
     final user = userProvider.user;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(5, 0, 24, 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -51,8 +53,10 @@ class DriverHeader extends StatelessWidget {
       children: [
         const Gap(8),
         GestureDetector(
-          onTap: () =>
-              driverProvider.setIndex(4), // Redirige vers l'onglet Profil
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DriverProfileScreen()),
+          ),
           child: Container(
             height: 55,
             width: 55,
@@ -72,7 +76,7 @@ class DriverHeader extends StatelessWidget {
                   ? Image.file(driverProvider.profileImage!, fit: BoxFit.cover, width: 55, height: 55)
                   : (driverProvider.profile?.profilePictureUrl != null
                       ? Image.network(
-                          "https://jingly-lindy-unminding.ngrok-free.dev${driverProvider.profile!.profilePictureUrl}",
+                          "${ApiConfig.baseUrl.replaceAll('/api', '')}${driverProvider.profile!.profilePictureUrl}",
                           fit: BoxFit.cover,
                           width: 55,
                           height: 55,
@@ -106,12 +110,16 @@ class DriverHeader extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              Text(
-                user != null ? "${user.name} ${user.prenom}" : "Chauffeur",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  user != null ? "${user.name} ${user.prenom}" : "Chauffeur",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -122,28 +130,47 @@ class DriverHeader extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
+                icon: const Icon(Icons.history, color: Colors.white),
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const DriverScannerScreen()),
+                  MaterialPageRoute(builder: (context) => const DriverHistoryScreen()),
                 ),
               ),
               Stack(
                 children: [
                    IconButton(
                     icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DriverMessagesScreen()),
-                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                      );
+                    },
                   ),
                   if (driverProvider.messages.any((m) => !m.isRead))
                     Positioned(
-                      right: 12,
-                      top: 12,
+                      right: 5,
+                      top: 5,
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            "${driverProvider.messages.where((m) => !m.isRead).length}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     )
                 ],
@@ -154,7 +181,7 @@ class DriverHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(

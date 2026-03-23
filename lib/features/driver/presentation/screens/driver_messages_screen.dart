@@ -31,7 +31,7 @@ class _DriverMessagesScreenState extends State<DriverMessagesScreen> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          const DriverHeader(title: "Messages", showBack: true),
+          const DriverHeader(title: "Messages"),
           Expanded(
             child: driverProvider.isLoading && driverProvider.messages.isEmpty
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -154,41 +154,84 @@ class _DriverMessagesScreenState extends State<DriverMessagesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getSourceColor(message.senderType).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    message.senderType.toUpperCase(),
-                    style: TextStyle(
-                      color: _getSourceColor(message.senderType),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    color: _getSourceColor(message.senderType).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _getSourceColor(message.senderType).withOpacity(0.2),
+                      width: 1,
                     ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getSourceIcon(message.senderType),
+                        size: 12,
+                        color: _getSourceColor(message.senderType),
+                      ),
+                      const Gap(6),
+                      Text(
+                        message.senderType.toUpperCase(),
+                        style: TextStyle(
+                          color: _getSourceColor(message.senderType),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Text(
                   _formatDate(message.createdAt),
-                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                  style: TextStyle(
+                    color: message.isRead ? Colors.grey[500] : AppColors.primary.withOpacity(0.8),
+                    fontSize: 11,
+                    fontWeight: message.isRead ? FontWeight.normal : FontWeight.w600,
+                  ),
                 ),
               ],
             ),
-            const Gap(12),
-            Text(
-              message.subject,
-              style: TextStyle(
-                fontWeight: message.isRead ? FontWeight.w600 : FontWeight.w800,
-                fontSize: 15,
-                color: message.isRead ? Colors.blueGrey[900] : AppColors.primary,
-              ),
+            const Gap(16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    message.subject,
+                    style: TextStyle(
+                      fontWeight: message.isRead ? FontWeight.w600 : FontWeight.w900,
+                      fontSize: 17,
+                      color: message.isRead ? Colors.blueGrey[900] : Colors.black,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                if (!message.isRead)
+                  Container(
+                    margin: const EdgeInsets.only(left: 10, top: 5),
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
             ),
-            const Gap(8),
+            const Gap(10),
             Text(
               message.message,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.grey[600], fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                height: 1.5,
+                letterSpacing: 0.2,
+              ),
             ),
           ],
         ),
@@ -198,23 +241,38 @@ class _DriverMessagesScreenState extends State<DriverMessagesScreen> {
 
   Color _getSourceColor(String type) {
     switch (type.toLowerCase()) {
-      case 'gare': return Colors.orange;
-      case 'admin': return Colors.red;
-      case 'system': return Colors.blue;
+      case 'gare': return const Color(0xFFFF9800);
+      case 'admin': return const Color(0xFFE91E63);
+      case 'system': return const Color(0xFF2196F3);
       default: return AppColors.primary;
     }
   }
 
-  String _formatDate(String dateStr) {
+  IconData _getSourceIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'gare': return Icons.directions_bus_rounded;
+      case 'admin': return Icons.admin_panel_settings_rounded;
+      case 'system': return Icons.settings_suggest_rounded;
+      default: return Icons.mail_rounded;
+    }
+  }
+
+  String _formatDate(DateTime date) {
     try {
-      final date = DateTime.parse(dateStr);
       final now = DateTime.now();
+      final difference = now.difference(date);
+
       if (date.day == now.day && date.month == now.month && date.year == now.year) {
-         return DateFormat('HH:mm').format(date);
+        return "Aujourd'hui à ${DateFormat('HH:mm').format(date)}";
+      } else if (difference.inDays == 1) {
+        return "Hier à ${DateFormat('HH:mm').format(date)}";
+      } else if (difference.inDays < 7) {
+        // Affiche le jour de la semaine pour les messages récents
+        return "${DateFormat('EEEE', 'fr_FR').format(date)} à ${DateFormat('HH:mm').format(date)}";
       }
-      return DateFormat('dd/MM/yyyy HH:mm').format(date);
+      return DateFormat('dd MMM yyyy à HH:mm', 'fr_FR').format(date);
     } catch (_) {
-      return dateStr;
+      return DateFormat('dd/MM/yyyy HH:mm').format(date);
     }
   }
 

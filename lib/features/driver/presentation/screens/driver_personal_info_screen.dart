@@ -6,6 +6,7 @@ import 'package:car225/core/theme/app_colors.dart';
 import 'package:car225/core/providers/user_provider.dart';
 import 'package:car225/features/driver/presentation/widgets/custom_app_bar.dart';
 import 'package:car225/features/driver/presentation/widgets/success_modal.dart';
+import 'package:car225/core/services/networking/api_config.dart';
 import '../providers/driver_provider.dart';
 
 class DriverPersonalInfoScreen extends StatefulWidget {
@@ -224,11 +225,16 @@ class _DriverPersonalInfoScreenState extends State<DriverPersonalInfoScreen> {
                           backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: pickedImage != null
                               ? FileImage(pickedImage)
-                              : (profile?.profilePictureUrl != null && profile!.profilePictureUrl!.isNotEmpty
-                                  ? NetworkImage(profile.profilePictureUrl!)
-                                  : const AssetImage('assets/images/driver_profile.png')) as ImageProvider,
-                          child: (pickedImage == null && (profile?.profilePictureUrl == null || profile!.profilePictureUrl!.isEmpty))
-                              ? const Icon(Icons.person, size: 80, color: AppColors.primary)
+                              : (profile?.profilePictureUrl != null &&
+                                      profile!.profilePictureUrl!.isNotEmpty
+                                  ? NetworkImage("${ApiConfig.baseUrl.replaceAll('/api', '')}${profile.profilePictureUrl}")
+                                  : const AssetImage('assets/images/driver_profile.png'))
+                                      as ImageProvider,
+                          child: (pickedImage == null &&
+                                  (profile?.profilePictureUrl == null ||
+                                      profile!.profilePictureUrl!.isEmpty))
+                              ? const Icon(Icons.person,
+                                  size: 80, color: AppColors.primary)
                               : null,
                         ),
                       ),

@@ -155,6 +155,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:car225/core/providers/user_provider.dart';
 
 // Tes imports d'écrans
 import '../../../agent/presentation/screens/agent_main_wrapper.dart';
@@ -196,6 +198,11 @@ class _SplashScreenState extends State<SplashScreen> {
     final role = prefs.getString('user_type'); // 🟢 On récupère le rôle
 
     if (mounted) {
+      if (token != null && token.isNotEmpty) {
+          // 🟢 ON CHARGE LE PROVIDER
+          context.read<UserProvider>().loadUser();
+      }
+      
       setState(() {
         _isConnected = token != null && token.isNotEmpty;
         _userRole = role;
@@ -215,7 +222,7 @@ class _SplashScreenState extends State<SplashScreen> {
         destination = const HostessMainWrapper();
       } else if (_userRole == 'agent') {
         destination = const AgentMainWrapper();
-      } else if (_userRole == 'driver') {
+      } else if (_userRole == 'driver' || _userRole == 'chauffeur') {
         destination = const DriverMainWrapper();
       } else {
         destination = const MainScreen(); // Particulier classique

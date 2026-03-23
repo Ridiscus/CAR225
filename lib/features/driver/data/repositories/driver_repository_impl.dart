@@ -70,8 +70,8 @@ class DriverRepositoryImpl implements DriverRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> cancelVoyage(int voyageId) {
-    return remoteDataSource.cancelVoyage(voyageId);
+  Future<Map<String, dynamic>> cancelVoyage(int voyageId, {String? reason}) {
+    return remoteDataSource.cancelVoyage(voyageId, reason: reason);
   }
 
   @override

@@ -457,30 +457,28 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     }
   }
 
-  void _showPaymentMethodSelector(BuildContext context, int totalAmount) {
+  void _showPaymentMethodSelector(BuildContext context, int subTotal, int totalWithWave) {
     final int currentBalance = userWalletBalance ?? 0;
-    final bool hasEnoughFunds = currentBalance >= totalAmount;
+    final bool hasEnoughFunds = currentBalance >= subTotal;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
-        isScrollControlled: true, // Permet au modal de s'adapter au contenu
+        isScrollControlled: true,
         builder: (modalContext) {
           return Container(
-            // Pas de padding global ici pour que le SafeArea gère le bas
             padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
             ),
-            child: SafeArea( // ✅ AJOUT DU SAFE AREA ICI
-              top: false, // On ne touche pas au haut
+            child: SafeArea(
+              top: false,
               child: Column(
-                mainAxisSize: MainAxisSize.min, // S'adapte à la hauteur du contenu
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Barre de poignée
                   Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
                   const Gap(20),
 
@@ -503,25 +501,29 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                           onTap: hasEnoughFunds
                               ? () {
-                            Navigator.pop(modalContext); // Ferme le modal avant de lancer le paiement
+                            Navigator.pop(modalContext);
                             _processPayment("CARPAY");
                           }
                               : () {
                             Navigator.pop(modalContext);
-                            _showTopNotification("Solde insuffisant. Rechargez votre compte.");
+                            _showTopNotification("Solde insuffisant pour payer par portefeuille.");
                           },
-                          // 🎨 IMAGE FLATICON WALLET
                           leading: Image.asset(
-                            "assets/images/wallet-filled-money-tool.png", // Assure-toi que cette image existe
+                            "assets/images/wallet-filled-money-tool.png",
                             width: 45,
                             height: 45,
-                            // Fallback au cas où l'image n'est pas trouvée
                             errorBuilder: (c,o,s) => const Icon(Icons.account_balance_wallet, color: AppColors.primary, size: 35),
                           ),
                           title: const Text("CarPay Wallet", style: TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(
-                              hasEnoughFunds ? "Solde: ${_formatCurrency(currentBalance)}" : "Insuffisant (${_formatCurrency(currentBalance)})",
-                              style: TextStyle(color: hasEnoughFunds ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 13)
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                  hasEnoughFunds ? "Payer ${_formatCurrency(subTotal)}" : "Insuffisant (${_formatCurrency(currentBalance)})",
+                                  style: TextStyle(color: hasEnoughFunds ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 13)
+                              ),
+                              const Text("Aucun frais supplémentaire", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
                           ),
                           trailing: hasEnoughFunds
                               ? const Icon(Icons.check_circle, color: AppColors.primary)
@@ -534,29 +536,35 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   // 2. OPTION MOBILE MONEY (WAVE)
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: Colors.blue.shade300, width: 2),
                       borderRadius: BorderRadius.circular(15),
+                      color: Colors.blue.withOpacity(0.05),
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                       onTap: () {
                         Navigator.pop(modalContext);
-                        _processPayment("WAVE"); // <-- Changed from CINETPAY
+                        _processPayment("WAVE");
                       },
-                      // 🎨 IMAGE FLATICON MOBILE PAYMENT
                       leading: Image.asset(
-                        "assets/images/digital-wallet.png", // Idéalement, mets le logo de Wave ici
+                        "assets/images/digital-wallet.png",
                         width: 45,
                         height: 45,
                         errorBuilder: (c,o,s) => const Icon(Icons.waves, color: Colors.blue, size: 35),
                       ),
                       title: const Text("Paiement via Wave", style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text("Payer en toute sécurité avec Wave", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Payer ${_formatCurrency(totalWithWave)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)),
+                          const Text("Inclut 4% de frais admin", style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                        ],
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.blue),
                     ),
                   ),
 
-                  const Gap(20), // Un petit espace en bas avant la fin du SafeArea
+                  const Gap(20),
                 ],
               ),
             ),
@@ -644,8 +652,9 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     final int ticketPrice = widget.program.isAllerRetour ? (widget.program.prix * 2) : widget.program.prix;
     final int passengerCount = (widget.bookingData['nombre_places'] as num).toInt();
     final int subTotal = ticketPrice * passengerCount;
-    final int fees = (subTotal * 0.04).toInt();
-    final int total = subTotal + fees;
+    // Les frais admin ne sont que pour Wave
+    final int waveFees = (subTotal * 0.04).toInt();
+    final int totalWithWave = subTotal + waveFees;
 
     // Date Départ
     String rawDateDepart = widget.bookingData['date_voyage']?.toString() ?? widget.program.dateDepart;
@@ -682,11 +691,9 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]
         ),
           child: SafeArea(
-            // ✅ CORRECTION : Ajout de 'child:' ici
             child: Container(
               width: double.infinity,
               height: 55,
-              // ✅ Coupe l'image pour respecter les bords arrondis
               clipBehavior: Clip.hardEdge,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
@@ -694,7 +701,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   image: AssetImage("assets/images/tabaa.jpg"),
                   fit: BoxFit.cover,
                 ),
-                // Optionnel : Une petite ombre pour le relief
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.primary.withOpacity(0.3),
@@ -704,15 +710,14 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 ],
               ),
               child: ElevatedButton(
-                // Si on soumet, on désactive le clic (null)
-                onPressed: isSubmitting ? null : () => _showPaymentMethodSelector(context, total),
+                // On passe subTotal et totalWithWave au modal
+                onPressed: isSubmitting ? null : () => _showPaymentMethodSelector(context, subTotal, totalWithWave),
 
                 style: ElevatedButton.styleFrom(
-                  // ✅ CRUCIAL : Transparent partout pour voir l'image derrière
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  disabledBackgroundColor: Colors.transparent, // Même désactivé, on voit l'image !
-                  disabledForegroundColor: Colors.white, // Le loader reste blanc
+                  disabledBackgroundColor: Colors.transparent, 
+                  disabledForegroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
@@ -724,7 +729,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
                 )
                     : Text(
-                    "Payer ${_formatCurrency(total)}",
+                    "Payer ${_formatCurrency(subTotal)}", // Affiche le prix par défaut (wallet)
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
                 ),
               ),
@@ -895,7 +900,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
             ),
             const Gap(15),
 
-            // 4. RÉSUMÉ DU PRIX
             _buildSectionCard(
               context,
               title: "Résumé du prix",
@@ -904,17 +908,20 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 const Gap(10),
                 _buildPriceRow(context, "Nombre de passagers", "x $passengerCount"),
                 const Gap(10),
-                _buildPriceRow(context, "Sous-total", _formatCurrency(subTotal), isBold: true),
+                _buildPriceRow(context, "Sous-total (Solde)", _formatCurrency(subTotal), isBold: true),
+                const Gap(5),
+                const Text("* Les frais de 4% ne s'appliquent qu'au paiement Wave", style: TextStyle(fontSize: 10, color: Colors.orange, fontStyle: FontStyle.italic)),
                 Divider(height: 20, color: dividerColor),
+                
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text("Frais de service (4%)", style: TextStyle(color: AppColors.grey, fontSize: 14)),
-                  Text(_formatCurrency(fees), style: TextStyle(fontSize: 14, color: textColor)),
+                  const Text("Prix Portefeuille", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(_formatCurrency(subTotal), style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.bold)),
                 ]),
-                const Divider(height: 20, color: AppColors.primary),
+                const Gap(8),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text("Total à payer", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-                  Text(_formatCurrency(total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                ])
+                  const Text("Prix Wave (+4%)", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.blue)),
+                  Text(_formatCurrency(totalWithWave), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
+                ]),
               ],
             ),
             const Gap(40),

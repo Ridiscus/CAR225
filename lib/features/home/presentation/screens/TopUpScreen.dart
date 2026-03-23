@@ -405,24 +405,46 @@ class _TopUpScreenState extends State<TopUpScreen> {
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              // ✅ Le bouton est cliquable dès que le montant est > 0
-              onPressed: (_isLoading || _amount <= 0) ? null : _initiateDeposit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: (_amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 5,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_amount > 0) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Sous-total", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    Text("$_amount FCFA", style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+                const Gap(5),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Frais de service (4%)", style: TextStyle(color: Colors.blue, fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text("+ ${(_amount * 0.04).round()} FCFA", style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+                const Divider(height: 20),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: (_isLoading || _amount <= 0) ? null : _initiateDeposit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: (_amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 5,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                      : Text(
+                    "PAYER ${(_amount + (_amount * 0.04).round())} FCFA",
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-              child: _isLoading
-                  ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                  : Text(
-                "PAYER $_amount FCFA",
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
+            ],
           ),
         ),
       ),

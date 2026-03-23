@@ -3,17 +3,24 @@ class VoyageModel {
   final String dateVoyage;
   final String statut;
   final int occupancy;
+  final String? tempsRestant;
   final VoyageProgrammeModel? programme;
   final VoyageVehiculeModel? vehicule;
+  final String? estimatedArrivalAt;
 
   VoyageModel({
     required this.id,
     required this.dateVoyage,
     required this.statut,
     required this.occupancy,
+    this.tempsRestant,
     this.programme,
     this.vehicule,
+    this.estimatedArrivalAt,
   });
+
+  String get status => statut;
+  bool get hasArrived => (statut == 'terminé' || statut == 'arrivé') && (estimatedArrivalAt != null && estimatedArrivalAt != "NULL");
 
   factory VoyageModel.fromJson(Map<String, dynamic> json) {
     return VoyageModel(
@@ -21,8 +28,10 @@ class VoyageModel {
       dateVoyage: json['date_voyage']?.toString() ?? '',
       statut: json['statut']?.toString() ?? '',
       occupancy: json['occupancy'] != null ? int.tryParse(json['occupancy'].toString()) ?? 0 : 0,
+      tempsRestant: json['temps_restant']?.toString(),
       programme: json['programme'] != null ? VoyageProgrammeModel.fromJson(json['programme']) : null,
       vehicule: json['vehicule'] != null ? VoyageVehiculeModel.fromJson(json['vehicule']) : null,
+      estimatedArrivalAt: json['estimated_arrival_at']?.toString(),
     );
   }
 }
@@ -36,6 +45,7 @@ class VoyageProgrammeModel {
   final String gareDepart;
   final String gareArrivee;
   final double tarif;
+  final int capacity;
 
   VoyageProgrammeModel({
     required this.id,
@@ -46,6 +56,7 @@ class VoyageProgrammeModel {
     required this.gareDepart,
     required this.gareArrivee,
     required this.tarif,
+    required this.capacity,
   });
 
   factory VoyageProgrammeModel.fromJson(Map<String, dynamic> json) {
@@ -57,7 +68,8 @@ class VoyageProgrammeModel {
       heureArrive: json['heure_arrive']?.toString() ?? '',
       gareDepart: json['gare_depart']?.toString() ?? '',
       gareArrivee: json['gare_arrivee']?.toString() ?? '',
-      tarif: json['tarif'] != null ? double.tryParse(json['tarif'].toString()) ?? 0.0 : 0.0,
+      tarif: json['montant_billet'] != null ? double.tryParse(json['montant_billet'].toString()) ?? 0.0 : 0.0,
+      capacity: json['capacity'] != null ? int.tryParse(json['capacity'].toString()) ?? 0 : 0,
     );
   }
 }
@@ -83,7 +95,7 @@ class VoyageVehiculeModel {
       marque: json['marque']?.toString() ?? '',
       modele: json['modele']?.toString(),
       immatriculation: json['immatriculation']?.toString() ?? '',
-      places: json['places'] != null ? int.tryParse(json['places'].toString()) ?? 70 : 70,
+      places: json['nombre_place'] != null ? int.tryParse(json['nombre_place'].toString()) ?? 0 : 0,
     );
   }
 }
@@ -95,13 +107,17 @@ extension VoyageModelUI on VoyageModel {
   
   DateTime get scheduledDepartureTime {
     try {
-      if (programme?.heureDepart != null) {
-        // Mock parsing if heureDepart is not a full dateTime but 'HH:mm'
-        final parts = programme!.heureDepart.split(':');
-        final now = DateTime.now();
-        return DateTime(now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
+      final hDepart = programme?.heureDepart;
+      if (hDepart != null && hDepart.contains(':')) {
+        final parts = hDepart.split(':');
+        if (parts.length >= 2) {
+          final now = DateTime.now();
+          final hour = int.tryParse(parts[0]) ?? 0;
+          final minute = int.tryParse(parts[1]) ?? 0;
+          return DateTime(now.year, now.month, now.day, hour, minute);
+        }
       }
-      return DateTime.parse(dateVoyage);
+      return dateVoyage.isNotEmpty ? DateTime.tryParse(dateVoyage) ?? DateTime.now() : DateTime.now();
     } catch (_) {
       return DateTime.now();
     }
@@ -109,16 +125,15 @@ extension VoyageModelUI on VoyageModel {
 
   DateTime get scheduledArrivalTime {
     try {
-      if (programme?.heureArrive != null && programme!.heureArrive.isNotEmpty) {
-        final timeParts = programme!.heureArrive.split(':');
-        final arrival = DateTime.parse(dateVoyage);
-        return DateTime(
-          arrival.year,
-          arrival.month,
-          arrival.day,
-          int.parse(timeParts[0]),
-          int.parse(timeParts[1]),
-        );
+      final hArrive = programme?.heureArrive;
+      if (hArrive != null && hArrive.contains(':')) {
+        final timeParts = hArrive.split(':');
+        if (timeParts.length >= 2) {
+          final now = DateTime.now();
+          final hour = int.tryParse(timeParts[0]) ?? 0;
+          final minute = int.tryParse(timeParts[1]) ?? 0;
+          return DateTime(now.year, now.month, now.day, hour, minute);
+        }
       }
       return scheduledDepartureTime.add(const Duration(hours: 3));
     } catch (_) {
@@ -132,11 +147,18 @@ extension VoyageModelUI on VoyageModel {
     return scheduledArrivalTime.difference(now);
   }
 
-  // legacy fields
-  DateTime? get actualDepartureTime => null;
-  DateTime? get actualArrivalTime => null;
   double get price => programme?.tarif ?? 0.0;
   int get passengersCount => occupancy;
-  int get totalSeats => (vehicule != null) ? vehicule!.places : 70;
-  String get status => statut;
+  
+  int get totalSeats {
+    final prog = programme;
+    if (prog != null && prog.capacity > 0) {
+      return prog.capacity;
+    }
+    final v = vehicule;
+    if (v != null) {
+      return v.places;
+    }
+    return 70;
+  }
 }

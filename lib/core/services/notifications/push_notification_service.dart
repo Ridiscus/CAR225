@@ -121,6 +121,8 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../features/driver/presentation/providers/driver_provider.dart';
 
 // Importe ta GlobalKey définie dans main.dart
 import '../../../features/home/presentation/screens/notification_screen.dart';
@@ -153,6 +155,19 @@ class PushNotificationService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       if (message.notification != null) {
         _showLocalNotification(message);
+        
+        // Rafraîchir les données si c'est un nouveau voyage (Chauffeur)
+        if (message.data['type'] == 'voyage_assigned') {
+          final context = navigatorKey.currentContext;
+          if (context != null) {
+            try {
+              final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+              driverProvider.loadDashboard();
+            } catch (e) {
+              print("Erreur refresh driver provider: $e");
+            }
+          }
+        }
       }
     });
 

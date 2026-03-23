@@ -22,7 +22,7 @@ abstract class DriverRepository {
   Future<VoyageModel> confirmVoyage(int voyageId);
   Future<VoyageModel> startVoyage(int voyageId);
   Future<Map<String, dynamic>> completeVoyage(int voyageId);
-  Future<Map<String, dynamic>> cancelVoyage(int voyageId);
+  Future<Map<String, dynamic>> cancelVoyage(int voyageId, {String? reason});
   Future<Map<String, dynamic>> updateLocation(int voyageId, double latitude, double longitude, {double? speed, double? heading});
 
   Future<Map<String, dynamic>> getMessages({int page = 1});

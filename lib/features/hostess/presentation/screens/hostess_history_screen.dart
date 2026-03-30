@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'package:car225/core/theme/app_colors.dart';
@@ -13,6 +16,9 @@ import '../../../auth/data/repositories/auth_repository_impl.dart';
 import '../../models/sale_model.dart';
 import '../providers/hostess_sales_provider.dart';
 
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 
 class HostessHistoryScreen extends StatefulWidget {
@@ -26,14 +32,35 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
+
+  // --- NOUVELLES VARIABLES POUR L'IMPRIMANTE ---
+  BlueThermalPrinter bluetooth = BlueThermalPrinter.instance;
+  List<BluetoothDevice> _devices = [];
+  BluetoothDevice? _selectedDevice;
+  bool _isPrinterConnected = false;
+
+
+
   @override
   void initState() {
     super.initState();
+    // Initialiser l'état de l'imprimante
+    _initPrinter();
     // Charge les ventes dès l'ouverture de l'écran.
     // Utilisation de addPostFrameCallback car on ne peut pas appeler un Provider dans un initState directement.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyFilter();
     });
+  }
+
+  // Vérifie si on est déjà connecté au lancement
+  Future<void> _initPrinter() async {
+    bool? isConnected = await bluetooth.isConnected;
+    if (mounted) {
+      setState(() {
+        _isPrinterConnected = isConnected ?? false;
+      });
+    }
   }
 
 
@@ -133,6 +160,156 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     }
   }
 
+
+  Future<bool> _requestBluetoothPermissions() async {
+    // On demande les permissions de localisation (nécessaire pour scanner le BT sur Android)
+    // Et les nouvelles permissions Android 12+ (Scan et Connect)
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+
+    // On vérifie si tout est accordé
+    bool isGranted = true;
+    statuses.forEach((permission, status) {
+      if (!status.isGranted) {
+        isGranted = false;
+      }
+    });
+
+    if (!isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Les permissions Bluetooth et Localisation sont requises pour imprimer."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _printTicket(HostessSaleModel sale) async {
+    // 1. On vérifie les permissions d'abord !
+    bool hasPermissions = await _requestBluetoothPermissions();
+    if (!hasPermissions) return;
+
+    // 2. On vérifie si on est connecté
+    bool? isConnected = await BlueThermalPrinter.instance.isConnected;
+
+    if (isConnected == null || !isConnected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Aucune imprimante connectée. Veuillez sélectionner votre imprimante."),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 3. Configurer le profil de l'imprimante
+    final profile = await CapabilityProfile.load();
+    // Utilise PaperSize.mm58 si ta ORGBRO est une petite imprimante (très courant), sinon mm80
+    //final generator = Generator(PaperSize.mm80, profile);
+    final generator = Generator(PaperSize.mm58, profile);
+    List<int> bytes = [];
+
+    // 🟢 ASTUCE : On force l'encodage européen/français pour les accents (é, è, ô)
+    bytes += generator.setGlobalCodeTable('CP1252');
+
+    // 🟢 NETTOYAGE DES CARACTÈRES SPÉCIAUX*$ù
+
+
+    // On remplace la flèche Unicode par un simple "->"
+    String trajetNettoye = sale.trajet.replaceAll('→', '->');
+
+    // 4. Construction du billet en ESC/POS
+    bytes += generator.text('CAR225',
+        styles: const PosStyles(
+          align: PosAlign.center,
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+          bold: true,
+        ));
+
+    bytes += generator.text('Billet de transport', styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.emptyLines(1);
+    bytes += generator.hr(); // Ligne pointillée
+
+    // Infos
+    bytes += generator.row([
+      PosColumn(text: 'Ticket:', width: 4),
+      PosColumn(text: sale.ticketNo, width: 8, styles: const PosStyles(bold: true)),
+    ]);
+
+    bytes += generator.row([
+      PosColumn(text: 'Passager:', width: 4),
+      PosColumn(text: sale.passager, width: 8),
+    ]);
+
+    bytes += generator.emptyLines(1);
+
+    // Trajet
+    bytes += generator.text('TRAJET', styles: const PosStyles(align: PosAlign.center, bold: true));
+    // 🟢 On utilise la variable nettoyée ici :
+    bytes += generator.text(trajetNettoye, styles: const PosStyles(align: PosAlign.center));
+
+    bytes += generator.emptyLines(1);
+
+    // QR Code
+    bytes += generator.qrcode(sale.reference);
+
+    bytes += generator.emptyLines(1);
+    bytes += generator.text('Bon voyage !', styles: const PosStyles(align: PosAlign.center, bold: true));
+
+    // Avancer le papier pour la découpe
+    bytes += generator.feed(3);
+    bytes += generator.cut();
+
+    // 5. Envoi direct des bytes à l'imprimante via Bluetooth
+    bluetooth.writeBytes(Uint8List.fromList(bytes));
+  }
+
+
+
+  /*void _showTopNotification(String message, {bool isError = true}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 60.0, left: 20.0, right: 20.0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isError ? const Color(0xFF222222) : Colors.green.shade700,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(isError ? Icons.info_outline : Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13), textAlign: TextAlign.center, maxLines: 2)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 3), () { if(mounted) overlayEntry.remove(); });
+  }*/
+
+
+
   @override
   Widget build(BuildContext context) {
     // 1. On récupère les données de l'API via le Provider
@@ -196,6 +373,8 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     );
   }
 
+
+
   Widget _buildPremiumHeader(bool isLoading) {
     final fmt = DateFormat('dd/MM/yyyy');
     final startLabel = _startDate != null ? fmt.format(_startDate!) : 'jj/mm/aaaa';
@@ -221,31 +400,62 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Historique des ventes',
+                      style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.8),
+                    ),
+                    Text(
+                      'Suivi de vos transactions',
+                      style: TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 🟢 ZONE DES BOUTONS (Rafraîchir + Imprimante)
+              Row(
                 children: [
-                  Text(
-                    'Historique des ventes',
-                    style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.8),
-                  ),
-                  Text(
-                    'Suivi de vos transactions',
-                    style: TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w500),
+                  if (hasFilter)
+                    GestureDetector(
+                      onTap: _resetFilter,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  if (hasFilter) const Gap(10), // Espace si le filtre est actif
+
+                  // 🖨️ BOUTON IMPRIMANTE
+                  GestureDetector(
+                    onTap: () => _showPrinterSettings(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _isPrinterConnected
+                            ? Colors.greenAccent.shade400 // Vert si connecté
+                            : Colors.white.withValues(alpha: 0.2), // Transparent sinon
+                        shape: BoxShape.circle,
+                        boxShadow: _isPrinterConnected ? [
+                          BoxShadow(color: Colors.greenAccent.withValues(alpha: 0.5), blurRadius: 8)
+                        ] : [],
+                      ),
+                      child: Icon(
+                          _isPrinterConnected ? Icons.print : Icons.print_disabled,
+                          color: _isPrinterConnected ? Colors.black87 : Colors.white,
+                          size: 20
+                      ),
+                    ),
                   ),
                 ],
               ),
-              if (hasFilter)
-                GestureDetector(
-                  onTap: _resetFilter,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                  ),
-                ),
             ],
           ),
           const Gap(20),
@@ -282,9 +492,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
-                    onTap: isLoading
-                        ? null
-                        : () {
+                    onTap: isLoading ? null : () {
                       HapticFeedback.mediumImpact();
                       _applyFilter();
                     },
@@ -294,13 +502,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
                       height: 50,
                       width: 50,
                       child: isLoading
-                          ? const Center(
-                        child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                        ),
-                      )
+                          ? const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)))
                           : const Icon(Icons.search_rounded, color: AppColors.primary, size: 28),
                     ),
                   ),
@@ -310,6 +512,94 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
           ),
         ],
       ),
+    );
+  }
+
+
+
+  Future<void> _showPrinterSettings(BuildContext context) async {
+    // 1. Demande les permissions d'abord (la fonction qu'on a créée avant)
+    bool hasPermissions = await _requestBluetoothPermissions();
+    if (!hasPermissions) return;
+
+    // 2. Récupérer les appareils Bluetooth associés au téléphone
+    try {
+      _devices = await bluetooth.getBondedDevices();
+    } catch (e) {
+      debugPrint("Erreur scan Bluetooth : $e");
+    }
+
+    if (!mounted) return;
+
+    // 3. Afficher le menu
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return StatefulBuilder(
+            builder: (context, setModalState) {
+              return Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Imprimante Thermique", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Gap(16),
+
+                    if (_devices.isEmpty)
+                      const Text("Aucun appareil Bluetooth associé. Allez dans les paramètres de votre téléphone pour associer l'imprimante ORGBRO.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+
+                    if (_devices.isNotEmpty)
+                      ..._devices.map((device) => ListTile(
+                        leading: const Icon(Icons.print, color: AppColors.primary),
+                        title: Text(device.name ?? "Appareil inconnu"),
+                        subtitle: Text(device.address ?? ""),
+                        trailing: _selectedDevice?.address == device.address
+                            ? const Icon(Icons.check_circle, color: Colors.green)
+                            : null,
+                        onTap: () async {
+                          setModalState(() => _selectedDevice = device);
+
+                          // On tente la connexion
+                          try {
+                            if (await bluetooth.isConnected == true) {
+                              await bluetooth.disconnect();
+                            }
+                            await bluetooth.connect(device);
+
+                            setState(() {
+                              _isPrinterConnected = true;
+                            });
+
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Imprimante connectée avec succès !"), backgroundColor: Colors.green));
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Échec de connexion : $e"), backgroundColor: Colors.red));
+                            }
+                          }
+                        },
+                      )).toList(),
+
+                    const Gap(20),
+                    if (_isPrinterConnected)
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                        onPressed: () async {
+                          await bluetooth.disconnect();
+                          setState(() => _isPrinterConnected = false);
+                          if (mounted) Navigator.pop(context);
+                        },
+                        child: const Text("Déconnecter", style: TextStyle(color: Colors.white)),
+                      )
+                  ],
+                ),
+              );
+            }
+        );
+      },
     );
   }
 
@@ -484,73 +774,7 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
     );
   }
 
-  Widget _buildSaleDetailsContent(BuildContext context, HostessSaleModel sale) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: SafeArea(
-        bottom: Platform.isAndroid ? true : false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const Gap(24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Détails de la vente', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1A1A))),
-                _buildStatusBadge(sale.statut),
-              ],
-            ),
-            const Gap(24),
-            _buildDetailRow('N° Billet', sale.ticketNo, isHighlight: true),
-            const Divider(height: 32, color: Color(0xFFEEEEEE)),
-            _buildDetailRow('Passager', sale.passager),
-            const Gap(16),
-            _buildDetailRow('Trajet', sale.trajet),
-            const Gap(16),
-            _buildDetailRow('Date', sale.date),
-            const Gap(16),
-            _buildDetailRow('Heure', sale.heure),
-            const Gap(16),
-            _buildDetailRow('Place', sale.siege),
-            const Divider(height: 32, color: Color(0xFFEEEEEE)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Montant total', style: TextStyle(fontSize: 16, color: Color(0xFF757575), fontWeight: FontWeight.w600)),
-                Text(sale.prix, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.primary)),
-              ],
-            ),
-            const Gap(32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 168, 166, 166),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text('Fermer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildDetailRow(String label, String value, {bool isHighlight = false}) {
     return Row(
@@ -587,4 +811,111 @@ class _HostessHistoryScreenState extends State<HostessHistoryScreen> {
       ),
     );
   }
+
+
+  Widget _buildSaleDetailsContent(BuildContext context, HostessSaleModel sale) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: SafeArea(
+        bottom: Platform.isAndroid ? true : false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Gap(24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Détails de la vente', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1A1A))),
+                _buildStatusBadge(sale.statut),
+              ],
+            ),
+            const Gap(24),
+
+            // 🟢 AFFICHAGE DU QR CODE DANS LE BOTTOM SHEET
+            if (sale.qrCodeUrl != null && sale.qrCodeUrl!.isNotEmpty) ...[
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.network(
+                    sale.qrCodeUrl!,
+                    width: 120,
+                    height: 120,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code, size: 80, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const Gap(16),
+            ],
+
+            _buildDetailRow('N° Billet', sale.ticketNo, isHighlight: true),
+            const Divider(height: 32, color: Color(0xFFEEEEEE)),
+            _buildDetailRow('Passager', sale.passager),
+            const Gap(16),
+            _buildDetailRow('Trajet', sale.trajet),
+            const Gap(16),
+            _buildDetailRow('Date', sale.date),
+            const Gap(16),
+            _buildDetailRow('Heure', sale.heure),
+            const Gap(16),
+            _buildDetailRow('Place', sale.siege),
+            const Divider(height: 32, color: Color(0xFFEEEEEE)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Montant total', style: TextStyle(fontSize: 16, color: Color(0xFF757575), fontWeight: FontWeight.w600)),
+                Text(sale.prix, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.primary)),
+              ],
+            ),
+            const Gap(32),
+
+            // 🟢 NOUVEAU BOUTON IMPRIMER
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context); // Ferme le bottom sheet
+                  _printTicket(sale);     // Lance l'impression
+                },
+                icon: const Icon(Icons.print, color: Colors.white),
+                label: const Text('Imprimer le billet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            const Gap(10),
+
+            // Bouton fermer classique (secondaire)
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Fermer', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+
 }

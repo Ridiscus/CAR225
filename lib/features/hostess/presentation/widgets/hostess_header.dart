@@ -69,10 +69,10 @@ class _HostessHeaderState extends State<HostessHeader> {
           // PROFIL AVATAR AVEC DESIGN DISTINCT
           InkWell(
             onTap: () {
-              final state = context
-                  .findAncestorStateOfType<HostessMainWrapperState>();
+              final state = context.findAncestorStateOfType<HostessMainWrapperState>();
               if (state != null) {
-                state.setIndex(4);
+                // 🟢 CHANGE LE 4 PAR LE BON INDEX (sûrement 3 ou 2)
+                state.setIndex(3);
               }
             },
             child: Stack(

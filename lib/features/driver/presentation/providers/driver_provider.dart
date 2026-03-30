@@ -1,72 +1,82 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/trip_model.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart' as dio;
+import '../../data/datasources/driver_remote_data_source.dart';
+import '../../data/repositories/driver_repository_impl.dart';
+import '../../data/models/driver_profile_model.dart';
+import '../../data/models/voyage_model.dart';
+import '../../data/models/driver_message_model.dart';
+import '../../data/models/driver_scan_info_model.dart';
+import '../../data/models/signalement_model.dart';
 
 class DriverProvider extends ChangeNotifier {
-  File? _profileImage;
-  File? get profileImage => _profileImage;
-
-  TripModel? _currentTrip;
-  TripModel? get currentTrip => _currentTrip;
-
-  List<TripModel> _allTrips = [];
-  List<TripModel> get allTrips => _allTrips;
-
-  // Filtres
-  List<TripModel> get todayTrips => _allTrips
-      .where(
-        (t) =>
-            t.scheduledDepartureTime.day == DateTime.now().day &&
-            t.scheduledDepartureTime.month == DateTime.now().month &&
-            t.scheduledDepartureTime.year == DateTime.now().year &&
-            t.status != 'completed' &&
-            t.status != 'cancelled',
-      )
-      .toList();
-
-  List<TripModel> get upcomingTrips => _allTrips
-      .where(
-        (t) =>
-            t.scheduledDepartureTime.isAfter(DateTime.now()) &&
-            t.scheduledDepartureTime.day != DateTime.now().day &&
-            t.status != 'completed' &&
-            t.status != 'cancelled',
-      )
-      .toList();
-
-  List<TripModel> get historyTrips => _allTrips
-      .where((t) => t.status == 'completed' || t.status == 'cancelled')
-      .toList();
-
-  List<TripModel> get activeTrips => _allTrips
-      .where((t) => t.status == 'started' || t.status == 'pending')
-      .toList();
+  final DriverRepositoryImpl _repo = DriverRepositoryImpl(remoteDataSource: DriverRemoteDataSourceImpl());
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  int _currentIndex = 0;
-  int get currentIndex => _currentIndex;
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
 
-  void setIndex(int index) {
-    _currentIndex = index;
-    notifyListeners();
-  }
+  DriverProfileModel? _profile;
+  DriverProfileModel? get profile => _profile;
+
+  File? _profileImage;
+  File? get profileImage => _profileImage;
 
   DriverProvider() {
-    _loadInitialData();
+    loadCachedImage();
+    loadProfile();
+    loadDashboard().then((_) => _checkOngoingTracking());
+    loadSignalements();
+    loadMessages();
   }
 
-  Future<void> _loadInitialData() async {
-    _isLoading = true;
-    notifyListeners();
+  Timer? _locationTimer;
 
-    await loadCachedImage();
-    await fetchAllTrips();
+  void _checkOngoingTracking() {
+    final ongoing = currentTrip;
+    if (ongoing != null && ongoing.statut == 'en_cours') {
+      _startLocationTracking(ongoing.id);
+    } else {
+      _stopLocationTracking();
+    }
+  }
 
-    _isLoading = false;
-    notifyListeners();
+  void _startLocationTracking(int voyageId) {
+    _locationTimer?.cancel();
+    
+    // Premier envoi immédiat
+    _sendLocation(voyageId);
+
+    _locationTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
+      _sendLocation(voyageId);
+    });
+  }
+
+  Future<void> _sendLocation(int voyageId) async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      await updateLocation(
+        voyageId,
+        position.latitude,
+        position.longitude,
+        speed: position.speed,
+        heading: position.heading,
+      );
+    } catch (e) {
+      debugPrint("Location tracking error: $e");
+    }
+  }
+
+  void _stopLocationTracking() {
+    _locationTimer?.cancel();
+    _locationTimer = null;
   }
 
   Future<void> loadCachedImage() async {
@@ -85,113 +95,220 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchAllTrips() async {
-    await Future.delayed(const Duration(seconds: 1));
+  // Trips lists (Vocabulaire UI adapté pour Minimiser les casses, type VoyageModel)
+  List<VoyageModel> _todayTrips = [];
+  List<VoyageModel> get todayTrips => _todayTrips;
 
-    _allTrips = [
-      TripModel(
-        id: "TRIP-001",
-        departureStation: "Gare Nord (Adjamé)",
-        arrivalStation: "Gare Sud (Treichville)",
-        carRegistration: "AB-123-CD",
-        scheduledDepartureTime: DateTime.now().add(const Duration(hours: 1)),
-        scheduledArrivalTime: DateTime.now().add(const Duration(hours: 3)),
-        status: 'pending',
-        price: 5000,
-        passengersCount: 42,
-        totalSeats: 70,
-      ),
-      TripModel(
-        id: "TRIP-002",
-        departureStation: "Gare Bassam",
-        arrivalStation: "Gare Nord",
-        carRegistration: "EF-456-GH",
-        scheduledDepartureTime: DateTime.now().add(
-          const Duration(days: 1, hours: 2),
-        ),
-        scheduledArrivalTime: DateTime.now().add(
-          const Duration(days: 1, hours: 5),
-        ),
-        status: 'pending',
-        price: 2500,
-        passengersCount: 15,
-        totalSeats: 32,
-      ),
-      TripModel(
-        id: "TRIP-003",
-        departureStation: "Gare Yamoussoukro",
-        arrivalStation: "Gare Bouaké",
-        carRegistration: "IJ-789-KL",
-        scheduledDepartureTime: DateTime.now().subtract(
-          const Duration(days: 1),
-        ),
-        scheduledArrivalTime: DateTime.now().subtract(
-          const Duration(days: 1, hours: -3),
-        ),
-        status: 'completed',
-        actualDepartureTime: DateTime.now().subtract(const Duration(days: 1)),
-        actualArrivalTime: DateTime.now().subtract(
-          const Duration(days: 1, hours: -3),
-        ),
-        price: 7000,
-        passengersCount: 65,
-        totalSeats: 70,
-      ),
-      TripModel(
-        id: "TRIP-004",
-        departureStation: "Gare Korhogo",
-        arrivalStation: "Gare Ferké",
-        carRegistration: "MN-012-OP",
-        scheduledDepartureTime: DateTime.now().subtract(
-          const Duration(days: 2),
-        ),
-        scheduledArrivalTime: DateTime.now().subtract(
-          const Duration(days: 2, hours: -2),
-        ),
-        status: 'cancelled',
-        price: 3000,
-        passengersCount: 0,
-        totalSeats: 32,
-      ),
-    ];
+  List<VoyageModel> _upcomingTrips = [];
+  List<VoyageModel> get upcomingTrips => _upcomingTrips;
 
-    // On définit le premier trajet du jour comme "current" s'il existe
-    if (todayTrips.isNotEmpty) {
-      _currentTrip = todayTrips.first;
-    }
+  List<VoyageModel> _historyTrips = [];
+  List<VoyageModel> get historyTrips => _historyTrips;
 
+  VoyageModel? _selectedTripForReport;
+  VoyageModel? get selectedTripForReport => _selectedTripForReport;
+
+  void setSelectedTripForReport(VoyageModel? trip) {
+    _selectedTripForReport = trip;
     notifyListeners();
   }
 
-  Future<void> markDeparture() async {
-    if (_currentTrip != null) {
-      final index = _allTrips.indexWhere((t) => t.id == _currentTrip!.id);
-      if (index != -1) {
-        _allTrips[index] = _allTrips[index].copyWith(
-          status: 'started',
-          actualDepartureTime: DateTime.now(),
-        );
-        _currentTrip = _allTrips[index];
-        notifyListeners();
+  List<DriverMessageModel> _messages = [];
+  List<DriverMessageModel> get messages => _messages;
+
+  DriverScanInfoModel? _scanInfo;
+  DriverScanInfoModel? get scanInfo => _scanInfo;
+
+  List<SignalementModel> _signalements = [];
+  List<SignalementModel> get signalements => _signalements;
+
+  Map<String, dynamic>? _stats;
+  Map<String, dynamic>? get stats => _stats;
+
+  VoyageModel? get currentTrip {
+    try {
+      return _todayTrips.firstWhere((t) => t.statut == 'en_cours' || t.statut == 'confirmé');
+    } catch (e) {
+      if (_todayTrips.isNotEmpty) {
+        return _todayTrips.firstWhere((t) => t.statut != 'terminé' && t.statut != 'annulé', orElse: () => _todayTrips.first);
       }
+      return null;
     }
   }
 
-  Future<void> markArrival() async {
-    if (_currentTrip != null) {
-      final index = _allTrips.indexWhere((t) => t.id == _currentTrip!.id);
-      if (index != -1) {
-        _allTrips[index] = _allTrips[index].copyWith(
-          status: 'completed',
-          actualArrivalTime: DateTime.now(),
-        );
-        _currentTrip = null; // Une fois terminé, on décharge le trajet courant
-        notifyListeners();
+  List<VoyageModel> get activeTrips => _todayTrips.where((t) => t.statut == 'en_cours' || t.statut == 'confirmé' || t.statut == 'en_attente').toList();
+
+  int _currentIndex = 0;
+  int get currentIndex => _currentIndex;
+
+  void setIndex(int index) {
+    if (_currentIndex == index) return;
+    _currentIndex = index;
+    notifyListeners();
+  }
+
+  // Loader state modifier
+  void _setLoading(bool val) {
+    _isLoading = val;
+    notifyListeners();
+  }
+
+  void _setError(String? msg) {
+    _errorMessage = msg;
+    notifyListeners();
+  }
+
+  void clearError() => _setError(null);
+
+  Future<void> loadProfile() async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final res = await _repo.getProfile();
+      _profile = res;
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+DriverMessageModel? _pendingMessageToOpen;
+DriverMessageModel? get pendingMessageToOpen => _pendingMessageToOpen;
+
+void navigateToMessage(DriverMessageModel message) {
+  _pendingMessageToOpen = message;
+  _currentIndex = 2; // Index de l'onglet Messages
+  notifyListeners();
+}
+
+void clearPendingMessage() {
+  _pendingMessageToOpen = null;
+  // On ne notifie pas forcément ici pour éviter des rebuilds inutiles
+}
+  Future<void> loadDashboard() async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final data = await _repo.getDashboardData();
+      if (data['success'] == true) {
+        _todayTrips = (data['today_voyages'] as List).map((v) => VoyageModel.fromJson(v)).toList();
+        _upcomingTrips = (data['upcoming_voyages'] as List).map((v) => VoyageModel.fromJson(v)).toList();
+        _stats = data['stats'];
       }
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> submitReport({
+  Future<void> fetchAllTrips() async {
+    await loadDashboard();
+  }
+
+  Future<void> loadVoyagesHistory({int page = 1}) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final data = await _repo.getVoyageHistory(page: page);
+      print("HISTORY DATA RECEIVED: ${data['voyages'] != null ? (data['voyages'] as List).length : 0} items");
+      if (data['success'] == true) {
+        _historyTrips = (data['voyages'] as List).map((v) => VoyageModel.fromJson(v)).toList();
+      }
+    } catch (e) {
+      print("HISTORY ERROR: $e");
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> confirmVoyage(int voyageId) async {
+    _setLoading(true);
+    try {
+      await _repo.confirmVoyage(voyageId);
+      await loadDashboard(); // refresh
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> markDeparture(int voyageId) async {
+    _setLoading(true);
+    try {
+      await _repo.startVoyage(voyageId);
+      await loadDashboard(); // refresh
+      _startLocationTracking(voyageId);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> markArrival(int voyageId) async {
+    _setLoading(true);
+    try {
+      await _repo.completeVoyage(voyageId);
+      await loadDashboard(); // refresh
+      _stopLocationTracking();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> cancelVoyage(int voyageId, {String? reason}) async {
+    _setLoading(true);
+    try {
+      await _repo.cancelVoyage(voyageId, reason: reason);
+      await loadDashboard(); // refresh
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> loadSignalements({int page = 1}) async {
+    _setLoading(true);
+    try {
+      final data = await _repo.getSignalements(page: page);
+      if (data['success'] == true) {
+        final rawSignalements = data['signalements'];
+        List<dynamic> signalementsList = [];
+        
+        if (rawSignalements is List) {
+          signalementsList = rawSignalements;
+        } else if (rawSignalements is Map) {
+          signalementsList = rawSignalements['data'] is List 
+              ? rawSignalements['data'] 
+              : [rawSignalements];
+        }
+
+        _signalements = signalementsList
+            .map<SignalementModel>((v) => SignalementModel.fromJson(v))
+            .toList();
+      }
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> submitReport({
     required String type,
     required String description,
     required String tripId,
@@ -199,10 +316,116 @@ class DriverProvider extends ChangeNotifier {
     double? latitude,
     double? longitude,
   }) async {
-    // Simulation d'envoi de rapport
-    await Future.delayed(const Duration(seconds: 1));
-    print(
-      "Rapport envoyé: $type - $description pour le trajet $tripId. Image: ${image != null}, Loc: $latitude, $longitude",
-    );
+    _setLoading(true);
+    try {
+      Map<String, dynamic> data = {
+        'voyage_id': tripId,
+        'type': type.toLowerCase(),
+        'description': description,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      };
+      
+      if (image != null) {
+        data['photo'] = await dio.MultipartFile.fromFile(image.path);
+      }
+      
+      await _repo.createSignalement(data);
+      await loadSignalements(); // refresh
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateLocation(int voyageId, double lat, double lng, {double? speed, double? heading}) async {
+    try {
+      await _repo.updateLocation(voyageId, lat, lng, speed: speed, heading: heading);
+    } catch (e) {
+      print("Erreur update location gps: $e");
+    }
+  }
+
+  // Scanner & Messages
+  Future<void> loadMessages({int page = 1}) async {
+    _setLoading(true);
+    try {
+      final res = await _repo.getMessages(page: page);
+      if (res['success'] == true) {
+        // Le serveur renvoie directement la liste dans 'messages'
+        final List msgList = res['messages'] is List 
+            ? res['messages'] 
+            : (res['messages']['data'] ?? []);
+            
+        _messages = msgList
+            .map((m) => DriverMessageModel.fromJson(m))
+            .toList();
+      }
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> loadScanInfo() async {
+    _setLoading(true);
+    try {
+      _scanInfo = await _repo.getScanInfo();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<Map<String, dynamic>> validateTicket(String reference) async {
+    _setLoading(true);
+    try {
+      // 1. Rechercher la réservation
+      final searchRes = await _repo.searchReservation(reference);
+      if (searchRes['success'] != true) {
+        return searchRes;
+      }
+      
+      // 2. Confirmer l'embarquement
+      final confirmRes = await _repo.confirmEmbarquement(reference);
+      await loadScanInfo(); // refresh list
+      return confirmRes;
+    } catch (e) {
+      _setError(e.toString());
+      return {'success': false, 'message': e.toString()};
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> sendMessage(String subject, String message) async {
+    _setLoading(true);
+    try {
+      await _repo.sendMessageToGare(subject, message);
+      await loadMessages(); // Refresh
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> markMessageAsRead(DriverMessageModel message) async {
+    try {
+      // L'appel aux détails marque automatiquement comme LU côté serveur
+      await _repo.getMessageDetails(message.id, message.source);
+      // Rafraîchir la liste locale pour mettre à jour le statut "isRead" et le badge
+      await loadMessages();
+      await loadDashboard(); // Pour décrémenter le badge sur l'accueil
+    } catch (e) {
+      debugPrint("Error marking message as read: $e");
+    }
   }
 }

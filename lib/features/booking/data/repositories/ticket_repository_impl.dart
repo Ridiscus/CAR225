@@ -14,230 +14,6 @@ class TicketRepositoryImpl implements TicketRepository {
 
   TicketRepositoryImpl({required this.dio});
 
-  // ---------------------------------------------------------------------------
-  // 1. RÉCUPÉRATION DE TOUS LES BILLETS (CORRIGÉE & FUSIONNÉE)
-  // ---------------------------------------------------------------------------
-  /*@override
-  Future<List<TicketModel>> getMyTickets() async {
-    debugPrint("🚀 [API START] getMyTickets : Lancement de la requête...");
-
-    try {
-      // 1. Log de l'URL appelée pour vérification
-      final String url = '${dio.options.baseUrl}/user/reservations?per_page=100';
-      debugPrint("🔗 [API URL] : $url");
-
-      final response = await dio.get('/user/reservations?per_page=100');
-
-      debugPrint("✅ [API SUCCESS] Code: ${response.statusCode}");
-      // debugPrint("📦 [API DATA RAW] : ${response.data}"); // Décommente si tu veux voir tout le JSON brut
-
-      final dynamic root = response.data;
-      final List<TicketModel> allTickets = [];
-
-      // Gestion de la pagination et de la structure JSON imbriquée
-      if (root is Map && root.containsKey('data')) {
-        final dynamic paginationData = root['data'];
-
-        // Log pour comprendre la structure reçue
-        debugPrint("🔍 [PARSING] Structure trouvée dans 'data': ${paginationData.runtimeType}");
-
-        final dynamic reservationsList = (paginationData is Map && paginationData.containsKey('data'))
-            ? paginationData['data']
-            : paginationData;
-
-        if (reservationsList is List) {
-          debugPrint("🔢 [PARSING] Nombre de réservations trouvées : ${reservationsList.length}");
-
-          final DateTime now = DateTime.now();
-
-          for (var i = 0; i < reservationsList.length; i++) {
-            try {
-              var res = reservationsList[i];
-
-              // Log par itération pour identifier quel ticket fait planter (si ça plante ici)
-              // debugPrint("🎫 [TICKET #$i] Traitement de l'ID: ${res['id']}");
-
-              final Map<String, dynamic> r = Map<String, dynamic>.from(res);
-              final Map<String, dynamic> programme = r['programme'] ?? {};
-              final Map<String, dynamic> compagnie = programme['compagnie'] ?? {};
-
-              // --- 1. EXTRACTION DES DONNÉES DE BASE ---
-              String departCity = r['point_depart'] ?? programme['point_depart'] ?? "Départ";
-              String arriveCity = r['point_arrive'] ?? programme['point_arrive'] ?? "Arrivée";
-              String companyName = compagnie['name'] ?? "Compagnie";
-              String cleanPrice = r['montant']?.toString() ?? "0";
-              String qrCodeUrl = r['qr_code'] ?? "";
-
-              // --- 2. GESTION DES DATES PRÉCISES ---
-              String heureDepart = programme['heure_depart'] ?? "00:00";
-              if (heureDepart.length > 5) heureDepart = heureDepart.substring(0, 5);
-
-              DateTime dateVoyage = DateTime.tryParse(r['date_voyage'] ?? "") ?? DateTime.now();
-
-              // Calcul de la date/heure exacte
-              DateTime exactDepartureTime = dateVoyage;
-              try {
-                final parts = heureDepart.split(':');
-                exactDepartureTime = dateVoyage.add(Duration(hours: int.parse(parts[0]), minutes: int.parse(parts[1])));
-              } catch (e) {
-                exactDepartureTime = dateVoyage.add(const Duration(hours: 23, minutes: 59));
-              }
-
-              // --- 3. LOGIQUE STATUTS ---
-              /*String rawStatus = (r['statut_aller'] ?? r['statut'] ?? "Inconnu").toString().toLowerCase();
-              String displayStatus = "En attente";
-
-              if (now.isAfter(exactDepartureTime) && !rawStatus.contains("annul")) {
-                displayStatus = "Terminé";
-              } else if (rawStatus.contains("annul")) {
-                displayStatus = "Annulé";
-              } else if (rawStatus.contains("util") || rawStatus.contains("scan") || rawStatus == "terminé") {
-                displayStatus = "Terminé";
-              } else if (rawStatus.contains("confirm") || rawStatus.contains("pay") || rawStatus.contains("valid")) {
-                displayStatus = "Confirmé";
-              }*/
-
-
-              // Remplace la section "3. LOGIQUE STATUTS" par ceci :
-
-              // --- 3. LOGIQUE STATUTS SIMPLIFIÉE (BACKEND FIRST) ---
-              String finalStatus;
-
-              // A. On regarde d'abord 'display_statut' (ce que l'humain doit voir)
-              if (r['display_statut'] != null && r['display_statut'].toString().isNotEmpty) {
-                finalStatus = r['display_statut'].toString();
-              }
-              // B. Sinon on prend 'statut' (technique)
-              else {
-                finalStatus = (r['statut_aller'] ?? r['statut'] ?? "Inconnu").toString();
-              }
-
-              // C. Nettoyage cosmétique (ex: "en_voyage" -> "En voyage")
-              finalStatus = finalStatus.replaceAll('_', ' ');
-              if (finalStatus.isNotEmpty) {
-                finalStatus = "${finalStatus[0].toUpperCase()}${finalStatus.substring(1)}";
-              }
-
-              // D. On ne touche plus aux dates pour forcer le statut !
-
-              // --- 4. GESTION DES PASSAGERS ---
-              String seatAller = "??";
-              String? seatRetour;
-              String passagerNom = "Moi";
-
-              if (r['passagers'] != null && (r['passagers'] as List).isNotEmpty) {
-                var firstPax = r['passagers'][0];
-                seatAller = firstPax['seat_number'].toString();
-                if (firstPax['return_seat_number'] != null) {
-                  seatRetour = firstPax['return_seat_number'].toString();
-                }
-                passagerNom = "${firstPax['prenom']} ${firstPax['nom']}";
-              } else {
-                seatAller = r['seat_number']?.toString() ?? "??";
-                seatRetour = r['seat_number_return']?.toString();
-                passagerNom = "${r['passager_prenom']} ${r['passager_nom']}";
-              }
-
-              // --- 5. AJOUT TICKET ---
-              allTickets.add(TicketModel(
-                // 🟢 1. Le VRAI ID de la base de données (int)
-                id: int.tryParse(r['id'].toString()) ?? 0,
-
-                // 🟢 2. La référence texte
-                transactionId: "${r['reference']}",
-
-                ticketNumber: "${r['reference']}",
-                passengerName: passagerNom,
-                seatNumber: seatAller,
-                returnSeatNumber: seatRetour,
-                departureCity: departCity,
-                arrivalCity: arriveCity,
-                companyName: companyName,
-                departureTimeRaw: heureDepart,
-                date: dateVoyage,
-                status: displayStatus,
-                pdfBase64: null,
-                qrCodeUrl: qrCodeUrl,
-                price: cleanPrice,
-                isAllerRetour: r['is_aller_retour'] == true,
-                returnDate: r['date_retour'] != null ? DateTime.tryParse(r['date_retour']) : null,
-                isReturnLeg: true, // ✅
-              ));
-
-              // --- 6. GESTION RETOUR (CODE EXISTANT CONSERVÉ) ---
-              if (r['is_aller_retour'] == true && r['date_retour'] != null) {
-                // ... (Ta logique retour existante ici) ...
-                DateTime dateRetour = DateTime.tryParse(r['date_retour'])!;
-                DateTime exactReturnTime = dateRetour.add(const Duration(hours: 23, minutes: 59));
-                String statusRetour = displayStatus;
-                if (now.isAfter(exactReturnTime) && !rawStatus.contains("annul")) {
-                  statusRetour = "Terminé";
-                } else if (['payé', 'validé', 'confirmé'].contains(displayStatus.toLowerCase())) {
-                  statusRetour = "Confirmé";
-                }
-
-                allTickets.add(TicketModel(
-                  // 🟢 1. Le VRAI ID de la base de données (int)
-                  id: int.tryParse(r['id'].toString()) ?? 0,
-
-                  // 🟢 2. Ton identifiant unique pour l'affichage (String)
-                  transactionId: "${r['reference']} (Retour)",
-
-                  ticketNumber: "${r['reference']} (Retour)",
-                  passengerName: passagerNom,
-                  seatNumber: seatRetour ?? "??",
-                  returnSeatNumber: null,
-                  departureCity: arriveCity,
-                  arrivalCity: departCity,
-                  companyName: companyName,
-                  departureTimeRaw: "12:00", // À ajuster si tu as l'heure retour
-                  date: dateRetour,
-                  status: statusRetour,
-                  pdfBase64: null,
-                  qrCodeUrl: qrCodeUrl,
-                  price: cleanPrice,
-                  isAllerRetour: true,
-                  isReturnLeg: true, // ✅
-                  returnDate: dateRetour,
-                ));
-
-              }
-
-            } catch (e, stack) {
-              debugPrint("⚠️ [PARSING ERROR] Erreur sur un ticket spécifique (Index $i): $e");
-              // On continue la boucle pour ne pas bloquer les autres tickets
-              continue;
-            }
-          }
-        } else {
-          debugPrint("⚠️ [API WARNING] 'reservationsList' n'est pas une liste ! Type reçu: ${reservationsList.runtimeType}");
-        }
-      } else {
-        debugPrint("⚠️ [API WARNING] Le JSON ne contient pas la clé 'data' ou n'est pas une Map.");
-      }
-
-      debugPrint("✅ [API END] Nombre final de tickets convertis : ${allTickets.length}");
-      return allTickets;
-
-    } on DioException catch (e) {
-      // --- C'EST ICI QUE TU VERRAS L'ERREUR 503 ---
-      debugPrint("🔴 [DIO ERROR] Type: ${e.type}");
-      debugPrint("🔴 [DIO ERROR] Message: ${e.message}");
-
-      if (e.response != null) {
-        debugPrint("🔴 [SERVER RESPONSE] Code: ${e.response?.statusCode}");
-        debugPrint("🔴 [SERVER RESPONSE] Data: ${e.response?.data}");
-        // Souvent Ngrok renvoie du HTML en 503, ça s'affichera ici
-      }
-      rethrow;
-    } catch (e, stack) {
-      debugPrint("🔴 [UNKNOWN ERROR] : $e");
-      debugPrint("StackTrace: $stack");
-      rethrow;
-    }
-  }*/
-
-
   @override
   Future<List<TicketModel>> getMyTickets() async {
     debugPrint("🚀 [API START] getMyTickets : Lancement de la requête...");
@@ -544,7 +320,7 @@ class TicketRepositoryImpl implements TicketRepository {
   }
 
 
-  @override
+  /*@override
   Future<TicketModel> getTicketDetails(String ticketId) async {
     debugPrint("\n🔵🔵🔵 [START DEBUG] getTicketDetails pour ID BRUT: $ticketId 🔵🔵🔵");
 
@@ -563,9 +339,24 @@ class TicketRepositoryImpl implements TicketRepository {
         debugPrint("📥 [API 1 RESPONSE] Code: ${responseAR.statusCode}");
         // debugPrint("📦 [API 1 DATA] : ${responseAR.data}");
 
-        if (responseAR.data['success'] == true && responseAR.data['is_aller_retour'] == true) {
+        /*if (responseAR.data['success'] == true && responseAR.data['is_aller_retour'] == true) {
           debugPrint("✅ [LOGIC] Détecté comme AR via endpoint spécial. Utilisation de fromRoundTripJson.");
           return TicketModel.fromRoundTripJson(responseAR.data);
+        } else {
+          debugPrint("⚠️ [LOGIC] Endpoint spécial OK, mais success=false ou is_aller_retour=false.");
+        }
+      } catch (e) {
+        debugPrint("❌ [API 1 ERROR] Échec de l'appel spécial AR (C'est peut-être normal) : $e");
+      }*/
+
+        if (responseAR.data['success'] == true && responseAR.data['is_aller_retour'] == true) {
+          debugPrint("✅ [LOGIC] Détecté comme AR via endpoint spécial. Utilisation de fromRoundTripJson.");
+
+          // 🟢 C'EST ICI QUE LA MAGIE OPÈRE : On passe le targetId !
+          return TicketModel.fromRoundTripJson(
+            responseAR.data, // On passe les données brutes
+            targetId: int.tryParse(ticketId), // On donne l'ID exact sur lequel on a cliqué
+          );
         } else {
           debugPrint("⚠️ [LOGIC] Endpoint spécial OK, mais success=false ou is_aller_retour=false.");
         }
@@ -603,27 +394,6 @@ class TicketRepositoryImpl implements TicketRepository {
 
       String heureDepart = programme['heure_depart'] ?? "00:00";
       if (heureDepart.length > 5) heureDepart = heureDepart.substring(0, 5);
-
-      // LOGIQUE STATUT
-      /*String finalStatus = r['statut'] ?? "En attente";
-      DateTime dateVoyage = DateTime.tryParse(r['date_voyage'] ?? "") ?? DateTime.now();
-      DateTime now = DateTime.now();
-
-      // Calcul expiration
-      DateTime exactDeparture = dateVoyage;
-      try {
-        var parts = heureDepart.split(':');
-        exactDeparture = dateVoyage.add(Duration(hours: int.parse(parts[0]), minutes: int.parse(parts[1])));
-      } catch(e) {
-        exactDeparture = dateVoyage.add(const Duration(hours: 23, minutes: 59));
-      }
-
-      if (now.isAfter(exactDeparture) && !finalStatus.toLowerCase().contains("annul")) {
-        finalStatus = "Terminé";
-      } else if (['payé', 'validé'].contains(finalStatus.toLowerCase())) {
-        finalStatus = "Confirmé";
-      }*/
-
 
       // ===========================================================
       // 🟠 DEBUT LOGIQUE STATUT (DEBUG & FIX)
@@ -692,18 +462,6 @@ class TicketRepositoryImpl implements TicketRepository {
       }
 
       debugPrint("🏁 [STATUS RESULT] Statut final affiché : $finalStatus\n");
-      // ===========================================================
-      // 🟠 FIN LOGIQUE STATUT
-      // ===========================================================
-
-      // ... (La suite reste identique : DateTime? dateRetour...) ...
-
-
-
-
-
-
-
       // --- 🟢 LOGIQUE CORRIGÉE : GESTION DATE RETOUR MANQUANTE ---
       DateTime? dateRetour;
 
@@ -762,45 +520,87 @@ class TicketRepositoryImpl implements TicketRepository {
       debugPrint("🔴🔴🔴 [CRASH] Erreur dans getTicketDetails : $e");
       rethrow;
     }
-  }
+  }*/
 
-
-  // ---------------------------------------------------------------------------
-  // 3. DÉTAILS DU TICKET
-  // ---------------------------------------------------------------------------
-  /*@override
+  @override
   Future<TicketModel> getTicketDetails(String ticketId) async {
+    debugPrint("\n🔵🔵🔵 [START DEBUG] getTicketDetails pour ID BRUT: $ticketId 🔵🔵🔵");
+
     try {
       String cleanId = ticketId.contains('_') ? ticketId.split('_')[0] : ticketId;
+      debugPrint("🧹 Clean ID utilisé: $cleanId");
 
-      // Tentative de récupération détails Aller-Retour (spécifique à ton API)
+      // -----------------------------------------------------------
+      // 1. TENTATIVE ENDPOINT SPÉCIAL (round-trip-tickets)
+      // -----------------------------------------------------------
       try {
+        debugPrint("📡 [API TRY 1] Appel de: /user/reservations/$cleanId/round-trip-tickets");
+
         final responseAR = await dio.get('/user/reservations/$cleanId/round-trip-tickets');
+
+        debugPrint("📥 [API 1 RESPONSE] Code: ${responseAR.statusCode}");
+
         if (responseAR.data['success'] == true && responseAR.data['is_aller_retour'] == true) {
-          // Note : Assure-toi que fromRoundTripJson gère aussi le statut comme getMyTickets
-          // ou applique la logique ici aussi si nécessaire.
-          return TicketModel.fromRoundTripJson(responseAR.data);
+          debugPrint("✅ [LOGIC] Détecté comme AR via endpoint spécial. Utilisation de fromRoundTripJson.");
+
+          // 🟢 C'EST ICI QUE LA MAGIE OPÈRE : On passe le targetId !
+          return TicketModel.fromRoundTripJson(
+            responseAR.data, // On passe les données brutes
+            targetId: int.tryParse(ticketId), // On donne l'ID exact sur lequel on a cliqué
+          );
+        } else {
+          debugPrint("⚠️ [LOGIC] Endpoint spécial OK, mais success=false ou is_aller_retour=false.");
         }
       } catch (e) {
-        // Ignorer et passer au standard
+        debugPrint("❌ [API 1 ERROR] Échec de l'appel spécial AR (C'est peut-être normal) : $e");
       }
+
+      // -----------------------------------------------------------
+      // 2. TENTATIVE ENDPOINT STANDARD (reservations/ID)
+      // -----------------------------------------------------------
+      debugPrint("📡 [API TRY 2] Appel de fallback: /user/reservations/$cleanId");
 
       final response = await dio.get('/user/reservations/$cleanId');
       final dynamic root = response.data;
+
+      debugPrint("📦 [API 2 DATA RAW] : $root");
+
       final Map<String, dynamic> r = (root is Map && root.containsKey('data')) ? root['data'] : root;
 
       final Map<String, dynamic> programme = r['programme'] ?? {};
       final Map<String, dynamic> compagnie = programme['compagnie'] ?? {};
+
+      // --- ANALYSE DES CHAMPS ---
+      bool isAR = r['is_aller_retour'] == true ||
+          r['is_aller_retour'] == 1 ||
+          r['is_aller_retour'].toString() == "1";
+
+      debugPrint("🛠️ [FIX LOGIC] isAR calculé: $isAR");
+
       String heureDepart = programme['heure_depart'] ?? "00:00";
       if (heureDepart.length > 5) heureDepart = heureDepart.substring(0, 5);
 
-      // LOGIQUE STATUT (Même logique que getMyTickets pour être cohérent dans les détails)
-      String finalStatus = r['statut'] ?? "En attente";
-      DateTime dateVoyage = DateTime.tryParse(r['date_voyage']) ?? DateTime.now();
-      DateTime now = DateTime.now();
+      // ===========================================================
+      // 🟠 DEBUT LOGIQUE STATUT (DEBUG & FIX)
+      // ===========================================================
+      String rawStatut = r['statut']?.toString() ?? "NULL";
+      String displayStatut = r['display_statut']?.toString() ?? "NULL";
+      String voyageStatut = r['voyage_statut']?.toString() ?? "NULL";
 
-      // Calcul expiration
+      String finalStatus;
+      bool statusIsFromBackend = false;
+
+      if (r['display_statut'] != null && r['display_statut'].toString().isNotEmpty) {
+        finalStatus = r['display_statut'];
+        statusIsFromBackend = true;
+      } else {
+        finalStatus = r['statut'] ?? "En attente";
+      }
+
+      DateTime dateVoyage = DateTime.tryParse(r['date_voyage'] ?? "") ?? DateTime.now();
+      DateTime now = DateTime.now();
       DateTime exactDeparture = dateVoyage;
+
       try {
         var parts = heureDepart.split(':');
         exactDeparture = dateVoyage.add(Duration(hours: int.parse(parts[0]), minutes: int.parse(parts[1])));
@@ -808,58 +608,53 @@ class TicketRepositoryImpl implements TicketRepository {
         exactDeparture = dateVoyage.add(const Duration(hours: 23, minutes: 59));
       }
 
-      if (now.isAfter(exactDeparture) && !finalStatus.toLowerCase().contains("annul")) {
-        finalStatus = "Terminé";
-      } else if (['payé', 'validé'].contains(finalStatus.toLowerCase())) {
-        finalStatus = "Confirmé";
+      if (statusIsFromBackend) {
+        finalStatus = finalStatus.replaceAll('_', ' ');
+        if (finalStatus.isNotEmpty) {
+          finalStatus = "${finalStatus[0].toUpperCase()}${finalStatus.substring(1)}";
+        }
+      } else {
+        if (now.isAfter(exactDeparture) && !finalStatus.toLowerCase().contains("annul")) {
+          finalStatus = "Terminé";
+        } else if (['payé', 'validé', 'terminee'].contains(finalStatus.toLowerCase())) {
+          finalStatus = "Confirmé";
+        }
       }
 
-      /*return TicketModel(
-        id: ticketId,
-        ticketNumber: "${r['reference']}",
-        passengerName: "${r['passager_prenom']} ${r['passager_nom']}",
-        seatNumber: r['seat_number'].toString(),
-        returnSeatNumber: null,
-        departureCity: r['point_depart'] ?? "Départ",
-        arrivalCity: r['point_arrive'] ?? "Arrivée",
-        companyName: compagnie['name'] ?? "Compagnie",
-        departureTimeRaw: heureDepart,
-        returnTimeRaw: null,
-        date: dateVoyage,
-        status: finalStatus, // Statut corrigé
-        qrCodeUrl: r['qr_code'],
-        price: r['montant']?.toString() ?? "0",
-        isAllerRetour: r['is_aller_retour'] == true,
-      );*/
-
+      DateTime? dateRetour;
+      if (r['date_retour'] != null) {
+        dateRetour = DateTime.tryParse(r['date_retour']);
+      } else if (isAR) {
+        dateRetour = dateVoyage;
+      }
 
       return TicketModel(
-        // 🟢 1. On convertit l'ID en int (si c'est une string "42", ça devient 42)
         id: int.tryParse(ticketId.toString()) ?? 0,
-
-        // 🟢 2. On passe la référence texte ici
         transactionId: r['reference'] ?? "",
-
         ticketNumber: "${r['reference']}",
         passengerName: "${r['passager_prenom']} ${r['passager_nom']}",
         seatNumber: r['seat_number'].toString(),
-        returnSeatNumber: null,
+        returnSeatNumber: r['return_seat_number']?.toString() ?? r['seat_number_return']?.toString(),
         departureCity: r['point_depart'] ?? "Départ",
         arrivalCity: r['point_arrive'] ?? "Arrivée",
         companyName: compagnie['name'] ?? "Compagnie",
         departureTimeRaw: heureDepart,
-        returnTimeRaw: null,
+        returnTimeRaw: r['heure_arrive'] ?? "--:--",
         date: dateVoyage,
+        returnDate: dateRetour,
         status: finalStatus,
         qrCodeUrl: r['qr_code'],
         price: r['montant']?.toString() ?? "0",
-        isAllerRetour: r['is_aller_retour'] == true,
+        isAllerRetour: isAR,
       );
 
     } catch (e) {
+      debugPrint("🔴🔴🔴 [CRASH] Erreur dans getTicketDetails : $e");
       rethrow;
     }
-  }*/
+  }
+
+
 
   // ---------------------------------------------------------------------------
   // 4. TÉLÉCHARGEMENT IMAGE (QR)

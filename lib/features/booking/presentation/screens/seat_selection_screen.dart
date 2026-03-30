@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/providers/user_provider.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../booking/data/datasources/booking_remote_data_source.dart';
 import '../../data/models/program_model.dart';
@@ -22,6 +23,9 @@ class SeatSelectionScreen extends StatefulWidget {
   final String? dateRetourChoisie; // Date retour formatée YYYY-MM-DD
   final ProgramModel? returnProgram; // Programme Retour
 
+  final int seatSelectionFee;
+  final bool isAutomaticSeatSelection;
+
   const SeatSelectionScreen({
     super.key,
     this.isGuestMode = false,
@@ -30,6 +34,8 @@ class SeatSelectionScreen extends StatefulWidget {
     required this.program,
     this.dateRetourChoisie,
     this.returnProgram,
+    this.isAutomaticSeatSelection = false, // 🟢 Par défaut à false
+    required this.seatSelectionFee,
   });
 
   @override
@@ -53,11 +59,17 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   final _formKey = GlobalKey<FormState>();
   final List<Map<String, TextEditingController>> _passengerControllers = [];
 
+  // 🟢 NOUVEAU : On gère le mode localement pour pouvoir le désactiver
+  late bool _isModeAuto;
+  late int _currentSeatFee; // Pour gérer les frais dynamiquement
+
   @override
   void initState() {
     super.initState();
     _initControllers();
     _fetchReservedSeats(); // Charge les sièges de l'Aller au démarrage
+    _isModeAuto = widget.isAutomaticSeatSelection;
+    _currentSeatFee = widget.seatSelectionFee;
   }
 
   @override
@@ -124,8 +136,12 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       occupiedSeats = []; // On vide pour éviter d'afficher les sièges occupés de l'aller sur le retour
     });
 
+    print("===================================================");
+    print("🔄 DÉBUT CHARGEMENT DES SIÈGES : ${isSelectingReturnPhase ? 'RETOUR' : 'ALLER'}");
+
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/',
       //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
@@ -134,45 +150,80 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     final dataSource = BookingRemoteDataSourceImpl(dio: dio);
 
     try {
-      // 1. DÉTERMINER QUEL PROGRAMME ET QUELLE DATE UTILISER
       ProgramModel targetProgram;
       String targetDateStr;
 
       if (isSelectingReturnPhase) {
-        // C'est le retour
         targetProgram = widget.returnProgram!;
-        // Si une date spécifique a été choisie via le calendar, on l'utilise, sinon celle du programme
-        targetDateStr = widget.dateRetourChoisie ?? targetProgram.dateDepart.split(' ')[0];
+        // Pour le retour, on prend la date choisie, sinon celle du programme retour
+        targetDateStr = widget.dateRetourChoisie ?? targetProgram.dateDepart;
       } else {
-        // C'est l'aller
         targetProgram = widget.program;
-        targetDateStr = targetProgram.dateDepart; // DateTime.parse gérera l'heure
+        targetDateStr = targetProgram.dateDepart;
       }
 
-      // 2. FORMATAE DATE
-      DateTime dateObj = DateTime.parse(targetDateStr.contains(' ') ? targetDateStr : "$targetDateStr 00:00:00");
-      String datePropre = DateFormat('yyyy-MM-dd').format(dateObj);
+      print("📅 [DEBUG] Date brute récupérée (targetDateStr) : $targetDateStr");
 
-      print("🔍 REQUÊTE SIÈGES (${isSelectingReturnPhase ? 'RETOUR' : 'ALLER'}) -> ID: ${targetProgram.id}, DATE: $datePropre");
+      // ✅ FORMATAGE DATE ROBUSTE
+      // On extrait directement les 10 premiers caractères (YYYY-MM-DD).
+      // Ça marche pour "2026-03-24 15:00:00" ET pour "2026-03-24T00:00:00.000Z"
+      String datePropre = targetDateStr.length >= 10 ? targetDateStr.substring(0, 10) : targetDateStr;
+
+      print("🔍 [DEBUG] REQUÊTE API -> ID Programme: ${targetProgram.id}, Date propre extraite: $datePropre");
 
       final seats = await dataSource.getReservedSeats(targetProgram.id, datePropre);
 
-      print("✅ SIÈGES OCCUPÉS REÇUS : $seats");
+      print("✅ [DEBUG] SIÈGES OCCUPÉS REÇUS : $seats");
 
       if (mounted) {
         setState(() {
           occupiedSeats = seats;
           isLoadingSeats = false;
         });
+
+        // 🟢 Déclenchement de l'algorithme si on est en automatique
+        if (widget.isAutomaticSeatSelection) {
+          print("🤖 [DEBUG] Mode Automatique activé. Déclenchement de _autoSelectSeatsAndProceed()...");
+          _autoSelectSeatsAndProceed();
+        } else {
+          print("👤 [DEBUG] Mode Manuel. En attente de la sélection de l'utilisateur.");
+        }
       }
-    } catch (e) {
-      print("❌ ERREUR FETCH SEATS : $e");
-      if (mounted) setState(() => isLoadingSeats = false);
-      _showTopNotification("Impossible de charger les sièges occupés");
+      print("===================================================");
+
+    } catch (e, stacktrace) {
+      print("❌ [ERREUR] FETCH SEATS ÉCHOUÉ : $e");
+      print("❌ [STACKTRACE] : $stacktrace");
+      if (mounted) {
+        setState(() => isLoadingSeats = false);
+        _showTopNotification("Impossible de charger les sièges occupés.");
+      }
+      print("===================================================");
     }
   }
 
+  /*void _toggleSeat(int seatNumber) {
+    setState(() {
+      // On travaille sur la liste courante via le getter
+      if (currentSelectedSeats.contains(seatNumber)) {
+        currentSelectedSeats.remove(seatNumber);
+      } else {
+        if (currentSelectedSeats.length < widget.passengerCount) {
+          currentSelectedSeats.add(seatNumber);
+        } else {
+          _showTopNotification("Maximum de ${widget.passengerCount} passager(s) atteint.");
+        }
+      }
+    });
+  }*/
+
   void _toggleSeat(int seatNumber) {
+    // 🟢 SÉCURITÉ : On empêche le clic manuel si le mode Auto est actif
+    if (_isModeAuto) {
+      _showTopNotification("Cliquez d'abord sur 'Je veux choisir manuellement' pour modifier vos sièges.");
+      return;
+    }
+
     setState(() {
       // On travaille sur la liste courante via le getter
       if (currentSelectedSeats.contains(seatNumber)) {
@@ -188,8 +239,67 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // 🔘 LOGIQUE DU BOUTON PRINCIPAL (TRANSITION)
-  // ---------------------------------------------------------------------------
+  void _autoSelectSeatsAndProceed() {
+    // 1. 🟢 RÉCUPÉRATION DYNAMIQUE DE LA CAPACITÉ TOTALE
+    // On récupère le nombre de places totales du programme actuel (Aller ou Retour)
+    int totalBusSeats = isSelectingReturnPhase
+        ? (widget.returnProgram?.capacity ?? 30) // Fallback à 30 si null par sécurité
+        : widget.program.capacity;
+
+    print("🎲 [DEBUG] Tentative d'attribution automatique pour ${widget.passengerCount} passagers sur un bus de $totalBusSeats places...");
+    print("📋 [DEBUG] Sièges occupés actuels (occupiedSeats): $occupiedSeats");
+
+    // 2. On crée une liste avec TOUS les sièges POSSIBLES (de 1 à totalBusSeats)
+    List<int> allSeats = List.generate(totalBusSeats, (index) => index + 1);
+
+    // 3. On retire les sièges qui sont déjà occupés (on garde que les libres)
+    List<int> availableSeats = allSeats.where((seat) => !occupiedSeats.contains(seat)).toList();
+
+    print("🔓 [DEBUG] Sièges disponibles trouvés (availableSeats count): ${availableSeats.length}");
+
+    // 4. 🎲 LA MAGIE EST ICI : On mélange les sièges libres de façon aléatoire !
+    availableSeats.shuffle();
+
+    // 5. On pioche le nombre de sièges nécessaires (passengerCount)
+    // On s'assure de ne pas piocher plus que ce qui est disponible
+    int numToSelect = widget.passengerCount > availableSeats.length ? availableSeats.length : widget.passengerCount;
+
+    for (int i = 0; i < numToSelect; i++) {
+      // On prend le premier siège de notre liste mélangée
+      currentSelectedSeats.add(availableSeats.removeAt(0));
+    }
+
+    // 6. On rafraîchit l'interface pour afficher les sièges sélectionnés
+    /*setState(() {});
+
+    // 7. Si on a bien le bon nombre de sièges, on passe à l'étape suivante
+    if (currentSelectedSeats.length == widget.passengerCount) {
+      print("🎲 [DEBUG] Sièges attribués aléatoirement : $currentSelectedSeats");
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          _handleMainButtonPress();
+        }
+      });
+    } else {
+      // Sécurité si le bus est trop plein
+      _showTopNotification("Il n'y a pas assez de places disponibles dans ce bus.");
+    }*/
+
+    // 6. On rafraîchit l'interface pour afficher les sièges sélectionnés
+    setState(() {});
+
+    // 7. 🟢 MODIFICATION : On affiche juste un message au lieu de forcer le passage à la suite
+    if (currentSelectedSeats.length == widget.passengerCount) {
+      print("🎲 [DEBUG] Sièges attribués aléatoirement : $currentSelectedSeats");
+      _showTopNotification("Sièges attribués automatiquement.", isError: false);
+    } else {
+      _showTopNotification("Il n'y a pas assez de places disponibles dans ce bus.");
+    }
+
+  }
+
+
+
   void _handleMainButtonPress() {
     // 1. Validation du nombre de sièges pour l'étape en cours
     if (currentSelectedSeats.length != widget.passengerCount) {
@@ -244,12 +354,18 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 3), () { if(mounted) overlayEntry.remove(); });
   }
-  // ---------------------------------------------------------------------------
-// 📝 MODAL PASSAGERS & SUBMIT (CORRIGÉ)
+// 📝 MODAL PASSAGERS & SUBMIT (CORRIGÉ AVEC LE TOGGLE)
 // ---------------------------------------------------------------------------
   void _showPassengerInfoModal(BuildContext context) {
     final sortedSeatsAller = selectedSeatsAller.toList()..sort();
     final sortedSeatsRetour = selectedSeatsRetour.toList()..sort();
+
+    // On récupère le user depuis le provider pour pouvoir le lire dans la modale
+    final userProvider = context.read<UserProvider>();
+    final user = userProvider.user;
+
+    // État initial du toggle : on part du principe que si les champs sont pleins (remplis au initState), c'est "vrai"
+    bool isForMe = _passengerControllers[0]["nom"]!.text.isNotEmpty;
 
     showModalBottomSheet(
         context: context,
@@ -291,138 +407,185 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                   Expanded(
                     child: Form(
                       key: _formKey,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: widget.passengerCount,
-                        separatorBuilder: (c, i) => const Divider(height: 40, thickness: 1),
-                        itemBuilder: (context, index) {
-                          final controllers = _passengerControllers[index];
+                      // 🟢 AJOUT : StatefulBuilder pour rafraîchir uniquement la liste de la modale quand on clique sur le toggle
+                      child: StatefulBuilder(
+                          builder: (BuildContext context, StateSetter setModalState) {
+                            return ListView.separated(
+                              padding: const EdgeInsets.all(20),
+                              itemCount: widget.passengerCount,
+                              separatorBuilder: (c, i) => const Divider(height: 40, thickness: 1),
+                              itemBuilder: (context, index) {
+                                final controllers = _passengerControllers[index];
 
-                          final seatAller = sortedSeatsAller[index];
-                          final seatRetour = (widget.returnProgram != null && sortedSeatsRetour.length > index)
-                              ? sortedSeatsRetour[index]
-                              : null;
+                                final seatAller = sortedSeatsAller[index];
+                                final seatRetour = (widget.returnProgram != null && sortedSeatsRetour.length > index)
+                                    ? sortedSeatsRetour[index]
+                                    : null;
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Titre Passager
-                              Row(children: [
-                                Image.asset(
-                                  "assets/images/user.png",
-                                  width: 24, height: 24,
-                                  color: AppColors.primary,
-                                ),
-                                const Gap(10),
-                                Text("Passager ${index + 1}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
-                                  child: Text(
-                                      seatRetour != null
-                                          ? "Aller: #$seatAller | Retour: #$seatRetour"
-                                          : "Siège #$seatAller",
-                                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)
-                                  ),
-                                )
-                              ]),
-                              const Gap(15),
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Titre Passager & Toggle "Pour moi" (Seulement pour Passager 1)
+                                    Row(children: [
+                                      Image.asset(
+                                        "assets/images/user.png",
+                                        width: 24, height: 24,
+                                        color: AppColors.primary,
+                                      ),
+                                      const Gap(10),
+                                      Text("Passager ${index + 1}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
+                                      const Spacer(),
 
-                              Row(children: [
-                                Expanded(
-                                    child: _buildTextField(
-                                        context, "Nom",
-                                        controller: controllers["nom"]!,
-                                        imagePath: "assets/images/user.png"
-                                    )
-                                ),
-                                const Gap(10),
-                                Expanded(
-                                    child: _buildTextField(
-                                      context, "Prénom",
-                                      controller: controllers["prenom"]!,
-                                    )
-                                ),
-                              ]),
-                              const Gap(15),
+                                      // 🟢 AJOUT DU TOGGLE POUR LE PASSAGER 1
+                                      if (index == 0 && user != null) ...[
+                                        const Text("Pour moi", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        Switch(
+                                          value: isForMe,
+                                          activeColor: AppColors.primary,
+                                          onChanged: (bool value) {
+                                            setModalState(() {
+                                              isForMe = value;
+                                              if (isForMe) {
+                                                // On REMPLIT avec les infos du user
+                                                controllers["nom"]!.text = user.name;
+                                                controllers["prenom"]!.text = user.prenom;
+                                                controllers["telephone"]!.text = user.contact;
+                                                controllers["email"]!.text = user.email;
+                                                controllers["nom_urgence"]!.text = user.nomUrgence ?? "";
+                                                controllers["lien_urgence"]!.text = user.lienParenteUrgence ?? "";
+                                                controllers["tel_urgence"]!.text = user.contactUrgence ?? "";
+                                              } else {
+                                                // On VIDE les champs
+                                                controllers["nom"]!.clear();
+                                                controllers["prenom"]!.clear();
+                                                controllers["telephone"]!.clear();
+                                                controllers["email"]!.clear();
+                                                controllers["nom_urgence"]!.clear();
+                                                controllers["lien_urgence"]!.clear();
+                                                controllers["tel_urgence"]!.clear();
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ],
 
-                              _buildTextField(
-                                  context, "Email",
-                                  controller: controllers["email"]!,
-                                  imagePath: "assets/images/email.png",
-                                  keyboardType: TextInputType.emailAddress,
-                                  hint: "exemple@email.com"
-                              ),
-                              const Gap(15),
+                                      // Badge du siège (affiché en dessous si on est sur le Passager 1 pour ne pas surcharger la ligne)
+                                      if (index != 0 || user == null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
+                                          child: Text(
+                                              seatRetour != null
+                                                  ? "Aller: #$seatAller | Retour: #$seatRetour"
+                                                  : "Siège #$seatAller",
+                                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)
+                                          ),
+                                        )
+                                    ]),
 
-                              _buildTextField(
-                                  context, "Téléphone",
-                                  controller: controllers["telephone"]!,
-                                  imagePath: "assets/images/phone-call.png",
-                                  isPhone: true,
-                                  keyboardType: TextInputType.phone
-                              ),
-                              const Gap(15),
-
-                              /*_buildTextField(
-                                  context, "Contact d'urgence",
-                                  controller: controllers["urgence"]!,
-                                  imagePath: "assets/images/health-insurance.png"
-                              ),*/
-
-                              // --- SECTION URGENCE ---
-                              const Gap(10),
-                              Text(
-                                  "CONTACT D'URGENCE (SOS)",
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600], letterSpacing: 1.0)
-                              ),
-                              const Gap(15),
-
-                              Row(
-                                children: [
-                                  Expanded(
-                                      flex: 3,
-                                      child: _buildTextField(
-                                          context,
-                                          "Nom & Prénom",
-                                          controller: controllers["nom_urgence"]!, // Nouveau contrôleur
-                                          imagePath: "assets/images/health-insurance.png"
+                                    // Badge du siège pour le Passager 1 (placé ici car la ligne du haut est occupée par le toggle)
+                                    if (index == 0 && user != null)
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          margin: const EdgeInsets.only(bottom: 15),
+                                          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
+                                          child: Text(
+                                              seatRetour != null
+                                                  ? "Aller: #$seatAller | Retour: #$seatRetour"
+                                                  : "Siège #$seatAller",
+                                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)
+                                          ),
+                                        ),
                                       )
-                                  ),
-                                  //const Gap(10),
-                                  /*Expanded(
-                                      flex: 2,
-                                      // Le nouveau Dropdown adapté pour la modale
-                                      child: _buildModalDropdown(context, controllers["lien_urgence"]!)
-                                  ),*/
-                                ],
-                              ),
-                              const Gap(15),
+                                    else
+                                      const Gap(15),
 
-                              _buildTextField(
-                                  context,
-                                  "Numéro d'urgence",
-                                  controller: controllers["tel_urgence"]!, // Nouveau contrôleur
-                                  imagePath: "assets/images/phone-call.png",
-                                  isPhone: true,
-                                  keyboardType: TextInputType.phone
-                              ),
+                                    Row(children: [
+                                      Expanded(
+                                          child: _buildTextField(
+                                              context, "Nom",
+                                              controller: controllers["nom"]!,
+                                              imagePath: "assets/images/user.png"
+                                          )
+                                      ),
+                                      const Gap(10),
+                                      Expanded(
+                                          child: _buildTextField(
+                                            context, "Prénom",
+                                            controller: controllers["prenom"]!,
+                                          )
+                                      ),
+                                    ]),
+                                    const Gap(15),
 
-                            ],
-                          );
-                        },
+                                    _buildTextField(
+                                        context, "Email",
+                                        controller: controllers["email"]!,
+                                        imagePath: "assets/images/email.png",
+                                        keyboardType: TextInputType.emailAddress,
+                                        hint: "exemple@email.com"
+                                    ),
+                                    const Gap(15),
+
+                                    _buildTextField(
+                                        context, "Téléphone",
+                                        controller: controllers["telephone"]!,
+                                        imagePath: "assets/images/phone-call.png",
+                                        isPhone: true,
+                                        keyboardType: TextInputType.phone
+                                    ),
+                                    const Gap(15),
+
+                                    // --- SECTION URGENCE ---
+                                    const Gap(10),
+                                    Text(
+                                        "CONTACT D'URGENCE (SOS)",
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600], letterSpacing: 1.0)
+                                    ),
+                                    const Gap(15),
+
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                            flex: 3,
+                                            child: _buildTextField(
+                                                context,
+                                                "Nom & Prénom",
+                                                controller: controllers["nom_urgence"]!, // Nouveau contrôleur
+                                                imagePath: "assets/images/health-insurance.png"
+                                            )
+                                        ),
+                                      ],
+                                    ),
+                                    const Gap(15),
+
+                                    _buildTextField(
+                                        context,
+                                        "Numéro d'urgence",
+                                        controller: controllers["tel_urgence"]!, // Nouveau contrôleur
+                                        imagePath: "assets/images/phone-call.png",
+                                        isPhone: true,
+                                        keyboardType: TextInputType.phone
+                                    ),
+
+                                  ],
+                                );
+                              },
+                            );
+                          }
                       ),
                     ),
                   ),
 
                   // ---------------------------------------------------------
-                  // ✅ CORRECTION ICI : Ajout du SafeArea autour du bouton
+                  // ✅ BOUTON DE VALIDATION
                   // ---------------------------------------------------------
                   SafeArea(
                     child: Container(
                       padding: const EdgeInsets.all(20),
-                      child: Container( // On remplace le SizedBox par Container
+                      child: Container(
                         width: double.infinity,
                         height: 55,
                         clipBehavior: Clip.hardEdge,
@@ -585,7 +748,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
 
 
-  void _submitDataAndNavigate() {
+  /*void _submitDataAndNavigate() {
     // -----------------------------------------------------------
     // 1. VALIDATION PRÉLIMINAIRE (Commune aux deux modes)
     // -----------------------------------------------------------
@@ -687,6 +850,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       "passagers": passengersData,
       "is_aller_retour": widget.program.isAllerRetour,
       if (dateRetourFinal != null) "date_retour": dateRetourFinal,
+      // 🟢 LA PIÈCE MANQUANTE EST ICI : On ajoute les frais de siège !
+      "seatSelectionFee": widget.seatSelectionFee,
     };
 
     if (widget.isGuestMode) {
@@ -698,19 +863,135 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
               builder: (context) => BookingSummaryScreen(
                 bookingData: bookingData,
                 program: widget.program,
+                returnProgram: widget.returnProgram, // 🟢 AJOUT ICI
               )
           )
       );
     }
+  }*/
+
+
+  void _submitDataAndNavigate() {
+    // -----------------------------------------------------------
+    // 1. VALIDATION PRÉLIMINAIRE (Commune aux deux modes)
+    // -----------------------------------------------------------
+    if (selectedSeatsAller.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez sélectionner au moins une place aller.")),
+      );
+      return;
+    }
+
+    // On trie les sièges pour être propre
+    final sortedSeatsAller = selectedSeatsAller.toList()..sort();
+    final sortedSeatsRetour = selectedSeatsRetour.toList()..sort();
+
+    // 🟢 NOUVEAU : CALCUL DES FRAIS DYNAMIQUES
+    // On utilise _currentSeatFee (qui change si l'utilisateur repasse en manuel)
+    int trajetMultiplier = widget.returnProgram != null ? 2 : 1;
+    int totalSeatFees = _currentSeatFee * widget.passengerCount * trajetMultiplier;
+
+    // -----------------------------------------------------------
+    // 2. 🟢 INTERCEPTION : MODE MODIFICATION
+    // -----------------------------------------------------------
+    if (widget.isModificationMode) {
+      // On prépare uniquement les données nécessaires pour l'API "modify"
+      Map<String, dynamic> modificationData = {
+        "programme_id": widget.program.id,
+        "date_voyage": widget.program.dateDepart.split(' ')[0],
+        "heure_depart": widget.program.heureDepart,
+        "seat_number": sortedSeatsAller.first,
+      };
+
+      // Gestion du Retour (si applicable)
+      if (widget.program.isAllerRetour && widget.returnProgram != null) {
+        modificationData["return_programme_id"] = widget.returnProgram!.id;
+        modificationData["return_heure_depart"] = widget.returnProgram!.heureDepart;
+
+        if (sortedSeatsRetour.isNotEmpty) {
+          modificationData["return_seat_number"] = sortedSeatsRetour.first;
+        }
+
+        if (widget.dateRetourChoisie != null) {
+          modificationData["return_date_voyage"] = widget.dateRetourChoisie;
+        }
+      }
+
+      // 🚀 RETOUR VERS L'ÉCRAN PRÉCÉDENT AVEC LES DONNÉES
+      Navigator.pop(context, modificationData);
+      return; // ⛔ ON ARRÊTE TOUT ICI POUR LE MODE MODIF
+    }
+
+    // -----------------------------------------------------------
+    // 3. 🔴 LOGIQUE NORMALE (RÉSERVATION CLASSIQUE)
+    // -----------------------------------------------------------
+
+    List<Map<String, dynamic>> passengersData = [];
+
+    for (int i = 0; i < widget.passengerCount; i++) {
+      final controllers = _passengerControllers[i];
+
+      // On fusionne le nom et le lien. Exemple : "DOE Bob (Père)"
+      String nomUrgenceComplet = "${controllers["nom_urgence"]!.text} (${controllers["lien_urgence"]!.text})";
+
+      final Map<String, dynamic> passager = {
+        "nom": controllers["nom"]!.text,
+        "prenom": controllers["prenom"]!.text,
+        "email": controllers["email"]!.text,
+        "telephone": controllers["telephone"]!.text,
+        "urgence": controllers["tel_urgence"]!.text,
+        "nom_passager_urgence": nomUrgenceComplet,
+        "seat_number": sortedSeatsAller[i],
+      };
+
+      if (widget.program.isAllerRetour && i < sortedSeatsRetour.length) {
+        passager["return_seat_number"] = sortedSeatsRetour[i];
+      }
+      passengersData.add(passager);
+    }
+
+    String? dateRetourFinal;
+    if (widget.program.isAllerRetour) {
+      dateRetourFinal = widget.dateRetourChoisie;
+      if (dateRetourFinal == null) {
+        DateTime dateDepart = DateTime.parse(widget.program.dateDepart);
+        DateTime retour = dateDepart.add(const Duration(days: 7));
+        dateRetourFinal = DateFormat('yyyy-MM-dd').format(retour);
+      }
+    }
+
+    // PAYLOAD FINAL RÉSERVATION
+    final bookingData = {
+      "programme_id": widget.program.id,
+      "date_voyage": widget.program.dateDepart,
+      "nombre_places": widget.passengerCount,
+      "seats": sortedSeatsAller,
+      if (widget.program.isAllerRetour && widget.returnProgram != null)
+        "programme_retour_id": widget.returnProgram!.id,
+      "passagers": passengersData,
+      "is_aller_retour": widget.program.isAllerRetour,
+      if (dateRetourFinal != null) "date_retour": dateRetourFinal,
+
+      // 🟢 On inclut les frais dynamiques dans le payload (par sécurité)
+      "seatSelectionFee": totalSeatFees,
+    };
+
+    if (widget.isGuestMode) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+    } else {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => BookingSummaryScreen(
+                bookingData: bookingData,
+                program: widget.program,
+                returnProgram: widget.returnProgram,
+              )));
+    }
   }
 
 
-
-
-  // ---------------------------------------------------------------------------
-  // 🖥 UI PRINCIPALE
-  // ---------------------------------------------------------------------------
-  @override
+  /*@override
   Widget build(BuildContext context) {
     // Calcul du prix total
     int ticketPrice = widget.program.isAllerRetour
@@ -809,6 +1090,176 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                 child: Column(children: [
                   _buildBusLayout(context),
                 ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }*/
+
+  @override
+  Widget build(BuildContext context) {
+    // Calcul du prix total
+    int ticketPrice = widget.program.isAllerRetour
+        ? (widget.program.prix * 2)
+        : widget.program.prix;
+    //int totalPrice = widget.passengerCount * ticketPrice;
+    // 🟢 NOUVEAU : Calcul des frais de choix de siège
+    // Si _isModeAuto est false, _currentSeatFee vaut 100. Sinon 0.
+    // On multiplie par le nombre de passagers (et par 2 si Aller-Retour)
+    int trajetMultiplier = widget.returnProgram != null ? 2 : 1;
+    int totalSeatFees = _currentSeatFee * widget.passengerCount * trajetMultiplier;
+
+    // 🟢 On ajoute les frais au prix total
+    int totalPrice = (widget.passengerCount * ticketPrice) + totalSeatFees;
+
+    // L'état courant pour l'affichage
+    final currentProgram = isSelectingReturnPhase ? widget.returnProgram! : widget.program;
+    final String titrePhase = isSelectingReturnPhase ? "RETOUR" : "ALLER";
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final cardColor = Theme.of(context).cardColor;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: textColor),
+          onPressed: () {
+            // Si on est en phase retour et qu'on fait retour, on revient à la phase aller
+            if (isSelectingReturnPhase) {
+              setState(() {
+                isSelectingReturnPhase = false;
+                _fetchReservedSeats(); // On recharge les places aller
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text("Choix place", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Gap(5),
+                // Badge "ALLER" ou "RETOUR"
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: isSelectingReturnPhase ? Colors.orange : AppColors.primary,
+                      borderRadius: BorderRadius.circular(4)),
+                  child: Text(titrePhase, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+            Text("${currentProgram.compagnieName} • ${widget.passengerCount} passager(s)", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomBar(context, totalPrice),
+      body: isLoadingSeats
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              // BANDEAU TRAJET DYNAMIQUE
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                decoration: BoxDecoration(
+                    color: isSelectingReturnPhase ? Colors.orange.withOpacity(0.1) : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isSelectingReturnPhase ? Colors.orange : AppColors.primary)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(currentProgram.villeDepart, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                    const Gap(10),
+                    Icon(Icons.arrow_forward, size: 16, color: isSelectingReturnPhase ? Colors.orange : AppColors.primary),
+                    const Gap(10),
+                    Text(currentProgram.villeArrivee, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                  ],
+                ),
+              ),
+
+              const Gap(20),
+
+              // LÉGENDE DES SIÈGES
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLegendItem(context, "Libre", isDark ? Colors.white10 : Colors.white, borderColor: Colors.grey),
+                  const Gap(10),
+                  _buildLegendItem(context, "Choisi", AppColors.primary),
+                  const Gap(10),
+                  _buildLegendItem(context, "Occupé", Colors.grey),
+                ],
+              ),
+              const Gap(20),
+
+              // 🟢 NOUVEAU : ENCART MODE AUTOMATIQUE -> PASSAGE MANUEL
+              if (_isModeAuto)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, color: Colors.blue),
+                          const Gap(10),
+                          Expanded(
+                            child: Text(
+                              "Des sièges vous ont été attribués automatiquement et gratuitement.",
+                              style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Gap(12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _isModeAuto = false; // On désactive le mode auto
+                              _currentSeatFee = 100; // On applique les frais
+                              currentSelectedSeats.clear(); // On vide les sièges générés
+                            });
+                            _showTopNotification("Mode manuel activé. Choisissez vos sièges (Frais: 100 FCFA).", isError: false);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.blue),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text("Je veux choisir manuellement (+100 FCFA)", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+
+              // PLAN DU BUS
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(30)),
+                child: Column(
+                  children: [
+                    _buildBusLayout(context),
+                  ],
+                ),
               ),
             ],
           ),
@@ -994,6 +1445,4 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       ),
     );
   }
-
-
 }

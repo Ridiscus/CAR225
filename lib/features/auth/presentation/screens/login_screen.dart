@@ -12,6 +12,7 @@ import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/device/device_service.dart';
 import '../../../agent/presentation/screens/agent_main_wrapper.dart';
+import '../../../driver/presentation/screens/driver_main_wrapper.dart';
 import '../../../home/presentation/screens/VerifOtpScreen.dart';
 import '../../../hostess/presentation/screens/hostess_main_wrapper.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
@@ -35,10 +36,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // --- 1. CONTROLLERS ---
-  /*final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();*/
-
   // --- 1. CONTROLLERS ---
   // Remplacer _emailController par _identifierController
   final TextEditingController _identifierController = TextEditingController();
@@ -205,23 +202,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return;
 
-        /*if (response.success) {
-          // Si besoin, charger des infos utilisateurs spécifiques ici
-          // await context.read<UserProvider>().loadUser();
-
-          _showTopNotification("Connexion réussie !");
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          if (!mounted) return;
-
-          // Redirection vers l'espace Hôtesse !
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HostessMainWrapper()),
-                (route) => false,
-          );
-        }*/
-
         if (response.success) {
           await context.read<UserProvider>().loadUser(); // À décommenter si besoin
 
@@ -230,14 +210,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
           if (!mounted) return;
 
-          // 🟢 ROUTAGE DYNAMIQUE SELON LE RÔLE
+          // 🟢 LOG POUR VOIR EXACTEMENT LE RÔLE ENVOYÉ PAR L'API
+          print("👉 [DEBUG] Rôle reçu de l'API : '${response.role}'");
+
+          // 🟢 ROUTAGE DYNAMIQUE SELON LE RÔLE (en minuscules pour éviter les erreurs de majuscules)
           Widget destination;
-          if (response.role == 'hotesse') {
+          final String role = (response.role ?? '').toLowerCase();
+
+          if (role == 'hotesse' || role == 'hôtesse') {
             destination = const HostessMainWrapper();
-          } else if (response.role == 'agent') {
+          } else if (role == 'agent') {
             destination = const AgentMainWrapper();
+          } else if (role == 'driver' || role == 'chauffeur') { // 🟢 ON ACCEPTE "driver" ET "chauffeur"
+            destination = const DriverMainWrapper();
           } else {
             // Par défaut si le rôle n'est pas reconnu
+            print("⚠️ [WARNING] Rôle non reconnu : '$role'. Redirection vers MainScreen.");
             destination = const MainScreen();
           }
 

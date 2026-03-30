@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:car225/features/auth/presentation/screens/login_screen.dart';
 
+import '../services/networking/api_config.dart';
+
 // Key globale pour la navigation sans context
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -11,16 +13,17 @@ class DioClient {
   static bool _isLoggingOut =
       false; // Flag pour éviter les boucles de déconnexion
 
-  static Dio get instance {
+  /*static Dio get instance {
     if (_dio == null) {
       _dio = Dio(
         BaseOptions(
           //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-          baseUrl: 'https://car225.com/api/',
-          headers: {
+          //baseUrl: 'https://car225.com/api/',
+          /*headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-          },
+          },*/
+          baseUrl: ApiConfig.baseUrl,
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -43,6 +46,43 @@ class DioClient {
             if (e.response?.statusCode == 401) {
               await _handleLogout();
               // On rejette la requête pour ne pas continuer le flux avec des données erronées
+              return handler.reject(e);
+            }
+            return handler.next(e);
+          },
+        ),
+      );
+    }
+    return _dio!;
+  }*/
+
+  static Dio get instance {
+    if (_dio == null) {
+      _dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConfig.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      _dio!.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            final prefs = await SharedPreferences.getInstance();
+            final token = prefs.getString('auth_token');
+            if (token != null) {
+              options.headers["Authorization"] = "Bearer $token";
+            }
+            return handler.next(options);
+          },
+          onError: (DioException e, handler) async {
+            if (e.response?.statusCode == 401) {
+              await _handleLogout();
               return handler.reject(e);
             }
             return handler.next(e);

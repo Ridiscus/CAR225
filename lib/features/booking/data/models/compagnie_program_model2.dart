@@ -1,48 +1,5 @@
 /// data/models/programme_model.dart
 
-/*class ProgrammeModel {
-  final int id;
-  final String trajet; // "Abidjan... -> Man..."
-  final int montantBillet;
-  final int placesDisponibles;
-
-  ProgrammeModel({
-    required this.id,
-    required this.trajet,
-    required this.montantBillet,
-    required this.placesDisponibles,
-  });
-
-  factory ProgrammeModel.fromJson(Map<String, dynamic> json) {
-    return ProgrammeModel(
-      id: json['id'] ?? 0,
-      trajet: json['trajet'] ?? "Inconnu -> Inconnu",
-      montantBillet: json['montant_billet'] ?? 0,
-      placesDisponibles: json['places_disponibles'] ?? 0,
-    );
-  }
-
-  // Helpers pour l'UI (pour séparer Départ et Arrivée)
-  String get depart {
-    if (trajet.contains('→')) {
-      return trajet.split('→')[0].trim().split(',')[0]; // Garde juste la ville
-    }
-    return "Départ";
-  }
-
-  String get arrivee {
-    if (trajet.contains('→')) {
-      return trajet.split('→')[1].trim().split(',')[0]; // Garde juste la ville
-    }
-    return "Arrivée";
-  }
-}*/
-
-
-
-
-
-
 // data/models/programme_model.dart
 
 class ProgrammeModel {

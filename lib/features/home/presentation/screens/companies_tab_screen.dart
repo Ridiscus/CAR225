@@ -25,31 +25,6 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> with SingleTick
   // 🟢 2. DECLARATION DU CONTROLLER D'ANIMATION
   late AnimationController _entranceController;
 
-  /*@override
-  void initState() {
-    super.initState();
-    // On charge les compagnies au démarrage de l'écran
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CompanyProvider>().fetchCompanies();
-    });
-
-    _entranceController = AnimationController(
-      duration: const Duration(milliseconds: 5000), // La durée que tu as choisie
-      vsync: this,
-    );
-
-  }
-
-
-
-  @override
-  void dispose() {
-    _entranceController.dispose();
-    super.dispose();
-  }*/
-
-
-
 
   @override
   void initState() {
@@ -162,23 +137,6 @@ class _CompaniesTabScreenState extends State<CompaniesTabScreen> with SingleTick
                               style: TextStyle(color: secondaryTextColor, fontSize: 13),
                             ),
                             const Gap(20),
-
-                            // --- 3. LISTE DES COMPAGNIES DYNAMIQUE ---
-                            /*if (provider.companies.isEmpty)
-                              const Center(child: Text("Aucune compagnie disponible."))
-                            else
-                              ListView.separated(
-                                padding: EdgeInsets.zero,
-                                shrinkWrap: true, // Important dans un SingleChildScrollView
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: provider.companies.length,
-                                separatorBuilder: (ctx, index) => const Gap(15),
-                                itemBuilder: (ctx, index) {
-                                  final company = provider.companies[index];
-                                  return _buildCompanyCard(context, company);
-                                },
-                              ),*/
-
 
                             // --- 3. LISTE DES COMPAGNIES DYNAMIQUE ---
                             if (provider.companies.isEmpty)

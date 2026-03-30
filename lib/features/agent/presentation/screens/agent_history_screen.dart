@@ -120,9 +120,15 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
                   ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                   : _errorMessage != null
                   ? _buildErrorState()
-                  : _scans.isEmpty
-                  ? _buildEmptyState(isFiltered: _selectedDate != null)
-                  : _buildScansList(_scans), // Utilise directement _scans venu de l'API
+              // 🟢 AJOUT DU REFRESH INDICATOR ICI
+                  : RefreshIndicator(
+                color: AppColors.primary,
+                backgroundColor: Colors.white,
+                onRefresh: _fetchHistory,
+                child: _scans.isEmpty
+                    ? _buildEmptyState(isFiltered: _selectedDate != null)
+                    : _buildScansList(_scans),
+              ),
             ),
           ],
         ),
@@ -130,7 +136,6 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
     );
   }
 
-  // (Garde tes widgets _buildCompactHeader, _buildScansList, _buildScanCard, _showScanDetails existants)
 
   // ⚠️ JUSTE UNE PETITE MODIFICATION POUR LE BOUTON "CROIX" DANS LE HEADER :
   Widget _buildDateTimePickerButton() {
@@ -211,52 +216,64 @@ class _AgentHistoryScreenState extends State<AgentHistoryScreen> {
 
 
   Widget _buildEmptyState({bool isFiltered = false}) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Gap(30),
-          Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary, width: 1),
-            ),
-            child: Icon(
-              isFiltered ? Icons.search_off_rounded : Icons.history_rounded,
-              size: 80,
-              color: AppColors.primary,
+    // 🟢 ENVELOPPER DANS UNE LISTVIEW POUR PERMETTRE LE SCROLL (PULL TO REFRESH) MÊME QUAND C'EST VIDE
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.5, // Pour centrer le contenu
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 1),
+                  ),
+                  child: Icon(
+                    isFiltered ? Icons.search_off_rounded : Icons.history_rounded,
+                    size: 80,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const Gap(24),
+                Text(
+                  isFiltered ? 'Aucun résultat trouvé' : 'Aucun scan enregistré',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                if (isFiltered) ...[
+                  const Gap(10),
+                  const Text(
+                    'Essayez une autre date ou réinitialisez le filtre',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Color.fromARGB(255, 169, 184, 190),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const Gap(24),
-          Text(
-            isFiltered ? 'Aucun résultat trouvé' : 'Aucun scan enregistré',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
-          ),
-          if (isFiltered) ...[
-            const Gap(10),
-            const Text(
-              'Essayez une autre date ou réinitialisez le filtre',
-              style: TextStyle(
-                fontSize: 15,
-                color: Color.fromARGB(255, 169, 184, 190),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
 
   Widget _buildScansList(List<TicketScan> scans) {
     return ListView.builder(
+      // 🟢 AJOUT DE LA PHYSIQUE POUR FORCER LE SCROLL
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
       itemCount: scans.length,
       itemBuilder: (context, index) {

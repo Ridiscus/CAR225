@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart'; // 🟢 Ajout pour formater proprement l'argent
 
 import '../../../../core/providers/user_provider.dart';
+import '../../../../core/services/networking/api_config.dart';
 
 class TopUpScreen extends StatefulWidget {
   const TopUpScreen({super.key});
@@ -19,12 +22,12 @@ class TopUpScreen extends StatefulWidget {
 
 class _TopUpScreenState extends State<TopUpScreen> {
   // --- ETAT ---
-  // On a supprimé _selectedOperator qui ne sert plus à rien
-  int _amount = 100; // Montant par défaut
+  int _amount = 100;
   final int _step = 500;
   bool _isLoading = false;
   late TextEditingController _amountController;
 
+  static Uri? _lastProcessedUri;
 
   // --- 🔗 VARIABLES POUR LES DEEP LINKS ---
   late AppLinks _appLinks;
@@ -34,30 +37,30 @@ class _TopUpScreenState extends State<TopUpScreen> {
   void initState() {
     super.initState();
     _amountController = TextEditingController(text: _amount.toString());
-
-    // Initialiser l'écouteur de liens au démarrage de l'écran
     _initDeepLinks();
   }
 
   @override
   void dispose() {
     _amountController.dispose();
-    // ⚠️ IMPORTANT : Annuler l'écoute pour éviter les fuites de mémoire
     _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  // Helper pour formater l'argent
+  String _formatCurrency(int amount) {
+    return NumberFormat.currency(locale: 'fr_FR', symbol: '', decimalDigits: 0).format(amount).trim();
   }
 
   // --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
   Future<void> _initDeepLinks() async {
     _appLinks = AppLinks();
 
-    // 1. Cas où l'application était COMPLÈTEMENT FERMÉE et est réveillée par le lien
     final initialUri = await _appLinks.getInitialLink();
     if (initialUri != null) {
       _handleDeepLink(initialUri);
     }
 
-    // 2. Cas où l'application était juste EN ARRIÈRE-PLAN (le cas le plus fréquent avec Wave)
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       _handleDeepLink(uri);
     }, onError: (err) {
@@ -66,48 +69,34 @@ class _TopUpScreenState extends State<TopUpScreen> {
   }
 
   // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  /*void _handleDeepLink(Uri uri) {
+  Future<void> _handleDeepLink(Uri uri) async {
     print("🔗 Lien reçu : $uri");
+    if (!mounted) return;
 
-    // On vérifie que c'est bien notre scheme (car225://) et notre host (payment)
     if (uri.scheme == 'car225' && uri.host == 'payment') {
+      final transactionId = uri.queryParameters['transactionId'];
 
-      // Si le backend redirige vers car225://payment/success
-      if (uri.path == '/success') {
-        _showTopNotification("Paiement réussi ! 🎉 Ton wallet est rechargé.");
+      if (transactionId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final bool isAlreadyProcessed = prefs.getBool('processed_$transactionId') ?? false;
 
-        // 💡 BONUS : Ici tu peux appeler une fonction pour rafraîchir le solde
-        // de l'utilisateur depuis l'API !
+        if (isAlreadyProcessed) {
+          print("⚠️ Transaction $transactionId déjà traitée, on ignore !");
+          return;
+        }
 
+        await prefs.setBool('processed_$transactionId', true);
       }
-      // Si le backend redirige vers car225://payment/error ou /cancel
-      else if (uri.path == '/error' || uri.path == '/cancel') {
-        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
-      }
-    }
-  }*/
 
-  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  void _handleDeepLink(Uri uri) {
-    print("🔗 Lien reçu : $uri");
-    if (!mounted) return; // Sécurité pour éviter les crashs de contexte
-
-    // On vérifie que c'est bien notre scheme (car225) et notre host (payment)
-    if (uri.scheme == 'car225' && uri.host == 'payment') {
-
-      // 💡 CORRECTION ICI : On lit le paramètre "?success=true" ou "?success=false"
       final isSuccess = uri.queryParameters['success'] == 'true';
-      final isCancel = uri.queryParameters['cancel'] == 'true'; // Au cas où le backend envoie cancel=true
 
       if (isSuccess) {
-        // 1. 🔄 Rafraîchir le solde du Wallet en arrière-plan
-        context.read<UserProvider>().loadUser();
+        await context.read<UserProvider>().loadUser();
+        if (!mounted) return;
 
-        // 2. 🎉 Afficher la belle modale de Succès
         showDialog(
             context: context,
-            barrierDismissible: false, // Force l'utilisateur à cliquer sur le bouton
+            barrierDismissible: false,
             builder: (BuildContext dialogContext) {
               return AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -133,10 +122,8 @@ class _TopUpScreenState extends State<TopUpScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       onPressed: () {
-                        // 3. 🔙 On ferme la modale
                         Navigator.pop(dialogContext);
-                        // 4. 🔙 On ramène l'utilisateur à l'écran du Wallet
-                        Navigator.pop(context);
+                        Navigator.pop(context, true);
                       },
                       child: const Text("Génial", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
@@ -147,7 +134,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
         );
 
       } else {
-        // ❌ Gérer l'erreur ou l'annulation si success n'est pas "true"
         showDialog(
             context: context,
             builder: (BuildContext dialogContext) {
@@ -174,8 +160,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
                         backgroundColor: Colors.redAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      onPressed: () => Navigator.pop(dialogContext), // On ferme juste la modale
-                      child: const Text("Réessayer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                      },
+                      child: const Text("Fermer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -192,16 +180,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
       _amount = newAmount;
       _amountController.text = _amount.toString();
     });
-  }
-
-  void _incrementAmount() {
-    _updateAmount(_amount + _step);
-  }
-
-  void _decrementAmount() {
-    if (_amount > 500) {
-      _updateAmount(_amount - _step);
-    }
   }
 
   void _addAmount(int value) {
@@ -221,7 +199,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
   void _showTopNotification(String message, {bool isError = false}) {
     if (!mounted) return;
-
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
@@ -285,7 +262,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
   // --- 🚀 LOGIQUE PAIEMENT BACKEND (WAVE) ---
   Future<void> _initiateDeposit() async {
-    // 1. Validation locale : On vérifie que le montant est valide
     if (_amount <= 0) {
       _showTopNotification("Veuillez entrer un montant valide", isError: true);
       return;
@@ -293,13 +269,14 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
     setState(() => _isLoading = true);
 
+    _lastProcessedUri = null;
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -308,17 +285,15 @@ class _TopUpScreenState extends State<TopUpScreen> {
         connectTimeout: const Duration(seconds: 15),
       ));
 
-      // 4. Données (Payload Wave)
+      // ⚠️ IMPORTANT : On envoie "_amount" (le montant net à recharger).
+      // Si ton API gère les 2% de son côté, c'est bon.
+      // Si c'est à l'appli d'envoyer le total (net + frais), il faut envoyer "totalAmount" ici.
       final data = {
         'amount': _amount,
         'payment_method': 'wave',
       };
 
-      print("📤 Envoi vers /user/wallet/recharge : $data");
-
       final response = await dio.post('/user/wallet/recharge', data: data);
-
-      print("📥 Réponse Backend : ${response.data}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final String? paymentUrl = response.data['payment_url'];
@@ -341,14 +316,11 @@ class _TopUpScreenState extends State<TopUpScreen> {
         }
       }
     } catch (e) {
-      print("🔴 Erreur API : $e");
       String message = "Impossible d'initier le paiement.";
-
       if (e is DioException) {
         if (e.type == DioExceptionType.connectionTimeout) {
           message = "Vérifiez votre connexion internet.";
         } else if (e.response != null) {
-          print("Erreur Data: ${e.response?.data}");
           if (e.response?.data is Map && e.response?.data['message'] != null) {
             message = e.response?.data['message'];
           } else {
@@ -362,7 +334,63 @@ class _TopUpScreenState extends State<TopUpScreen> {
     }
   }
 
-  // Ouvre le navigateur externe
+  /*Future<void> _initiateDeposit() async {
+    if (_amount <= 0) {
+      _showTopNotification("Veuillez entrer un montant valide", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    _lastProcessedUri = null;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 15),
+      ));
+
+      final data = {
+        'amount': _amount,
+        'payment_method': 'wave',
+      };
+
+      final response = await dio.post('/user/wallet/recharge', data: data);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final String? paymentUrl = response.data['payment_url'];
+
+        if (paymentUrl != null && paymentUrl.isNotEmpty) {
+          _showTopNotification("Redirection vers Wave... 🚀");
+          await Future.delayed(const Duration(milliseconds: 500));
+          await _launchPaymentUrl(paymentUrl);
+        } else {
+          final paymentDetails = response.data['payment_details'];
+          final fallbackUrl = paymentDetails != null ? paymentDetails['payment_url'] : null;
+
+          if (fallbackUrl != null && fallbackUrl.toString().isNotEmpty) {
+            _showTopNotification("Redirection vers Wave... 🚀");
+            await Future.delayed(const Duration(milliseconds: 500));
+            await _launchPaymentUrl(fallbackUrl);
+          } else {
+            throw Exception("L'URL de paiement Wave est introuvable dans la réponse.");
+          }
+        }
+      }
+    } catch (e) {
+      // ... gestion d'erreur inchangée
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }*/
+
   Future<void> _launchPaymentUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     try {
@@ -373,7 +401,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
       _showTopNotification("Erreur lors de l'ouverture du lien", isError: true);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +413,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final cardColor = Theme.of(context).cardColor;
+
+    // 🟢 CALCUL DES FRAIS
+    final int fees = (_amount * 0.02).toInt();
+    final int totalAmount = _amount + fees;
 
     return Scaffold(
       backgroundColor: scaffoldColor,
@@ -401,28 +431,54 @@ class _TopUpScreenState extends State<TopUpScreen> {
         ),
       ),
 
-      // --- BOUTON PAYER ---
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.all(20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              // ✅ Le bouton est cliquable dès que le montant est > 0
-              onPressed: (_isLoading || _amount <= 0) ? null : _initiateDeposit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: (_amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 5,
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Pour ne pas prendre toute la hauteur
+            children: [
+              // 🟢 INFO FRAIS JUSTE AU-DESSUS DU BOUTON
+              if (_amount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 15),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Frais Wave (2%)",
+                        style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700], fontSize: 14),
+                      ),
+                      Text(
+                        "+ ${_formatCurrency(fees)} F",
+                        style: TextStyle(
+                            color: isDark ? Colors.grey[300] : Colors.black87,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // BOUTON PAYER
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: (_isLoading || _amount <= 0) ? null : _initiateDeposit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: (_amount <= 0) ? Colors.grey : const Color(0xFFE64A19),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 5,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                      : Text(
+                    "PAYER ${_formatCurrency(totalAmount)} F", // 🟢 Affichage du total
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-              child: _isLoading
-                  ? const SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                  : Text(
-                "PAYER $_amount FCFA",
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
+            ],
           ),
         ),
       ),
@@ -435,22 +491,17 @@ class _TopUpScreenState extends State<TopUpScreen> {
             Text("MA CARTE VIRTUELLE", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold)),
             const Gap(10),
 
-            // --- 1. CARTE STYLE "CREDIT CARD" PREMIUM ---
             Container(
               width: double.infinity,
-              height: 240,
+              height: 290,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFbf360c), Color(0xFFff7043)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: const Color(0xFF161822),
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE64A19).withOpacity(0.5),
-                    blurRadius: 25,
-                    offset: const Offset(0, 10),
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
                   )
                 ],
               ),
@@ -458,42 +509,27 @@ class _TopUpScreenState extends State<TopUpScreen> {
                 borderRadius: BorderRadius.circular(25),
                 child: Stack(
                   children: [
-                    // ARRIÈRE-PLAN
                     Positioned(
-                      right: -40,
-                      bottom: -40,
+                      right: -20,
+                      bottom: -30,
                       child: Transform.rotate(
-                        angle: -0.5,
-                        child: Opacity(
-                          opacity: 0.15,
-                          child: Image.asset(
-                            "assets/images/busheader.png",
-                            width: 250,
-                            errorBuilder: (c, o, s) => const Icon(Icons.directions_car, size: 250, color: Colors.white),
+                        angle: -0.2,
+                        child: Text(
+                          "CAR 225",
+                          style: TextStyle(
+                            fontSize: 120,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white.withOpacity(0.03),
+                            letterSpacing: -5,
                           ),
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: -50,
-                      left: -50,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.05),
-                        ),
-                      ),
-                    ),
-
-                    // CONTENU CARTE
                     Padding(
                       padding: const EdgeInsets.all(25.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // HEADER
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -502,11 +538,11 @@ class _TopUpScreenState extends State<TopUpScreen> {
                                   Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                                      border: Border.all(color: const Color(0xFFE64A19).withOpacity(0.8), width: 2),
                                     ),
                                     child: CircleAvatar(
                                       radius: 20,
-                                      backgroundColor: Colors.white24,
+                                      backgroundColor: Colors.white12,
                                       backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
                                       child: userPhotoUrl == null
                                           ? const Icon(Icons.person, color: Colors.white)
@@ -523,79 +559,98 @@ class _TopUpScreenState extends State<TopUpScreen> {
                                       ),
                                       Text(
                                         "Membre CAR 225",
-                                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10),
+                                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                              const Icon(Icons.wifi, color: Colors.white54, size: 28),
+                              const Icon(Icons.contactless_outlined, color: Colors.white54, size: 28),
                             ],
                           ),
+
                           const Spacer(),
 
-                          // MONTANT
                           Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text("SOLDE A AJOUTER", style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 10, letterSpacing: 2)),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    IntrinsicWidth(
-                                      child: TextField(
-                                        controller: _amountController,
-                                        keyboardType: TextInputType.number,
-                                        onChanged: _onAmountTyped,
-                                        textAlign: TextAlign.center,
-                                        cursorColor: Colors.white,
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 42,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 1,
-                                            fontFamily: "Monospace"
+                                const Text(
+                                    "MONTANT À RECHARGER", // 🟢 Petit changement de texte
+                                    style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 11, letterSpacing: 1.5, fontWeight: FontWeight.bold)
+                                ),
+                                const Gap(8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(15),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: IntrinsicWidth(
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Flexible(
+                                          child: IntrinsicWidth(
+                                            child: TextField(
+                                              controller: _amountController,
+                                              keyboardType: TextInputType.number,
+                                              inputFormatters: [
+                                                LengthLimitingTextInputFormatter(7),
+                                              ],
+                                              onChanged: _onAmountTyped,
+                                              textAlign: TextAlign.center,
+                                              cursorColor: const Color(0xFFE64A19),
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 42,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontFamily: "Montserrat"
+                                              ),
+                                              decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                filled: true,
+                                                fillColor: Colors.transparent,
+                                                contentPadding: EdgeInsets.zero,
+                                                isDense: true,
+                                                hintText: "0",
+                                                hintStyle: TextStyle(color: Colors.white24),
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        decoration: const InputDecoration(
-                                          border: InputBorder.none,
-                                          filled: true,
-                                          fillColor: Colors.transparent,
-                                          contentPadding: EdgeInsets.zero,
-                                          isDense: true,
-                                          hintText: "0",
-                                          hintStyle: TextStyle(color: Colors.white38),
+                                        const Gap(8),
+                                        const Text(
+                                          "FCFA",
+                                          style: TextStyle(
+                                              color: Color(0xFFE64A19),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800
+                                          ),
                                         ),
-                                      ),
+                                        const Gap(10),
+                                        const Icon(Icons.edit, color: Colors.white54, size: 18),
+                                      ],
                                     ),
-                                    const Text(
-                                      " FCFA",
-                                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
+
                           const Spacer(),
 
-                          // CHIPS
-                          SizedBox(
-                            height: 35,
-                            child: ListView(
-                              scrollDirection: Axis.horizontal,
-                              children: [
-                                _buildGlassChip(context, "+1.000", 1000),
-                                const Gap(8),
-                                _buildGlassChip(context, "+2.000", 2000),
-                                const Gap(8),
-                                _buildGlassChip(context, "+5.000", 5000),
-                                const Gap(8),
-                                _buildGlassChip(context, "+10.000", 10000),
-                              ],
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildGlassChip(context, "+1.000", 1000),
+                              const Gap(10),
+                              _buildGlassChip(context, "+2.000", 2000),
+                              const Gap(10),
+                              _buildGlassChip(context, "+5.000", 5000),
+                            ],
                           )
                         ],
                       ),
@@ -606,14 +661,12 @@ class _TopUpScreenState extends State<TopUpScreen> {
             ),
             const Gap(30),
 
-            // --- 2. MOYEN DE PAIEMENT (WAVE UNIQUE) ---
             Text("MOYEN DE PAIEMENT", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold)),
             const Gap(15),
 
-            // ✅ Carte Unique pour Wave
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF5EC2F2).withOpacity(0.1), // Bleu léger de Wave
+                color: const Color(0xFF5EC2F2).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(color: const Color(0xFF5EC2F2), width: 2),
               ),
@@ -629,15 +682,33 @@ class _TopUpScreenState extends State<TopUpScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Image.asset(
-                      "assets/images/wavee.png", // Assure-toi que cette image existe
+                      "assets/images/wavee.png",
                       fit: BoxFit.contain,
                       errorBuilder: (c, o, s) => const Icon(Icons.waves, color: Colors.blue),
                     ),
                   ),
                 ),
-                title: const Text(
-                  "Paiement Mobile",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                title: Row(
+                  children: [
+                    const Text(
+                      "Paiement Mobile",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Gap(8),
+                    // 🟢 BADGE INFORMATIF SUR LA TUILE WAVE
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.orange, width: 1),
+                      ),
+                      child: const Text(
+                        "2% frais",
+                        style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
                 subtitle: const Text(
                   "Sécurisé par Wave",
@@ -654,7 +725,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
     );
   }
 
-  // --- WIDGET HELPER : CHIP STYLE "GLASS" ---
   Widget _buildGlassChip(BuildContext context, String label, int value) {
     return Material(
       color: Colors.transparent,

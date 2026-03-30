@@ -9,6 +9,7 @@ import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/local_badge.dart';
 import '../../../../core/providers/user_provider.dart';
 // import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/active_reservation_model.dart';
 import '../../../booking/domain/repositories/alert_repository.dart';   // ⚠️ Vérifie ce chemin
 
@@ -96,84 +97,6 @@ class AlertsTabScreen extends StatefulWidget {
     }
   }
 
-
-
-  /*Future<void> _fetchReservations() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final String? token = prefs.getString('auth_token') ??
-          prefs.getString('access_token') ??
-          prefs.getString('token');
-
-      if (token == null || token.isEmpty) {
-        throw Exception("Non connecté (Token manquant)");
-      }
-
-      final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-      ));
-
-      final repository = AlertRepository(dio: dio);
-
-      // 1. On récupère TOUTES les réservations renvoyées par le backend
-      final allReservations = await repository.getActiveReservations();
-
-      // 2. 🔴 FILTRAGE MAGIQUE ICI 🔴
-      // On ne garde que les voyages qui NE SONT PAS terminés, annulés ou arrivés.
-      final activeOnly = allReservations.where((res) {
-        // ⚠️ ASSURE-TOI QUE "displayStatut" EST BIEN LE NOM DE TA VARIABLE DANS LE MODEL
-        // Si tu l'as appelé autrement (ex: res.statut), change-le ici.
-        final status = (res.displayStatut ?? "").toLowerCase();
-
-        return !status.contains("termin") &&
-            !status.contains("annul") &&
-            !status.contains("arriv");
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          // On passe la liste filtrée à l'UI
-          _reservations = activeOnly;
-          _isLoading = false;
-        });
-      }
-      // 🟢 5. ON LANCE L'ANIMATION ICI !
-      _entranceController.forward(from: 0.0);
-    }
-    catch (e) {
-      debugPrint("Erreur fetch: $e");
-
-      if (mounted) {
-        setState(() {
-          if (e.toString().contains("Non connecté")) {
-            _errorMessage = "Vous n'êtes pas connecté.";
-          } else if (e is DioException && e.response?.statusCode == 401) {
-            _errorMessage = "Session expirée. Veuillez vous reconnecter.";
-          } else {
-            _errorMessage = "Impossible de charger les voyages.";
-          }
-          _isLoading = false;
-        });
-      }
-    }
-  }*/
-
-
   Future<void> _fetchReservations() async {
     if (mounted) {
       setState(() {
@@ -197,14 +120,114 @@ class AlertsTabScreen extends StatefulWidget {
         throw Exception("Non connecté (Token manquant)");
       }
 
+      // 🟢 CONFIGURATION PROPRE
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        // ✅ LES HEADERS SONT DÉCOMMENTÉS ET ACTIFS
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+      debugPrint("📡 [FETCH] Appel API /user/signalements/active-reservations");
+
+      // 1️⃣ Récupération brute
+      final allReservations = await repository.getActiveReservations();
+
+      debugPrint("📦 [FETCH] Réservations reçues : ${allReservations.length}");
+
+      // 🔍 DEBUG CONTENU
+      for (final res in allReservations) {
+        debugPrint(
+          "➡️ ID:${res.id} | Prog:${res.programmeId} | Veh:${res.vehiculeId} | Statut:${res.displayStatut}",
+        );
+      }
+
+      // 2️⃣ FILTRAGE
+      final activeOnly = allReservations.where((res) {
+        final status = res.displayStatut.toLowerCase();
+
+        final isActive = !status.contains("termin") &&
+            !status.contains("annul") &&
+            !status.contains("arriv");
+
+        debugPrint(
+          "🔎 [FILTER] ID:${res.id} | statut='$status' | gardé=$isActive",
+        );
+
+        return isActive;
+      }).toList();
+
+      debugPrint("✅ [FETCH] Réservations actives après filtre : ${activeOnly.length}");
+
+      if (mounted) {
+        setState(() {
+          _reservations = activeOnly;
+          _isLoading = false;
+        });
+      }
+
+      debugPrint("🎬 [FETCH] Lancement animation UI");
+      _entranceController.forward(from: 0.0);
+
+    } catch (e) {
+      debugPrint("❌ [FETCH] Erreur attrapée : $e");
+
+      if (mounted) {
+        setState(() {
+          if (e.toString().contains("Non connecté")) {
+            _errorMessage = "Vous n'êtes pas connecté.";
+          } else if (e is DioException && e.response?.statusCode == 401) {
+            _errorMessage = "Session expirée. Veuillez vous reconnecter.";
+          } else {
+            _errorMessage = "Impossible de charger les voyages.";
+          }
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+
+
+  /*Future<void> _fetchReservations() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    debugPrint("🚀 [FETCH] Début récupération des réservations");
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final String? token = prefs.getString('auth_token') ??
+          prefs.getString('access_token') ??
+          prefs.getString('token');
+
+      debugPrint("🔐 [FETCH] Token présent : ${token != null && token.isNotEmpty}");
+
+      if (token == null || token.isEmpty) {
+        throw Exception("Non connecté (Token manquant)");
+      }
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        //baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        /*headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },*/
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
       ));
@@ -268,7 +291,7 @@ class AlertsTabScreen extends StatefulWidget {
         });
       }
     }
-  }
+  }*/
 
 
 

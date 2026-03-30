@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../booking/data/models/active_reservation_model.dart';
 import '../../../booking/domain/repositories/alert_repository.dart';
@@ -41,6 +42,10 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
+  // 🟢 1. On garde une référence à l'OverlayEntry actif
+  OverlayEntry? _currentNotification;
+
+
   // ✅ 1. LOGIQUE INTELLIGENTE
   // Vérifie si les champs doivent être obligatoires (seulement si Accident)
   bool get _isMandatory {
@@ -48,8 +53,16 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
   }
 
   // Convertit le texte affiché en valeur acceptée par l'API
-  String _getApiType(String displayType) {
-    switch (displayType.toLowerCase()) {
+  // Convertit le texte affiché en valeur acceptée par l'API
+  /*String _getApiType(String displayType) {
+    // 🟢 1. Le .trim() EST VITAL ICI pour enlever les espaces avant/après
+    final String cleanType = displayType.trim().toLowerCase();
+
+    // 🟢 2. Des logs précis avec des guillemets pour détecter les espaces invisibles
+    print("🔍 [DEBUG TYPE] Entrée UI brute  : '$displayType'");
+    print("🔍 [DEBUG TYPE] Après nettoyage  : '$cleanType'");
+
+    switch (cleanType) {
       case 'accident':
         return 'accident';
       case 'panne':
@@ -59,14 +72,49 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       case 'retard':
         return 'retard';
       default:
-        return displayType.toLowerCase();
+        print("⚠️ [WARNING TYPE] Type non reconnu par le switch ! On envoie : '$cleanType'");
+        return cleanType;
+    }
+  }*/
+
+  // Convertit le texte affiché en valeur acceptée par l'API
+  String _getApiType(String displayType) {
+    final String cleanType = displayType.trim().toLowerCase();
+
+    print("🔍 [DEBUG TYPE] Entrée UI brute  : '$displayType'");
+    print("🔍 [DEBUG TYPE] Après nettoyage  : '$cleanType'");
+
+    switch (cleanType) {
+      case 'accident':
+        return 'accident';
+
+    // 🟢 ON AJOUTE TON TEXTE EXACT DE L'UI ICI
+      case 'panne véhicule':
+      case 'panne': // (On garde 'panne' au cas où ça change plus tard)
+        return 'panne'; // On envoie juste 'panne' à l'API
+
+      case 'embouteillage':
+        return 'embouteillage';
+
+      case 'retard':
+        return 'retard';
+
+      default:
+        print("⚠️ [WARNING TYPE] Type non reconnu par le switch ! On envoie : '$cleanType'");
+        return cleanType;
     }
   }
 
+
+
+
   // --- NOTIFICATION TOP OVERLAY ---
   void _showTopNotification(String message, {bool isError = true}) {
+    // 🟢 Si une notification existe déjà, on la supprime pour éviter de les empiler
+    _removeCurrentNotification();
+
     final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
+    _currentNotification = OverlayEntry(
       builder: (context) => Positioned(
         top: 60.0,
         left: 20.0,
@@ -106,13 +154,41 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       ),
     );
 
-    overlay.insert(overlayEntry);
+    overlay.insert(_currentNotification!);
+
+    // 🟢 2. On passe la référence locale au Future.delayed
+    // On retire le check "if (mounted)" car on veut que la notification disparaisse
+    // même si on a changé d'écran entre-temps.
+    final notificationToRemove = _currentNotification;
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        try { overlayEntry.remove(); } catch (_) {}
-      }
+      try {
+        if (notificationToRemove != null && notificationToRemove.mounted) {
+          notificationToRemove.remove();
+        }
+      } catch (_) {}
     });
   }
+
+  // 🟢 Nouvelle méthode pour nettoyer proprement
+  void _removeCurrentNotification() {
+    if (_currentNotification != null && _currentNotification!.mounted) {
+      try {
+        _currentNotification!.remove();
+      } catch (_) {}
+      _currentNotification = null;
+    }
+  }
+
+  // 🟢 3. On nettoie si l'utilisateur appuie sur le bouton retour classique
+  @override
+  void dispose() {
+    _removeCurrentNotification();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+
 
   // --- GESTION PHOTO ---
   Future<void> _pickImage(ImageSource source) async {
@@ -213,94 +289,9 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
     }
   }
 
+
   // --- ENVOI DU SIGNALEMENT ---
   /*Future<void> _submitSignalement() async {
-    // ✅ 2. VALIDATION CONDITIONNELLE
-    // Si c'est un ACCIDENT, on oblige la description et la photo.
-    // Sinon, on laisse passer même si vide.
-
-    if (_isMandatory) {
-      if (_descriptionController.text.trim().isEmpty) {
-        _showTopNotification("Veuillez décrire l'accident.", isError: true);
-        return;
-      }
-      if (_selectedImage == null) {
-        _showTopNotification("Une photo est obligatoire pour un accident.", isError: true);
-        return;
-      }
-    }
-
-    // La localisation reste obligatoire pour tout le monde pour savoir où ça se passe
-    if (_currentPosition == null) {
-      _showTopNotification("Récupération de la position en cours...", isError: false);
-      await _getCurrentLocation();
-      if (_currentPosition == null) return;
-    }
-
-    // 🚫 VÉRIFICATION VÉHICULE (OBLIGATOIRE)
-    if (widget.reservation.vehiculeId == null || widget.reservation.vehiculeId <= 0) {
-      _showTopNotification(
-        "Aucun véhicule valide associé à cette réservation",
-        isError: true,
-      );
-      return;
-    }
-
-    setState(() => _isSending = true);
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? prefs.getString('token');
-
-      final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      ));
-
-      final repository = AlertRepository(dio: dio);
-
-      await repository.createSignalement(
-        programmeId: widget.reservation.programmeId,
-        vehiculeId: widget.reservation.vehiculeId,
-        type: _getApiType(widget.alertType),
-
-        description: _descriptionController.text, // Peut être vide si non accident
-        latitude: _currentPosition!.latitude,
-        longitude: _currentPosition!.longitude,
-
-        // ✅ J'ai enlevé le "!" ici. Si c'est null (optionnel), on envoie null.
-        // Assure-toi que ton AlertRepository accepte "File? photo" et non "File photo"
-        photo: _selectedImage,
-      );
-
-      if (mounted) {
-        _showTopNotification("Signalement envoyé !", isError: false);
-        await Future.delayed(const Duration(milliseconds: 500));
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AlertSuccessScreen()),
-        );
-      }
-
-    } catch (e) {
-      if (mounted) {
-        String msg = e.toString().replaceAll("Exception:", "").trim();
-        _showTopNotification(msg, isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
-    }
-  }*/
-
-
-  // --- ENVOI DU SIGNALEMENT ---
-  Future<void> _submitSignalement() async {
 
     // ✅ VALIDATION ACCIDENT
     if (_isMandatory) {
@@ -339,12 +330,13 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       final token = prefs.getString('auth_token') ?? prefs.getString('token');
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
+        baseUrl: ApiConfig.baseUrl,
+        //baseUrl: 'https://car225.com/api/',
         //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        headers: {
+        /*headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
-        },
+        },*/
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
       ));
@@ -362,11 +354,19 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       );
 
       if (mounted) {
-        _showTopNotification("Signalement envoyé avec succès", isError: false);
-        await Future.delayed(const Duration(milliseconds: 500));
+        _removeCurrentNotification(); // Si tu as gardé la correction d'avant
+
+        // On génère un petit numéro de suivi factice basé sur l'heure
+        // (à remplacer par l'ID de l'API si ton backend te le renvoie dans response.data)
+        final reference = "#SIG-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AlertSuccessScreen()),
+          MaterialPageRoute(builder: (_) => AlertSuccessScreen(
+            alertType: widget.alertType, // Ex: "Panne véhicule"
+            status: "En attente",        // Ou "Reçu"
+            reference: reference,
+          )),
         );
       }
 
@@ -378,7 +378,90 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }*/
+
+
+  // --- ENVOI DU SIGNALEMENT ---
+  Future<void> _submitSignalement() async {
+    // ✅ VALIDATION ACCIDENT
+    if (_isMandatory) {
+      if (_descriptionController.text.trim().isEmpty) {
+        _showTopNotification("Veuillez décrire l'accident.", isError: true);
+        return;
+      }
+      if (_selectedImage == null) {
+        _showTopNotification("Une photo est obligatoire pour un accident.", isError: true);
+        return;
+      }
+    }
+
+    // 📍 Localisation obligatoire
+    if (_currentPosition == null) {
+      _showTopNotification("Récupération de la position en cours...", isError: false);
+      await _getCurrentLocation();
+      if (_currentPosition == null) return;
+    }
+
+    final int? vehiculeId = widget.reservation.vehiculeId;
+
+    if (vehiculeId == null || vehiculeId <= 0) {
+      _showTopNotification(
+        "Aucun véhicule valide associé à cette réservation",
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isSending = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? prefs.getString('token');
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ));
+
+      final repository = AlertRepository(dio: dio);
+
+      await repository.createSignalement(
+        programmeId: widget.reservation.programmeId,
+        vehiculeId: widget.reservation.vehiculeId!,
+        type: _getApiType(widget.alertType),
+        description: _descriptionController.text,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        photo: _selectedImage,
+      );
+
+      if (mounted) {
+        _removeCurrentNotification();
+        final reference = "#SIG-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => AlertSuccessScreen(
+            alertType: widget.alertType,
+            status: "En attente",
+            reference: reference,
+          )),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = e.toString().replaceAll("Exception:", "").trim();
+        _showTopNotification(msg, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {

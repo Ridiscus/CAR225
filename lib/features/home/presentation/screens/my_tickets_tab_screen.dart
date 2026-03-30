@@ -15,6 +15,7 @@ import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/local_badge.dart'; // Vérifie le nom
 import '../../../../common/widgets/ticket_card.dart'; // Si tu l'utilises
 import '../../../../core/providers/user_provider.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../booking/data/models/ticket_model.dart';
 import '../../../booking/data/repositories/ticket_repository_impl.dart';
@@ -74,15 +75,15 @@ class _MyTicketsTabScreenState extends State<MyTicketsTabScreen>  with SingleTic
     final String token = prefs.getString('auth_token') ?? '';
 
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
-      //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+      // 🟢 ApiConfig centralisé
+      baseUrl: ApiConfig.baseUrl,
+
+      // ✅ HEADERS DÉCOMMENTÉS ET ACTIFS
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Accept': 'application/json', // Oblige Laravel à renvoyer du JSON et non une redirection 302 HTML
+        'Authorization': 'Bearer $token'
       },
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
     ));
 
     _ticketRepository = TicketRepositoryImpl(dio: dio);

@@ -267,6 +267,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
                     const Text("Aucun départ prévu pour aujourd'hui.", style: TextStyle(color: Colors.redAccent))
                   else
                     DropdownButtonFormField<ProgrammeModel>(
+                      isExpanded: true, // 🟢 1. AJOUT CRUCIAL : Force le Dropdown à respecter la largeur max
                       decoration: InputDecoration(
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -276,10 +277,11 @@ class _TicketScannerScreenState extends State<TicketScannerScreen>
                       items: _programmesList.map((prog) {
                         return DropdownMenuItem<ProgrammeModel>(
                           value: prog,
-                          // Affichage clair : Départ -> Arrivée (Heure) [Plaque]
                           child: Text(
                             "${prog.pointDepart.split(',').first} -> ${prog.pointArrive.split(',').first}  (${prog.heureDepart}) [Car: ${prog.immatriculation}]",
                             style: const TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis, // 🟢 2. AJOUT CRUCIAL : Coupe le texte avec des "..." s'il dépasse
+                            maxLines: 1, // 🟢 Empêche le texte de passer à la ligne
                           ),
                         );
                       }).toList(),

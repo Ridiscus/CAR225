@@ -82,7 +82,7 @@ class AgentRepositoryImpl implements AgentRepository {
     }
   }
 
-  @override
+  /*@override
   Future<AgentDashboardData> getDashboardData() async {
     try {
       final response = await remoteDataSource.getDashboardData();
@@ -93,7 +93,7 @@ class AgentRepositoryImpl implements AgentRepository {
     } catch (e) {
       throw Exception(e.toString().replaceAll("Exception: ", ""));
     }
-  }
+  }*/
 
   // 🟢 1. RECHERCHE PAR SCAN QR CODE
   @override

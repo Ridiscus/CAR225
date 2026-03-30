@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
 // --- IMPORTS CORE & THEME ---
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../onboarding/presentation/bando.dart';
 
@@ -39,11 +40,13 @@ class SearchResultsScreen extends StatefulWidget {
   String? errorMessage;
   List<ProgramModel> programs = [];
 
+  // 🟢 NOUVELLE VARIABLE POUR LES GROUPES
+  List<List<ProgramModel>> groupedPrograms = [];
+
   late BookingRepositoryImpl _repository;
 
   // 🟢 2. DÉCLARATION DU CONTROLLER
   late AnimationController _entranceController;
-
 
   @override
   void initState() {
@@ -69,11 +72,12 @@ class SearchResultsScreen extends StatefulWidget {
 
   void _setupDependenciesAndFetch() {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/',
       //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
-      headers: {'Content-Type': 'application/json'},
+      /*headers: {'Content-Type': 'application/json'},*/
     ));
 
     final dataSource = BookingRemoteDataSourceImpl(dio: dio);
@@ -98,11 +102,27 @@ class SearchResultsScreen extends StatefulWidget {
         results = await _repository.getAllTrips();
       }
 
-      if (mounted) {
-        setState(() { programs = results; isLoading = false; });
+      // 🟢 LOGIQUE DE GROUPEMENT
+      Map<String, List<ProgramModel>> groupsMap = {};
+      for (var program in results) {
+        // Clé unique par Compagnie + Départ + Arrivée
+        String key = "${program.compagnieId}_${program.villeDepart}_${program.villeArrivee}";
+        if (!groupsMap.containsKey(key)) {
+          groupsMap[key] = [];
+        }
+        groupsMap[key]!.add(program);
       }
 
-      // 🟢 5. ON LANCE L'ANIMATION UNE FOIS LES DONNÉES PRÊTES
+      List<List<ProgramModel>> newGroupedPrograms = groupsMap.values.toList();
+
+      if (mounted) {
+        setState(() {
+          programs = results;
+          groupedPrograms = newGroupedPrograms; // 🟢 On stocke les groupes
+          isLoading = false;
+        });
+      }
+
       _entranceController.forward(from: 0.0);
 
     } catch (e) {
@@ -115,13 +135,11 @@ class SearchResultsScreen extends StatefulWidget {
     }
   }
 
-  void _incrementPassengers() { if (passengerCount < 5) setState(() => passengerCount++); }
+  void _incrementPassengers() { if (passengerCount < 8) setState(() => passengerCount++); }
   void _decrementPassengers() { if (passengerCount > 1) setState(() => passengerCount--); }
 
 
-
-  // 🟢 CORRECTION DE L'APPEL A LA MODALE
-  Future<void> _showBookingOptionsModal(BuildContext context, ProgramModel program) async {
+  Future<void> _showBookingOptionsModal(BuildContext context, List<ProgramModel> availableOutboundTrips) async {
     final Map<String, dynamic>? configResult = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -133,34 +151,38 @@ class SearchResultsScreen extends StatefulWidget {
           maxChildSize: 0.95,
           builder: (_, controller) {
             return _BookingConfigModalContent(
-              program: program,
+              availableOutboundTrips: availableOutboundTrips,
               passengerCount: passengerCount,
               isGuestMode: widget.isGuestMode,
               isModificationMode: widget.isModificationMode,
               repository: _repository,
-
-              // ✅ ICI : On passe la variable CRUCIALE à la modale
               ticketWasAllerRetour: widget.ticketWasAllerRetour,
+              // 🟢 NOUVEAU : On passe la date cherchée au modal
+              searchedDate: widget.searchParams?['date'],
             );
           },
         );
       },
     );
-
     // Si on revient avec des résultats, on va vers la sélection des sièges
     if (configResult != null && mounted) {
       _navigateToSeatSelection(
         program: configResult['program'],
         returnProgram: configResult['returnProgram'], // Sera null si isRoundTrip était false
+        // 🟢 NOUVEAU : On récupère le paramètre
+        isAutomaticSeatSelection: configResult['isAutomaticSeatSelection'] ?? false,
+        // 🟢 LA PIÈCE MANQUANTE EST LÀ !!
         dateRetourChoisie: configResult['dateRetourChoisie'],
       );
     }
   }
 
+
   void _navigateToSeatSelection({
     required ProgramModel program,
     ProgramModel? returnProgram,
     String? dateRetourChoisie,
+    bool isAutomaticSeatSelection = false, // 🟢 NOUVEAU
   }) async {
     final result = await Navigator.push(
       context,
@@ -172,6 +194,9 @@ class SearchResultsScreen extends StatefulWidget {
           isGuestMode: widget.isGuestMode,
           isModificationMode: widget.isModificationMode,
           dateRetourChoisie: dateRetourChoisie,
+          // 🟢 NOUVEAU : On passe l'information à l'écran des sièges
+          isAutomaticSeatSelection: isAutomaticSeatSelection,
+          seatSelectionFee: isAutomaticSeatSelection ? 0 : 100,
         ),
       ),
     );
@@ -248,41 +273,30 @@ class SearchResultsScreen extends StatefulWidget {
                 ? Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("Oups ! $errorMessage", textAlign: TextAlign.center, style: TextStyle(color: textColor))))
                 : programs.isEmpty
                 ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.directions_bus_outlined, size: 60, color: Colors.grey.shade400), const Gap(10), Text("Aucun trajet disponible", style: TextStyle(color: Colors.grey.shade600))]))
-                /*: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: programs.length,
-              itemBuilder: (context, index) {
-                return _buildTicketCard(context, programs[index]);
-              },
-            ),*/
 
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: programs.length,
+              itemCount: groupedPrograms.length, // 🟢 Utiliser la longueur des groupes
               itemBuilder: (context, index) {
-                final program = programs[index];
+                // 🟢 On récupère le GROUPE entier
+                final group = groupedPrograms[index];
+                // On utilise le premier élément du groupe pour afficher les infos générales de la carte
+                final representatifProgram = group.first;
 
-                // 🟢 6. CALCUL DU DÉLAI EN CASCADE (STAGGERED ANIMATION)
                 final double startDelay = (index % 10) * 0.1;
                 final double endDelay = (startDelay + 0.5).clamp(0.0, 1.0);
+                final animation = CurvedAnimation(parent: _entranceController, curve: Interval(startDelay, endDelay, curve: Curves.easeOutCubic));
 
-                final animation = CurvedAnimation(
-                  parent: _entranceController,
-                  curve: Interval(startDelay, endDelay, curve: Curves.easeOutCubic),
-                );
-
-                // 🟢 7. APPLICATION DES TRANSITIONS (SLIDE + FADE)
                 return SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.3), // Vient un peu du bas
-                    end: Offset.zero,
-                  ).animate(animation),
+                  position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(animation),
                   child: FadeTransition(
                     opacity: animation,
-                    child: _buildTicketCard(context, program),
+                    // 🟢 On passe TOUT LE GROUPE à la méthode qui construit la carte
+                    child: _buildTicketCard(context, group),
                   ),
                 );
               },
+
             ),
 
           ),
@@ -291,11 +305,14 @@ class SearchResultsScreen extends StatefulWidget {
     );
   }
 
-  Widget _buildTicketCard(BuildContext context, ProgramModel program) {
+
+
+    Widget _buildTicketCard(BuildContext context, List<ProgramModel> group) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     final shadowColor = isDark ? Colors.black26 : Colors.black.withOpacity(0.05);
+    final program = group.first;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -446,14 +463,14 @@ class SearchResultsScreen extends StatefulWidget {
                 fit: BoxFit.cover,
               ),
             ),
+
             child: ElevatedButton(
               onPressed: () {
-                String searchDate = widget.searchParams?['date'] ?? program.dateDepart.split(' ')[0];
-                String timeOnly = program.heureDepart;
-                String correctDateDepart = "$searchDate $timeOnly";
-                ProgramModel programCorrige = program.copyWith(dateDepart: correctDateDepart);
-                _showBookingOptionsModal(context, programCorrige);
+                // 🟢 On passe LE GROUPE ENTIER au modal, plus seulement un programme
+                _showBookingOptionsModal(context, group);
               },
+
+
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent, // Transparent !
                   shadowColor: Colors.transparent,
@@ -465,33 +482,39 @@ class SearchResultsScreen extends StatefulWidget {
             ),
           )
 
-
         ],
       ),
     );
   }
 }
 
+
+
+
+
 // -----------------------------------------------------------------------------
 // 🟢 COMPOSANT INTERNE : LE CONTENU DU MODAL AVEC L'INFORMATION
 // -----------------------------------------------------------------------------
 class _BookingConfigModalContent extends StatefulWidget {
-  final ProgramModel program;
+  final List<ProgramModel> availableOutboundTrips;
   final int passengerCount;
   final bool isModificationMode;
   final bool isGuestMode;
   final bool ticketWasAllerRetour;
   final BookingRepositoryImpl repository;
 
+  // 🟢 NOUVEAU : La date initialement cherchée
+  final String? searchedDate;
+
   const _BookingConfigModalContent({
     super.key,
-    required this.program,
+    required this.availableOutboundTrips,
     required this.passengerCount,
     required this.isModificationMode,
     required this.isGuestMode,
-    // Ajouté au constructeur
     this.ticketWasAllerRetour = false,
     required this.repository,
+    this.searchedDate, // 🟢 NOUVEAU
   });
 
   @override
@@ -499,6 +522,8 @@ class _BookingConfigModalContent extends StatefulWidget {
 }
 
 class _BookingConfigModalContentState extends State<_BookingConfigModalContent> {
+  // 🟢 Nouveau : On stocke le programme Aller sélectionné par l'utilisateur
+  ProgramModel? selectedOutboundProgram;
   bool isRoundTrip = false;
   late String selectedDepartureTime;
   DateTime? selectedReturnDate;
@@ -506,20 +531,29 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
   List<ProgramModel> availableReturnTrips = [];
   ProgramModel? selectedReturnProgram;
 
+
+  // 🟢 NOUVEAU : État pour le mode de sélection des sièges
+  //bool isAutomaticSeatSelection = false; // Par défaut sur Manuel
+
+
+
   @override
   void initState() {
     super.initState();
-    selectedDepartureTime = widget.program.heureDepart;
 
-    // 🔒 LOGIQUE DE VERROUILLAGE CORRIGÉE
-    if (widget.isModificationMode) {
-      // Si c'était un aller-retour, on FORCE le mode aller-retour dès l'ouverture
-      isRoundTrip = widget.ticketWasAllerRetour;
-    } else {
-      // Mode normal : on respecte la logique par défaut (ou celle du programme si déjà défini)
-      isRoundTrip = widget.program.isAllerRetour;
+    // 🟢 Par défaut, on sélectionne le premier horaire de la liste pour l'Aller
+    if (widget.availableOutboundTrips.isNotEmpty) {
+      selectedOutboundProgram = widget.availableOutboundTrips.first;
     }
 
+    if (widget.isModificationMode) {
+      isRoundTrip = widget.ticketWasAllerRetour;
+    } else {
+      // 🟢 On se base sur le premier élément pour savoir si on active l'AR par défaut
+      isRoundTrip = widget.availableOutboundTrips.isNotEmpty
+          ? widget.availableOutboundTrips.first.isAllerRetour
+          : false;
+    }
   }
 
   void _showTopNotification(String message, {bool isError = true}) {
@@ -557,8 +591,10 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(date);
       String formatCity(String city) => "${city.split(',')[0].trim()}, Côte d'Ivoire";
-      final villeDepartRetour = formatCity(widget.program.villeArrivee.trim());
-      final villeArriveeRetour = formatCity(widget.program.villeDepart.trim());
+      //final villeDepartRetour = formatCity(widget.program.villeArrivee.trim());
+      final villeArriveeRetour = formatCity(selectedOutboundProgram!.villeDepart.trim());
+      // Remplacer widget.program.villeArrivee par :
+      final villeDepartRetour = formatCity(selectedOutboundProgram!.villeArrivee.trim());
 
       final results = await widget.repository.searchTrips(villeDepartRetour, villeArriveeRetour, dateStr, false);
       if (mounted) setState(() { availableReturnTrips = results; isLoadingReturnTrips = false; });
@@ -571,13 +607,34 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
   }
 
   Future<void> _pickReturnDate() async {
-    DateTime departureDate = DateTime.tryParse(widget.program.dateDepart) ?? DateTime.now();
+    // 🟢 1. ON UTILISE LA DATE RECHERCHÉE PAR L'UTILISATEUR EN PRIORITÉ
+    String dateStringToParse = widget.searchedDate ?? selectedOutboundProgram!.dateDepart.split(' ')[0];
+
+    // 🟢 2. On parse la date
+    DateTime departureDate = DateTime.tryParse(dateStringToParse) ?? DateTime.now();
+
+    // 🟢 3. SÉCURITÉ : On remet les heures à zéro pour que le calendrier compare uniquement les jours
+    departureDate = DateTime(departureDate.year, departureDate.month, departureDate.day);
+
+    // Date sélectionnée par défaut à l'ouverture du calendrier (le lendemain par défaut)
     DateTime initialDate = selectedReturnDate ?? departureDate.add(const Duration(days: 1));
-    if (initialDate.isBefore(departureDate)) initialDate = departureDate;
+
+    // Si la date initiale calculée est avant le départ (cas rare), on la force au jour du départ
+    if (initialDate.isBefore(departureDate)) {
+      initialDate = departureDate;
+    }
 
     final picked = await showDatePicker(
-      context: context, initialDate: initialDate, firstDate: departureDate, lastDate: DateTime(departureDate.year + 1),
-      builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary)), child: child!),
+      context: context,
+      initialDate: initialDate,
+      firstDate: departureDate, // 🔒 C'est ici que la magie opère : bloque avant l'Aller !
+      lastDate: DateTime(departureDate.year + 1),
+      builder: (context, child) => Theme(
+          data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(primary: AppColors.primary)
+          ),
+          child: child!
+      ),
     );
 
     if (picked != null) {
@@ -586,7 +643,15 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
     }
   }
 
+
+
   void _onValidate() {
+    // 🟢 On vérifie qu'une heure d'Aller est bien sélectionnée
+    if (selectedOutboundProgram == null) {
+      _showTopNotification("Veuillez sélectionner une heure de départ.");
+      return;
+    }
+
     if (isRoundTrip) {
       if (selectedReturnDate == null) {
         _showTopNotification("Veuillez choisir une date de retour.");
@@ -602,22 +667,43 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
       }
     }
 
-    // 1. On prépare les données à renvoyer au parent (SearchResultsScreen)
-    // On ne navigue PAS ici, on ferme juste le modal avec le résultat.
     Navigator.pop(context, {
-      'program': widget.program.copyWith(isAllerRetour: isRoundTrip),
+      'program': selectedOutboundProgram!.copyWith(
+        isAllerRetour: isRoundTrip,
+        // 🟢 Sécurité absolue : On force la date du programme avec celle cherchée
+        dateDepart: widget.searchedDate != null
+            ? "${widget.searchedDate} ${selectedOutboundProgram!.heureDepart}"
+            : selectedOutboundProgram!.dateDepart,
+      ),
       'returnProgram': isRoundTrip ? selectedReturnProgram : null,
       'dateRetourChoisie': isRoundTrip && selectedReturnDate != null
           ? DateFormat('yyyy-MM-dd').format(selectedReturnDate!)
-          : null
+          : null,
+      // 🟢 NOUVEAU : On passe le choix de sélection
+      //'isAutomaticSeatSelection': isAutomaticSeatSelection,
+      'isAutomaticSeatSelection': true,
+      'seatSelectionFee': 0,
+      // 🟢 NOUVEAU : On transmet le montant des frais pour l'écran suivant
+      //'seatSelectionFee': isAutomaticSeatSelection ? 0 : 100,
     });
 
   }
+
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+
+
+    // 🟢 Sécurité : on récupère les infos globales du trajet sur le premier élément
+    final trajetAller = widget.availableOutboundTrips.isNotEmpty
+        ? widget.availableOutboundTrips.first
+        : null;
+
+    if (trajetAller == null) {
+      return const SizedBox(); // Sécurité si la liste est vide
+    }
 
     return Container(
       padding: const EdgeInsets.all(25),
@@ -628,185 +714,313 @@ class _BookingConfigModalContentState extends State<_BookingConfigModalContent> 
       child: SafeArea(
         top: false,
         bottom: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
-            const Gap(20),
-            Text("Configuration du voyage", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-            const Gap(20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
+              const Gap(20),
+              Text("Configuration du voyage", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+              const Gap(20),
 
-
-            // 🔒 LE BLOC DE CHOIX DU TYPE DE VOYAGE
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10)
+              // 🔒 LE BLOC DE CHOIX DU TYPE DE VOYAGE
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10)
+                ),
+                child: Row(
+                  children: [
+                    _buildTypeOption(
+                        "Aller Simple",
+                        !isRoundTrip,
+                        widget.isModificationMode
+                            ? null
+                            : () { setState(() { isRoundTrip = false; selectedReturnProgram = null; selectedReturnDate = null; }); }
+                    ),
+                    _buildTypeOption(
+                        "Aller - Retour",
+                        isRoundTrip,
+                        widget.isModificationMode
+                            ? null
+                            : () => setState(() => isRoundTrip = true)
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  // BOUTON ALLER SIMPLE
-                  _buildTypeOption(
-                      "Aller Simple",
-                      !isRoundTrip, // Actif si isRoundTrip est false
-                      // Si Modif : On bloque le clic (null). Sinon : on change l'état.
-                      widget.isModificationMode
-                          ? null
-                          : () { setState(() { isRoundTrip = false; selectedReturnProgram = null; selectedReturnDate = null; }); }
-                  ),
 
-                  // BOUTON ALLER RETOUR
-                  _buildTypeOption(
-                      "Aller - Retour",
-                      isRoundTrip, // Actif si isRoundTrip est true
-                      // Si Modif : On bloque le clic (null). Sinon : on change l'état.
-                      widget.isModificationMode
-                          ? null
-                          : () => setState(() => isRoundTrip = true)
-                  ),
-                ],
+              const Gap(20),
+
+              // RÉCAP ALLER
+              Text(
+                  "Aller : ${trajetAller.villeDepart} ➔ ${trajetAller.villeArrivee}",
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)
               ),
-            ),
+              const Gap(8),
 
-
-            const Gap(20),
-
-            // RÉCAP ALLER
-            Text("Aller : ${widget.program.villeDepart} ➔ ${widget.program.villeArrivee}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
-            const Gap(8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.primary)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
-                  const Gap(5),
-                  Text(DateFormat("d MMM yyyy", "fr_FR").format(DateTime.parse(widget.program.dateDepart.split(' ')[0])), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13)),
-                  Container(height: 15, width: 1, color: AppColors.primary, margin: const EdgeInsets.symmetric(horizontal: 8)),
-                  const Icon(Icons.access_time, size: 14, color: AppColors.primary),
-                  const Gap(5),
-                  Text(widget.program.heureDepart, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13)),
-                ],
-              ),
-            ),
-
-            if (isRoundTrip) ...[
-              const Gap(25),
-              const Divider(),
-              const Gap(10),
-              Text("Retour : ${widget.program.villeArrivee} ➔ ${widget.program.villeDepart}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const Gap(10),
-              GestureDetector(
-                onTap: _pickReturnDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                  decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(10), color: isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(selectedReturnDate == null ? "Sélectionner la date retour" : DateFormat("EEEE d MMMM yyyy", "fr_FR").format(selectedReturnDate!), style: TextStyle(fontWeight: FontWeight.bold, color: selectedReturnDate == null ? Colors.grey : textColor, fontSize: 14)),
-                      const Icon(Icons.calendar_month, color: AppColors.primary),
-                    ],
-                  ),
+              // Affichage de la date
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.primary)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                    const Gap(5),
+                    Text(
+                        DateFormat("d MMM yyyy", "fr_FR").format(
+                            DateTime.parse(
+                                widget.searchedDate ?? trajetAller.dateDepart.split(' ')[0]
+                            )
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13)
+                    ),
+                  ],
                 ),
               ),
               const Gap(15),
-              if (isLoadingReturnTrips)
-                const Center(child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
-              else if (selectedReturnDate != null && availableReturnTrips.isEmpty)
-                Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: const Row(children: [Icon(Icons.warning, color: Colors.red, size: 16), Gap(8), Expanded(child: Text("Aucun bus disponible pour ce retour.", style: TextStyle(color: Colors.red, fontSize: 12)))])
-                )
-              else if (selectedReturnDate != null) ...[
-                  const Text("Choisissez l'heure de retour :", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const Gap(8),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: availableReturnTrips.map((prog) {
-                      final bool isSelected = selectedReturnProgram?.id == prog.id;
-                      return ChoiceChip(
-                        label: Text(prog.heureDepart, style: TextStyle(color: isSelected ? Colors.white : textColor, fontWeight: FontWeight.bold)),
-                        selected: isSelected,
-                        selectedColor: AppColors.primary,
-                        backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                        onSelected: (bool selected) { setState(() { selectedReturnProgram = selected ? prog : null; }); },
-                      );
-                    }).toList(),
-                  ),
-                ]
-            ],
 
-            const Spacer(),
+              const Text("Choisissez l'heure de départ :", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Gap(8),
 
-            // -----------------------------------------------------------
-            // 🆕 NOUVEAU BLOC INFO FLEXIBILITÉ
-            // -----------------------------------------------------------
-            Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFCA8A04).withOpacity(0.1), // Fond Orange subtil
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFCA8A04).withOpacity(0.3)),
+              // AFFICHAGE DES HEURES DE DÉPART DISPONIBLES
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: widget.availableOutboundTrips.map((prog) {
+                  final bool isSelected = selectedOutboundProgram?.id == prog.id;
+                  return ChoiceChip(
+                    label: Text(
+                        prog.heureDepart,
+                        style: TextStyle(color: isSelected ? Colors.white : textColor, fontWeight: FontWeight.bold)
+                    ),
+                    selected: isSelected,
+                    selectedColor: AppColors.primary,
+                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                    onSelected: (bool selected) {
+                      setState(() {
+                        if (selected) {
+                          selectedOutboundProgram = prog;
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Color(0xFFCA8A04), size: 22), // Icône Info
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 12, color: textColor),
-                        children: const [
-                          TextSpan(text: "Annulation & Modification possibles jusqu'à ", style: TextStyle(fontWeight: FontWeight.normal)),
-                          TextSpan(text: "15 min avant le départ ", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFCA8A04))),
-                          TextSpan(text: "via l'écran 'Mes Réservations'.", style: TextStyle(fontWeight: FontWeight.normal)),
-                        ],
-                      ),
+
+              if (isRoundTrip) ...[
+                const Gap(25),
+                const Divider(),
+                const Gap(10),
+                Text("Retour : ${trajetAller.villeArrivee} ➔ ${trajetAller.villeDepart}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const Gap(10),
+                GestureDetector(
+                  onTap: _pickReturnDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(10), color: isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(selectedReturnDate == null ? "Sélectionner la date retour" : DateFormat("EEEE d MMMM yyyy", "fr_FR").format(selectedReturnDate!), style: TextStyle(fontWeight: FontWeight.bold, color: selectedReturnDate == null ? Colors.grey : textColor, fontSize: 14)),
+                        const Icon(Icons.calendar_month, color: AppColors.primary),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            Container(
-              width: double.infinity,
-              height: 50,
-              clipBehavior: Clip.hardEdge,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                image: const DecorationImage(
-                  image: AssetImage("assets/images/tabaa.jpg"),
-                  fit: BoxFit.cover,
                 ),
-                boxShadow: [
-                  BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-                ],
-              ),
-              child: ElevatedButton(
-                onPressed: _onValidate,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent, // Fond transparent
-                    shadowColor: Colors.transparent,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                ),
-                child: const Text("Choisir les sièges", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ),
+                const Gap(15),
+                if (isLoadingReturnTrips)
+                  const Center(child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                else if (selectedReturnDate != null && availableReturnTrips.isEmpty)
+                  Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Row(children: [Icon(Icons.warning, color: Colors.red, size: 16), Gap(8), Expanded(child: Text("Aucun bus disponible pour ce retour.", style: TextStyle(color: Colors.red, fontSize: 12)))])
+                  )
+                else if (selectedReturnDate != null) ...[
+                    const Text("Choisissez l'heure de retour :", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const Gap(8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: availableReturnTrips.map((prog) {
+                        final bool isSelected = selectedReturnProgram?.id == prog.id;
+                        return ChoiceChip(
+                          label: Text(prog.heureDepart, style: TextStyle(color: isSelected ? Colors.white : textColor, fontWeight: FontWeight.bold)),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary,
+                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                          onSelected: (bool selected) { setState(() { selectedReturnProgram = selected ? prog : null; }); },
+                        );
+                      }).toList(),
+                    ),
+                  ]
+              ],
 
-            const Gap(10),
-          ],
+              const Gap(25),
+
+              // 🟢 NOUVEAU : BLOC DE CHOIX DES SIÈGES
+              /*Text("Attribution des sièges", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
+              const Gap(10),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10)
+                ),
+                child: Row(
+                  children: [
+                    // BOUTON MANUEL
+                    _buildTypeOption(
+                        "Manuel",
+                        !isAutomaticSeatSelection,
+                            () => setState(() => isAutomaticSeatSelection = false)
+                    ),
+                    // BOUTON AUTOMATIQUE
+                    _buildTypeOption(
+                        "Automatique",
+                        isAutomaticSeatSelection,
+                            () => setState(() => isAutomaticSeatSelection = true)
+                    ),
+                  ],
+                ),
+              ),
+
+              // 🟢 NOUVEAU : MESSAGE D'INFORMATION POUR LES FRAIS MANUELS
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: !isAutomaticSeatSelection
+                    ? Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "La sélection manuelle des sièges entraîne des frais de 100 FCFA.",
+                            style: TextStyle(fontSize: 12, color: textColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                    : const SizedBox.shrink(),
+              ),
+
+              const Gap(30),*/
+
+              // BLOC INFO FLEXIBILITÉ
+              Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCA8A04).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCA8A04).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Color(0xFFCA8A04), size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(fontSize: 12, color: textColor),
+                          children: const [
+                            TextSpan(text: "Annulation & Modification possibles jusqu'à ", style: TextStyle(fontWeight: FontWeight.normal)),
+                            TextSpan(text: "15 min avant le départ ", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFCA8A04))),
+                            TextSpan(text: "via l'écran 'Mes Réservations'.", style: TextStyle(fontWeight: FontWeight.normal)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 🟢 BOUTON INTELLIGENT QUI CHANGE DE TEXTE
+              /*Container(
+                width: double.infinity,
+                height: 50,
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  image: const DecorationImage(
+                    image: AssetImage("assets/images/tabaa.jpg"),
+                    fit: BoxFit.cover,
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: _onValidate,
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  child: Text(
+                    // ✨ La magie est ici !
+                      isAutomaticSeatSelection ? "Valider et Continuer" : "Choisir les sièges",
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                  ),
+                ),
+              ),
+
+              const Gap(10),
+            ],*/
+
+              Container(
+                width: double.infinity,
+                height: 50,
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  image: const DecorationImage(
+                    image: AssetImage("assets/images/tabaa.jpg"),
+                    fit: BoxFit.cover,
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: _onValidate,
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  child: const Text(
+                      "Continuer", // ✨ Plus de logique complexe, on avance !
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                  ),
+                ),
+              ),
+
+              const Gap(10),
+            ],
+
+          ),
         ),
       ),
     );
   }
-
 
 
   Widget _buildTypeOption(String label, bool isSelected, VoidCallback? onTap) {

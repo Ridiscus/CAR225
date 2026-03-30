@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 // ✅ Assure-toi que ces imports sont bons chez toi
 import '../../../../common/widgets/BookingConfigurationSheet.dart';
 import '../../../../common/widgets/cube_magic.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../home/presentation/screens/real_time_seat_info.dart';
 import '../../data/datasources/booking_remote_data_source.dart';
@@ -69,37 +70,13 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> with Single
     super.dispose();
   }
 
-  /*void _initData() async {
-    final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
-      headers: {'Content-Type': 'application/json'},
-    ));
-
-    final dataSource = BookingRemoteDataSourceImpl(dio: dio);
-
-    // ✅ CORRECTION : On initialise bien _repository ici
-    _repository = BookingRepositoryImpl(remoteDataSource: dataSource);
-
-    try {
-      // On utilise _repository
-      final trips = await _repository.getAllTrips();
-      if (mounted) {
-        setState(() {
-          allItineraries = trips;
-          filteredItineraries = trips;
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }*/
 
   void _initData() async {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/',
       //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-      headers: {'Content-Type': 'application/json'},
+      /*headers: {'Content-Type': 'application/json'},*/
     ));
 
     final dataSource = BookingRemoteDataSourceImpl(dio: dio);
@@ -406,9 +383,27 @@ class _AllItinerariesScreenState extends State<AllItinerariesScreen> with Single
                 ProgramModel originalProgram = filteredItineraries[index];
                 ProgramModel displayProgram = originalProgram;
 
+                /*if (_selectedDate != null) {
+                  displayProgram = ProgramModel(
+                    id: originalProgram.id,
+                    compagnieName: originalProgram.compagnieName,
+                    prix: originalProgram.prix,
+                    heureDepart: originalProgram.heureDepart,
+                    heureArrivee: originalProgram.heureArrivee,
+                    duree: originalProgram.duree,
+                    placesDisponibles: originalProgram.placesDisponibles,
+                    capacity: originalProgram.capacity,
+                    isAllerRetour: originalProgram.isAllerRetour,
+                    villeDepart: originalProgram.villeDepart,
+                    villeArrivee: originalProgram.villeArrivee,
+                    dateDepart: DateFormat('yyyy-MM-dd').format(_selectedDate!) + " " + originalProgram.heureDepart,
+                  );
+                }*/
+
                 if (_selectedDate != null) {
                   displayProgram = ProgramModel(
                     id: originalProgram.id,
+                    compagnieId: originalProgram.compagnieId, // 🟢 AJOUT ICI
                     compagnieName: originalProgram.compagnieName,
                     prix: originalProgram.prix,
                     heureDepart: originalProgram.heureDepart,

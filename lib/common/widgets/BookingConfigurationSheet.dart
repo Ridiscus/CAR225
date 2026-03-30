@@ -39,6 +39,9 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
 
   int passengerCount = 1;
 
+  // 🟢 NOUVEAU : Variable pour stocker si la sélection est automatique ou manuelle
+  bool isAutomaticSeatSelection = true;
+
   @override
   void initState() {
     super.initState();
@@ -164,7 +167,7 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
     );
 
     // Navigation vers les sièges
-    Navigator.push(
+    /*Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => SeatSelectionScreen(
@@ -174,7 +177,27 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
           dateRetourChoisie: isAllerRetour ? DateFormat('yyyy-MM-dd').format(dateRetour!) : null,
         ),
       ),
+    );*/
+
+    // Navigation vers les sièges
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SeatSelectionScreen(
+          program: finalProgramAller,
+          returnProgram: isAllerRetour ? selectedReturnProgram : null,
+          passengerCount: passengerCount,
+          dateRetourChoisie: isAllerRetour ? DateFormat('yyyy-MM-dd').format(dateRetour!) : null,
+
+          // 🟢 NOUVEAU : On passe les paramètres obligatoires manquants
+          isGuestMode: false, // ou la bonne valeur si tu l'as dans la modale
+          isModificationMode: false, // Normalement false depuis une nouvelle réservation
+          isAutomaticSeatSelection: isAutomaticSeatSelection, // La variable qu'on vient de créer
+          seatSelectionFee: isAutomaticSeatSelection ? 0 : 100, // Le calcul du prix !
+        ),
+      ),
     );
+
   }
 
   @override
@@ -275,6 +298,70 @@ class _BookingConfigurationSheetState extends State<BookingConfigurationSheet> {
                 ),
               ),
 
+              const Gap(30),
+
+              // 🟢 NOUVEAU : SÉLECTION DU MODE DE SIÈGE
+              Text("Choix des sièges", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const Gap(10),
+
+              // Option Automatique (Gratuit)
+              GestureDetector(
+                onTap: () => setState(() => isAutomaticSeatSelection = true),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isAutomaticSeatSelection ? AppColors.primary : Colors.grey.shade300, width: isAutomaticSeatSelection ? 2 : 1),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isAutomaticSeatSelection ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(isAutomaticSeatSelection ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: isAutomaticSeatSelection ? AppColors.primary : Colors.grey),
+                      const Gap(10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Placement Automatique", style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text("Attribution aléatoire", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const Text("Gratuit", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                    ],
+                  ),
+                ),
+              ),
+              const Gap(10),
+
+              // Option Manuelle (Payant : 100 FCFA)
+              GestureDetector(
+                onTap: () => setState(() => isAutomaticSeatSelection = false),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: !isAutomaticSeatSelection ? AppColors.primary : Colors.grey.shade300, width: !isAutomaticSeatSelection ? 2 : 1),
+                    borderRadius: BorderRadius.circular(12),
+                    color: !isAutomaticSeatSelection ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(!isAutomaticSeatSelection ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: !isAutomaticSeatSelection ? AppColors.primary : Colors.grey),
+                      const Gap(10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Choix Manuel", style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text("Choisissez vos places préférées", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const Text("+100 FCFA", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                    ],
+                  ),
+                ),
+              ),
               const Gap(30),
 
               // 5. BOUTON

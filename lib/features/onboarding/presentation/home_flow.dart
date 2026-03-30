@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/services/networking/api_config.dart';
 import '../../auth/presentation/screens/login_screen.dart';
 import '../../booking/presentation/screens/search_results_screen.dart';
 
@@ -46,8 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // mais sans la redéfinir partout dans le code métier.
 
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/', // L'URL centrale
-      headers: {'Content-Type': 'application/json'},
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/', // L'URL centrale
+      /*headers: {'Content-Type': 'application/json'},*/
     ));
 
     // Injection de dépendance manuelle

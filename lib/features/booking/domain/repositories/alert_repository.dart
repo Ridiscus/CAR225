@@ -10,21 +10,6 @@ class AlertRepository {
   AlertRepository({required Dio dio}) : _dio = dio;
 
   // Récupérer les réservations
-  /*Future<List<ActiveReservationModel>> getActiveReservations() async {
-    try {
-      final response = await _dio.get('/user/signalements/active-reservations');
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final List<dynamic> data = response.data['reservations'];
-        return data.map((json) => ActiveReservationModel.fromJson(json)).toList();
-      } else {
-        throw Exception("Erreur lors de la récupération des réservations");
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }*/
-
-  // Récupérer les réservations
   Future<List<ActiveReservationModel>> getActiveReservations() async {
     try {
       debugPrint("📡 [API] Appel : /user/signalements/active-reservations");
@@ -79,7 +64,8 @@ class AlertRepository {
     File? photo, // <-- Peut être null maintenant
   }) async {
     print("🚀 --- DÉBUT ENVOI SIGNALEMENT ---");
-    print("📝 Données : ProgID=$programmeId, VehiculeID=$vehiculeId, Type=$type");
+    // 🟢 AJOUT DES GUILLEMETS AUTOUR DE $type ICI : Type='$type'
+    print("📝 Données : ProgID=$programmeId, VehiculeID=$vehiculeId, Type='$type'");
 
     // On sécurise le print de la photo pour ne pas faire planter si null
     if (photo != null) {

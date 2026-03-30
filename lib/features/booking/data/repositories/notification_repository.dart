@@ -25,7 +25,7 @@ class NotificationRepository {
     return await FirebaseMessaging.instance.getToken();
   }
 
-  Future<List<NotificationModel>> getNotifications() async {
+  /*Future<List<NotificationModel>> getNotifications() async {
     final token = await _getAuthToken();
     dio.options.headers["Authorization"] = "Bearer $token";
 
@@ -88,6 +88,71 @@ class NotificationRepository {
     } catch (e) {
       print("Erreur unread count: $e");
       return 0; // En cas d'erreur, on affiche 0 par sécurité
+    }
+  }*/
+
+  Future<List<NotificationModel>> getNotifications() async {
+    final token = await _getAuthToken();
+    dio.options.headers["Authorization"] = "Bearer $token";
+
+    // 🟢 AJOUT DU SLASH / ICI 👇
+    final response = await dio.get('/user/notifications');
+
+    if (response.statusCode == 200 && response.data['success'] == true) {
+      final List<dynamic> list = response.data['data']['data'];
+      return list.map((e) => NotificationModel.fromJson(e)).toList();
+    }
+    throw Exception("Erreur chargement notifications");
+  }
+
+  Future<void> markAsRead(String id) async {
+    final token = await _getAuthToken();
+    final fcmToken = await _getFcmToken();
+
+    dio.options.headers["Authorization"] = "Bearer $token";
+    // 🟢 AJOUT DU SLASH / ICI 👇
+    await dio.post('/user/notifications/$id/mark-as-read', data: {
+      "fcm_token": fcmToken
+    });
+  }
+
+  Future<void> markAllAsRead() async {
+    final token = await _getAuthToken();
+    final fcmToken = await _getFcmToken();
+
+    dio.options.headers["Authorization"] = "Bearer $token";
+    // 🟢 AJOUT DU SLASH / ICI 👇
+    await dio.post('/user/notifications/mark-all-as-read', data: {
+      "fcm_token": fcmToken
+    });
+  }
+
+  Future<void> deleteNotification(String id) async {
+    final token = await _getAuthToken();
+    final fcmToken = await _getFcmToken();
+
+    dio.options.headers["Authorization"] = "Bearer $token";
+    // 🟢 AJOUT DU SLASH / ICI 👇
+    await dio.delete('/user/notifications/$id', data: {
+      "fcm_token": fcmToken
+    });
+  }
+
+  Future<int> getUnreadCount() async {
+    final token = await _getAuthToken();
+    dio.options.headers["Authorization"] = "Bearer $token";
+
+    try {
+      // 🟢 AJOUT DU SLASH / ICI 👇
+      final response = await dio.get('/user/notifications/unread-count');
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['unread_count'] as int;
+      }
+      return 0;
+    } catch (e) {
+      print("Erreur unread count: $e");
+      return 0;
     }
   }
 

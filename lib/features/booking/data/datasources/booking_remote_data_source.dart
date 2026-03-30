@@ -27,9 +27,6 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
 
 
 
-
-
-
   // ---------------------------------------------------------------------------
   // 1. RÉCUPÉRATION DES VILLES + REMPLISSAGE DU DICTIONNAIRE
   // ---------------------------------------------------------------------------
@@ -231,90 +228,6 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
   // ---------------------------------------------------------------------------
   // 2. RÉCUPÉRATION DE TOUS LES PROGRAMMES (Via API dédiée /user/programmes)
   // ---------------------------------------------------------------------------
-  /*@override
-  Future<List<ProgramModel>> getAllProgrammes() async {
-    print("------------------------------------------------------------------");
-    print("🚀 [DEBUG] getAllProgrammes : Démarrage appel /user/programmes");
-
-    try {
-      // 1. Appel de l'API dédiée
-      final response = await dio.get('/user/programmes');
-
-      print("📥 [DEBUG] Status Code : ${response.statusCode}");
-
-      // 2. Vérification basique
-      if (response.statusCode != 200 || response.data == null) {
-        print("⚠️ [DEBUG] Erreur ou réponse vide.");
-        return [];
-      }
-
-      final rootData = response.data;
-      List<dynamic> rawList = [];
-
-      // 3. Navigation dans le JSON (Structure Laravel Pagination)
-      // Structure reçue : { "success": true, "data": { "data": [ ... ], "current_page": 1 ... } }
-      if (rootData is Map && rootData.containsKey('data')) {
-        final paginationData = rootData['data'];
-
-        if (paginationData is Map && paginationData.containsKey('data')) {
-          // C'est ici que se trouve la vraie liste
-          rawList = paginationData['data'] ?? [];
-        } else if (paginationData is List) {
-          // Cas rare où il n'y a pas de pagination
-          rawList = paginationData;
-        }
-      }
-
-      print("🔢 [DEBUG] ${rawList.length} programmes trouvés dans la réponse.");
-
-      // 4. Conversion en ProgramModel
-      final List<ProgramModel> extractedPrograms = [];
-
-      for (var jsonItem in rawList) {
-        try {
-          // Copie mutable pour nettoyage
-          Map<String, dynamic> cleanJson = Map.from(jsonItem);
-
-          // --- NETTOYAGE DES DONNÉES ---
-
-          // A. Le prix arrive souvent en String "100" -> On le force en int
-          var rawPrix = cleanJson['montant_billet'] ?? cleanJson['prix'] ?? 0;
-          cleanJson['montant_billet'] = int.tryParse(rawPrix.toString().split('.')[0]) ?? 0;
-
-          // B. Gestion des objets imbriqués (Vehicule / Compagnie)
-          // Normalement ProgramModel.fromJson gère ça, mais on s'assure qu'ils ne sont pas null
-          if (cleanJson['vehicule'] == null) {
-            // Tu peux mettre des valeurs par défaut si nécessaire
-            print("⚠️ Véhicule null pour le programme ${cleanJson['id']}");
-          }
-
-          // C. Dates
-          // "2026-01-30T00:00:00.000000Z" est géré par DateTime.parse,
-          // mais assure-toi que ton Model le gère bien.
-
-          // D. Ajout à la liste
-          extractedPrograms.add(ProgramModel.fromJson(cleanJson));
-
-        } catch (e) {
-          print("⚠️ [DEBUG] Erreur de parsing sur l'item ID ${jsonItem['id']}: $e");
-        }
-      }
-
-      print("✅ [DEBUG] ${extractedPrograms.length} programmes parsés avec succès.");
-      return extractedPrograms;
-
-    } on DioException catch (e) {
-      print("❌ [DEBUG] DioError (getAllProgrammes): ${e.message}");
-      print("👉 Data: ${e.response?.data}");
-      return [];
-    } catch (e, stack) {
-      print("❌ [DEBUG] Erreur Critique (getAllProgrammes): $e");
-      print(stack);
-      return [];
-    }
-  }*/
-
-
   @override
   Future<List<ProgramModel>> getAllProgrammes() async {
     print("------------------------------------------------------------------");
@@ -443,50 +356,6 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       return [];
     }
   }
-
-
-  /*final List<ProgramModel> extractedPrograms = [];
-
-  for (var jsonItem in rawList) {
-  // 1. On récupère la capacité du PARENT (Source de vérité)
-  int parentCapacity = int.tryParse(jsonItem['capacity'].toString()) ?? 0;
-
-  // Fallback : si capacity n'est pas là, on regarde le véhicule du parent
-  if (parentCapacity == 0 && jsonItem['vehicule'] != null) {
-  parentCapacity = int.tryParse(jsonItem['vehicule']['nombre_place'].toString()) ?? 0;
-  }
-
-  List horaires = jsonItem['horaires_disponibles'] ?? [];
-
-  if (horaires.isNotEmpty) {
-  // --- CAS MULTI-HORAIRES ---
-  for (var horaire in horaires) {
-  // On prépare les données pour l'enfant
-  Map<String, dynamic> childJson = Map.from(jsonItem); // On base sur le parent
-
-  // On met à jour les infos spécifiques
-  childJson['id'] = horaire['programme_id'] ?? jsonItem['id'];
-  childJson['heure_depart'] = horaire['heure_depart'];
-  childJson['heure_arrive'] = horaire['heure_arrive'];
-
-  // 🔥 LE POINT CLÉ : On injecte la capacité du parent
-  // Le modèle va maintenant la trouver grâce à la modif de l'étape 1
-  childJson['capacity'] = parentCapacity;
-
-  // Le prix spécifique
-  var rawPrix = horaire['prix'] ?? horaire['montant_billet'];
-  if (rawPrix != null) childJson['montant_billet'] = rawPrix;
-
-  extractedPrograms.add(ProgramModel.fromJson(childJson));
-  }
-  } else {
-  // --- CAS SIMPLE ---
-  // On s'assure juste que capacity est bien lu
-  jsonItem['capacity'] = parentCapacity;
-  extractedPrograms.add(ProgramModel.fromJson(jsonItem));
-  }
-  }*/
-
 
 
 

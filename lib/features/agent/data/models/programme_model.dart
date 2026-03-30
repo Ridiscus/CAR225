@@ -1,46 +1,10 @@
 // lib/data/models/programme_model.dart
 
-/*class ProgrammeModel {
-  final int id;
-  final String pointDepart;
-  final String pointArrive;
-  final String heureDepart;
-  final String gareDepart;
-  final String gareArrivee;
-  final int vehiculeId;
-  final String immatriculation;
-
-  ProgrammeModel({
-    required this.id,
-    required this.pointDepart,
-    required this.pointArrive,
-    required this.heureDepart,
-    required this.gareDepart,
-    required this.gareArrivee,
-    required this.vehiculeId,
-    required this.immatriculation,
-  });
-
-  factory ProgrammeModel.fromJson(Map<String, dynamic> json) {
-    return ProgrammeModel(
-      id: json['id'] ?? 0,
-      pointDepart: json['point_depart'] ?? '',
-      pointArrive: json['point_arrive'] ?? '',
-      heureDepart: json['heure_depart'] ?? '',
-      gareDepart: json['gare_depart'] ?? '',
-      gareArrivee: json['gare_arrivee'] ?? '',
-      vehiculeId: json['vehicule_id'] ?? 0,
-      immatriculation: json['immatriculation'] ?? 'Inconnu',
-    );
-  }
-}*/
-
-
 class ProgrammeModel {
   final int id;
   final String pointDepart;
   final String pointArrive;
-  final String? duree;
+  final String duree; // 🟢 On garde ça obligatoire (sans le ?) pour éviter l'erreur avec .isNotEmpty
 
   // 🟢 NOUVEAUX CHAMPS BASÉS SUR LE JSON
   final String? heureDepart;
@@ -59,7 +23,7 @@ class ProgrammeModel {
     required this.id,
     required this.pointDepart,
     required this.pointArrive,
-    this.duree,
+    required this.duree,
     this.heureDepart,
     this.heureArrivee,
     this.gareDepart,
@@ -76,15 +40,17 @@ class ProgrammeModel {
       id: json['id'] ?? 0,
       pointDepart: json['point_depart'] ?? "Inconnu",
       pointArrive: json['point_arrive'] ?? "Inconnu",
-      duree: json['durer_parcours'],
-      // 🟢 MAPPING DES NOUVEAUX CHAMPS
+      duree: json['durer_parcours'] ?? "", // 🟢 Valeur par défaut
+
       heureDepart: json['heure_depart'],
-      heureArrivee: json['heure_arrivee'], // S'il n'existe pas dans l'API, ce sera null
+      heureArrivee: json['heure_arrivee'],
       gareDepart: json['gare_depart'],
       gareArrivee: json['gare_arrivee'],
       vehiculeId: json['vehicule_id'],
       immatriculation: json['immatriculation'],
-      chauffeurNom: json['chauffeur_nom'], // S'il n'existe pas, ce sera null
+
+      // 🟢 CORRECTION ICI : La clé exacte envoyée par l'API est 'chauffeur'
+      chauffeurNom: json['chauffeur'],
 
       montantBillet: json['montant_billet'] ?? 0,
       placesDisponibles: json['places_disponibles'] ?? 0,

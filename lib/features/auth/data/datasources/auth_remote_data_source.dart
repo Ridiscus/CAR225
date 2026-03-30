@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../../../booking/data/models/user_stats_model.dart';
 import '../../../hostess/models/hostess_profile_model.dart';
 import '../../../hostess/models/sale_model.dart';
@@ -72,9 +73,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl() {
     dio = Dio(
       BaseOptions(
-        //baseUrl: 'https://car225.com/api/',
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        //baseUrl: ApiConfig.baseUrl,
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -84,7 +83,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       ),
     );
 
-    // INTERCEPTOR : Injecte le token automatiquement
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         final prefs = await SharedPreferences.getInstance();
@@ -287,7 +285,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String pointArrive,
   }) async {
     try {
-      print("🌍 [GET REQUÊTE] Vers: /hotesse/vendre-ticket");
+      // 🟢 AJOUT : Vérification de l'URL de base et du chemin complet
+      print("🌍 [GET REQUÊTE] Serveur actuel : ${dio.options.baseUrl}");
+      print("🌍 [GET REQUÊTE] Chemin complet : ${dio.options.baseUrl}/hotesse/vendre-ticket");
+
       print("🔍 [GET PARAMS] date: $dateDepart, depart: $pointDepart, arrivee: $pointArrive");
 
       final response = await dio.get(
@@ -306,7 +307,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       print("❌ [GET ERREUR] $e");
       if (e is DioException) {
-        print("🚨 [GET DÉTAILS BACKEND] ${e.response?.data}");
+        print("🚨 [GET DÉTAILS BACKEND] Code: ${e.response?.statusCode}");
+        print("🚨 [GET DATA BACKEND] ${e.response?.data}");
+        print("🚨 [GET URL QUI A PLANTÉ] ${e.requestOptions.uri}"); // TRÈS UTILE !
       }
       rethrow;
     }
@@ -315,7 +318,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> bookTicket(Map<String, dynamic> payload) async {
     try {
-      print("🚀 [POST REQUÊTE] Vers: /hotesse/vendre-ticket");
+      // 🟢 AJOUT : Vérification de l'URL et des Headers (ex: Token)
+      print("🚀 [POST REQUÊTE] Serveur actuel : ${dio.options.baseUrl}");
+      print("🚀 [POST REQUÊTE] Headers envoyés : ${dio.options.headers}");
+
       print("📤 [POST PAYLOAD] $payload");
 
       final response = await dio.post(
@@ -329,14 +335,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return response.data;
     } catch (e) {
       print("❌ [POST ERREUR] $e");
-      // Souvent, quand un POST échoue (ex: erreur 400 ou 422),
-      // le backend envoie la vraie raison dans e.response.data
       if (e is DioException) {
-        print("🚨 [POST DÉTAILS BACKEND] ${e.response?.statusCode} - ${e.response?.data}");
+        print("🚨 [POST DÉTAILS BACKEND] Code: ${e.response?.statusCode}");
+        print("🚨 [POST DATA BACKEND] ${e.response?.data}");
+        print("🚨 [POST URL QUI A PLANTÉ] ${e.requestOptions.uri}"); // TRÈS UTILE !
       }
       rethrow;
     }
   }
+
 
   @override
   Future<Map<String, dynamic>> getHostessDashboard() async {

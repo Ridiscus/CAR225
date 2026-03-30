@@ -1,6 +1,7 @@
 import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../models/categorie_models.dart';
 import '../models/claim_model.dart';
 import '../models/voyage_model.dart';
@@ -8,9 +9,40 @@ import '../models/voyage_model.dart';
 class SupportRepository {
   late Dio _dio;
 
+  /*SupportRepository() {
+    _dio = Dio(BaseOptions(
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/', // On utilise ta vraie URL
+      /*headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },*/
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+    ));
+
+    // On réinjecte ton intercepteur pour que le token soit envoyé
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token');
+
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+          dev.log("🔑 [Interceptor] Token injecté pour Support", name: 'SupportAPI');
+        }
+        return handler.next(options);
+      },
+      onError: (DioException e, handler) {
+        dev.log("❌ [API Error] ${e.response?.statusCode} : ${e.message}", name: 'SupportAPI');
+        return handler.next(e);
+      },
+    ));
+  }*/
+
   SupportRepository() {
     _dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/', // On utilise ta vraie URL
+      baseUrl: ApiConfig.baseUrl,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -19,7 +51,6 @@ class SupportRepository {
       receiveTimeout: const Duration(seconds: 15),
     ));
 
-    // On réinjecte ton intercepteur pour que le token soit envoyé
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         final prefs = await SharedPreferences.getInstance();

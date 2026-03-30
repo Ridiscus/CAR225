@@ -21,7 +21,7 @@ abstract class AgentRepository {
 
   // 🟢 AJOUTE LA SIGNATURE ICI
   Future<List<TicketScan>> getScanHistory({DateTime? date});
-  Future<AgentDashboardData> getDashboardData();
+  //Future<AgentDashboardData> getDashboardData();
   Future<TicketReservationModel> searchTicket(String qrCode);
   Future<TicketReservationModel> searchTicketByReference(String reference);
   Future<Map<String, dynamic>> confirmBoarding({

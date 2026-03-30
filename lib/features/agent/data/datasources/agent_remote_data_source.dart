@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:car225/core/network/dio_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/networking/api_config.dart';
 import '../models/ticket_reservation_model.dart';
 import '../models/programme_model.dart';
 
@@ -15,7 +16,7 @@ abstract class AgentRemoteDataSource {
     required String confirmPassword,
   });
   Future<Map<String, dynamic>> getScanHistory({String? date});
-  Future<Map<String, dynamic>> getDashboardData();
+  //Future<Map<String, dynamic>> getDashboardData();
   Future<TicketReservationModel> searchTicket(String qrCode);
   Future<TicketReservationModel> searchTicketByReference(String reference);
   Future<Map<String, dynamic>> confirmBoarding({
@@ -30,11 +31,46 @@ class AgentRemoteDataSourceImpl implements AgentRemoteDataSource {
   late final Dio dio;
 
   // 🟢 1. Constructeur corrigé (plus de point-virgule parasite)
+  /*AgentRemoteDataSourceImpl() {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        //baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        /*headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },*/
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    );
+
+    // INTERCEPTOR : Injecte le token automatiquement
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token');
+
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+          print("🔑 [Interceptor] Token injecté");
+        }
+        return handler.next(options);
+      },
+      onError: (DioException e, handler) {
+        if (e.response?.statusCode == 401) {
+          print("⛔ [Interceptor] Erreur 401: Non autorisé");
+        }
+        return handler.next(e);
+      },
+    ));
+  }*/
+
   AgentRemoteDataSourceImpl() {
     dio = Dio(
       BaseOptions(
-        //baseUrl: 'https://car225.com/api/',
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -44,7 +80,6 @@ class AgentRemoteDataSourceImpl implements AgentRemoteDataSource {
       ),
     );
 
-    // INTERCEPTOR : Injecte le token automatiquement
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         final prefs = await SharedPreferences.getInstance();
@@ -169,17 +204,23 @@ class AgentRemoteDataSourceImpl implements AgentRemoteDataSource {
     }
   }
 
-  // 🟢 NOUVELLE MÉTHODE
+  // 🟢 NOUVELLE MÉTHODE AVEC LOGS
   @override
   Future<Map<String, dynamic>> getScanHistory({String? date}) async {
+    print('====== 🚀 DÉBUT REQUÊTE: getScanHistory ======');
+
     try {
-      // Si une date est fournie, on l'ajoute à l'URL : ?date=2026-03-15
       final queryParams = date != null ? {'date': date} : null;
+      print('👉 GET /agent/reservations/scan-history | Query: $queryParams');
 
       final response = await dio.get(
         'agent/reservations/scan-history',
         queryParameters: queryParams,
       );
+
+      // 🟢 LOG DE LA RÉPONSE GLOBALE
+      print('✅ [SUCCÈS HTTP] Code : ${response.statusCode}');
+      print('✅ [SUCCÈS HTTP] Data brute de l\'historique : ${response.data}');
 
       if (response.statusCode == 200) {
         return response.data;
@@ -187,45 +228,10 @@ class AgentRemoteDataSourceImpl implements AgentRemoteDataSource {
         throw Exception('Erreur lors de la récupération de l\'historique');
       }
     } on DioException catch (e) {
+      print('⛔ [ERREUR DIO HISTORIQUE] : ${e.response?.data}');
       throw Exception(e.response?.data['message'] ?? 'Erreur réseau');
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> getDashboardData() async {
-    print('====== 🚀 DÉBUT DE LA REQUÊTE DASHBOARD ======');
-    print('👉 GET agent/dashboard');
-
-    try {
-      final response = await dio.get('agent/dashboard');
-
-      print('✅ [SUCCÈS HTTP] Code : ${response.statusCode}');
-      // Attention : Si le JSON est très long, la console Flutter peut le tronquer un peu.
-      print('✅ [SUCCÈS HTTP] Data : ${response.data}');
-      print('====================================================');
-
-      if (response.statusCode == 200) {
-        return response.data;
-      } else {
-        throw Exception('Erreur de chargement du dashboard. Code: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      print('⛔ [ERREUR DIO DASHBOARD] Type : ${e.type}');
-      print('⛔ [ERREUR DIO DASHBOARD] Message interne : ${e.message}');
-      print('⛔ [ERREUR DIO DASHBOARD] Status Code : ${e.response?.statusCode}');
-      print('⛔ [ERREUR DIO DASHBOARD] Response Data brut : ${e.response?.data}');
-      print('====================================================');
-
-      // Extraction du message d'erreur si disponible
-      final errorMessage = e.response?.data != null && e.response?.data is Map
-          ? e.response?.data['message'] ?? 'Erreur réseau'
-          : 'Erreur réseau';
-
-      throw Exception(errorMessage);
-    } catch (e) {
-      print('⛔ [ERREUR INATTENDUE DASHBOARD] : $e');
-      print('====================================================');
-      throw Exception('Erreur inattendue : $e');
+    } finally {
+      print('====== 🏁 FIN REQUÊTE: getScanHistory ======');
     }
   }
 

@@ -4,7 +4,7 @@ class ApiConfig {
   // 🔘 L'INTERRUPTEUR MAGIQUE
   // true = Tu utilises Ngrok (Tests en cours)
   // false = Tu utilises la Prod (car225.com)
-  static const bool useLocalInDebug = true;
+  static const bool useLocalInDebug = false;
 
   // ==============================================================================
   // ⚙️ CONFIGURATION DES URLS

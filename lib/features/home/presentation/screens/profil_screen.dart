@@ -183,6 +183,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
+        // 🟢 AJOUT DU BOUTON RETOUR ICI
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
+          onPressed: () => Navigator.pop(context), // Retour à la page précédente
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -268,7 +273,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Gap(25),
 
             // --- 4. LISTE DES OPTIONS ---
-            // Le reste de ton code est parfait, je l'ai gardé tel quel
             _buildMenuOption(
               context: context,
               imagePath: "assets/images/user.png",

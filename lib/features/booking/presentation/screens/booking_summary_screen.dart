@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/services/networking/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../home/presentation/screens/main_wrapper_screen.dart';
 import '../../data/models/program_model.dart';
@@ -15,11 +16,13 @@ import '../../data/models/program_model.dart';
 class BookingSummaryScreen extends StatefulWidget {
   final Map<String, dynamic> bookingData;
   final ProgramModel program;
+  final ProgramModel? returnProgram;
 
   const BookingSummaryScreen({
     super.key,
     required this.bookingData,
     required this.program,
+    this.returnProgram,
   });
 
   @override
@@ -30,6 +33,8 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   bool isSubmitting = false;
   int? userWalletBalance;
   bool isLoadingBalance = true;
+
+
 
   // 🔗 Ajoute ces deux lignes :
   late AppLinks _appLinks;
@@ -49,6 +54,40 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }
 
   // --- 1. RÉCUPÉRATION DU SOLDE RÉEL ---
+  /*Future<void> _fetchRealWalletBalance() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null) return;
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        //baseUrl: 'https://car225.com/api/',
+        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        /*headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },*/
+      ));
+
+      final response = await dio.get('/user/wallet');
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] ?? response.data;
+        double soldeDouble = double.tryParse(data['solde'].toString()) ?? 0.0;
+        if (mounted) {
+          setState(() {
+            userWalletBalance = soldeDouble.toInt();
+            isLoadingBalance = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Erreur chargement solde: $e");
+      if (mounted) setState(() => isLoadingBalance = false);
+    }
+  }*/
+
   Future<void> _fetchRealWalletBalance() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -56,8 +95,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
       if (token == null) return;
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        baseUrl: ApiConfig.baseUrl,
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -82,44 +120,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     }
   }
 
-  // --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
-  /*Future<void> _initDeepLinks() async {
-    _appLinks = AppLinks();
-
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
-    }, onError: (err) {
-      print("Erreur Deep Link: $err");
-    });
-  }
-
-  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  void _handleDeepLink(Uri uri) {
-    print("🔗 Lien de retour Wave reçu : $uri");
-
-    if (uri.scheme == 'car225' && uri.host == 'payment') {
-      if (uri.path == '/success') {
-        // 1. On affiche la petite notification verte en haut
-        if (mounted) {
-          _showTopNotification("Paiement réussi ! 🎉");
-        }
-
-        // 2. On attend un tout petit peu (pour que l'animation de retour à l'app se finisse bien)
-        // et on affiche la grosse pop-up de succès qui contient le bouton de redirection.
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            _showSuccessDialog();
-          }
-        });
-
-      }
-      else if (uri.path == '/error' || uri.path == '/cancel') {
-        if (mounted) {
-          _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
-        }
-      }
-    }
-  }*/
 
 // --- 🎧 LOGIQUE D'ÉCOUTE DES LIENS ---
   Future<void> _initDeepLinks() async {
@@ -167,92 +167,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }
 
   // --- 3. VÉRIFICATION SÉCURISÉE DU PAIEMENT CÔTÉ SERVEUR ---
-  /*Future<void> _verifyPayment(String transactionId) async {
-    // Optionnel : on remet isSubmitting à true pour bloquer le bouton "Payer" au cas où
-    setState(() => isSubmitting = true);
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-
-      final dio = Dio(BaseOptions(
-        //baseUrl: 'https://car225.com/api/',
-        baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-      ));
-
-      print("⏳ Vérification du paiement auprès du serveur pour : $transactionId");
-
-      // ⚠️ À MODIFIER : Mets ici la vraie route de ton API Laravel pour vérifier le paiement
-      final response = await dio.get('/payment/verify/$transactionId');
-
-      if (response.statusCode == 200) {
-        // Le serveur confirme : l'argent est bien là ! 💰
-        print("✅ Paiement validé par le serveur !");
-        if (mounted) {
-          _showTopNotification("Paiement validé avec succès ! 🎉");
-
-          // On attend un tout petit peu pour l'animation et on affiche la pop-up
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) _showSuccessDialog();
-          });
-        }
-      } else {
-        // Le serveur n'a pas validé la transaction
-        if (mounted) {
-          _showTopNotification("Le paiement n'a pas pu être validé.", isError: true);
-        }
-      }
-    } catch (e) {
-      print("❌ ERREUR VÉRIFICATION PAIEMENT : $e");
-      if (mounted) {
-        _showTopNotification("Impossible de contacter le serveur pour vérifier le paiement.", isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => isSubmitting = false);
-    }
-  }
-
-  // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  void _handleDeepLink(Uri uri) {
-    if (uri.scheme != 'car225' || uri.host != 'payment') {
-      return;
-    }
-
-    final urlString = uri.toString().toLowerCase();
-    print("🔗 LIEN DE RETOUR PAIEMENT INTERCEPTÉ : $urlString");
-
-    // 1. On vérifie si c'est un succès
-    if (uri.queryParameters['success'] == 'true' || urlString.contains('success')) {
-
-      // Extraction du transactionid proprement grâce à Uri
-      final transactionId = uri.queryParameters['transactionid'];
-
-      if (transactionId != null && transactionId.isNotEmpty) {
-        // Au lieu d'afficher direct le succès, on fait patienter l'utilisateur
-        if (mounted) {
-          _showTopNotification("Vérification de votre paiement...");
-        }
-
-        // Et on lance la vérification serveur ! 🛡️
-        _verifyPayment(transactionId);
-
-      } else {
-        // Fallback bizarre : Wave a renvoyé success mais sans ID (très rare)
-        print("⚠️ Succès sans transaction_id reçu.");
-        if (mounted) _showTopNotification("Paiement reçu, vérification en attente.");
-      }
-    }
-    // 2. On vérifie si c'est une erreur
-    else if (uri.path.contains('error') || uri.queryParameters['cancel'] == 'true' || urlString.contains('fail')) {
-      if (mounted) {
-        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
-      }
-    }
-  }*/
 
   void _showTopNotification(String message, {bool isError = false}) {
     if (!mounted) return;
@@ -328,11 +242,13 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
       final token = prefs.getString('auth_token');
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+        // 🟢 ApiConfig centralisé
+        baseUrl: ApiConfig.baseUrl,
+
+        // ✅ HEADERS DÉCOMMENTÉS ET ACTIFS
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'Accept': 'application/json', // Oblige Laravel à renvoyer du JSON et non une redirection 302 HTML
           'Authorization': 'Bearer $token'
         },
       ));
@@ -510,15 +426,44 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                             Navigator.pop(modalContext);
                             _showTopNotification("Solde insuffisant. Rechargez votre compte.");
                           },
-                          // 🎨 IMAGE FLATICON WALLET
                           leading: Image.asset(
-                            "assets/images/wallet-filled-money-tool.png", // Assure-toi que cette image existe
+                            "assets/images/wallet-filled-money-tool.png",
                             width: 45,
                             height: 45,
-                            // Fallback au cas où l'image n'est pas trouvée
                             errorBuilder: (c,o,s) => const Icon(Icons.account_balance_wallet, color: AppColors.primary, size: 35),
                           ),
-                          title: const Text("CarPay Wallet", style: TextStyle(fontWeight: FontWeight.bold)),
+
+                          // 🟢 MODIFICATION ICI : Ajout du Badge dans le titre
+                          title: Row(
+                            children: [
+                              const Text("CarPay", style: TextStyle(fontWeight: FontWeight.bold)),
+                              const Gap(8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.green, width: 1),
+                                ),
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.stars, size: 12, color: Colors.green),
+                                    Gap(4),
+                                    Text(
+                                      "0 Frais",
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          // ---------------------------------------------------
+
                           subtitle: Text(
                               hasEnoughFunds ? "Solde: ${_formatCurrency(currentBalance)}" : "Insuffisant (${_formatCurrency(currentBalance)})",
                               style: TextStyle(color: hasEnoughFunds ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 13)
@@ -545,9 +490,9 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                       },
                       // 🎨 IMAGE FLATICON MOBILE PAYMENT
                       leading: Image.asset(
-                        "assets/images/digital-wallet.png", // Idéalement, mets le logo de Wave ici
-                        width: 45,
-                        height: 45,
+                        "assets/images/waave.jpg", // Idéalement, mets le logo de Wave ici
+                        width: 98,
+                        height: 98,
                         errorBuilder: (c,o,s) => const Icon(Icons.waves, color: Colors.blue, size: 35),
                       ),
                       title: const Text("Paiement via Wave", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -564,7 +509,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
         }
     );
   }
-
 
 
   void _showSuccessDialog() {
@@ -638,14 +582,32 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
     );
   }
 
-  @override
+  /*@override
   Widget build(BuildContext context) {
     // Calcul Prix
     final int ticketPrice = widget.program.isAllerRetour ? (widget.program.prix * 2) : widget.program.prix;
     final int passengerCount = (widget.bookingData['nombre_places'] as num).toInt();
     final int subTotal = ticketPrice * passengerCount;
-    final int fees = (subTotal * 0.04).toInt();
-    final int total = subTotal + fees;
+    final int fees = (subTotal * 0.02).toInt();
+    final int total = subTotal + fees;*/
+  @override
+  Widget build(BuildContext context) {
+    // 🟢 1. CALCUL DES PRIX
+    final int ticketPrice = widget.program.isAllerRetour ? (widget.program.prix * 2) : widget.program.prix;
+    final int passengerCount = (widget.bookingData['nombre_places'] as num).toInt();
+    final int subTotal = ticketPrice * passengerCount;
+
+    // 🟢 2. NOUVEAU : Récupération des frais de siège (100 FCFA si manuel, sinon 0)
+    // On multiplie par le nombre de passagers (si tu veux 100F par personne)
+    // Ou on laisse tel quel si c'est 100F au total pour toute la réservation.
+    // Partons du principe que c'est 100F au total pour la réservation :
+    final int seatFee = (widget.bookingData['seatSelectionFee'] as num?)?.toInt() ?? 0;
+
+    // 🟢 3. Calcul des taxes de plateforme
+    final int fees = (subTotal * 0.02).toInt();
+
+    // 🟢 4. LE GRAND TOTAL (Billet + Siège + Taxes)
+    final int total = subTotal + seatFee + fees;
 
     // Date Départ
     String rawDateDepart = widget.bookingData['date_voyage']?.toString() ?? widget.program.dateDepart;
@@ -738,7 +700,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
           children: [
             const Text("Vérifiez les détails de votre réservation", style: TextStyle(color: AppColors.grey, fontSize: 14)),
             const Gap(20),
-
             // 1. DÉTAILS DU TRAJET
             _buildSectionCard(
               context,
@@ -755,19 +716,43 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(widget.program.compagnieName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
-                    // Badge Aller-Retour ou Standard
+                    // ✅ 1. On enveloppe le Text dans un Expanded
+                    Expanded(
+                      child: Text(
+                        widget.program.compagnieName,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor),
+                        overflow: TextOverflow.ellipsis, // ✅ 2. Ajoute "..." si c'est trop long
+                        maxLines: 1, // ✅ 3. S'assure que ça reste sur une seule ligne
+                      ),
+                    ),
+
+                    const SizedBox(width: 10), // Un petit espace de sécurité pour éviter que le texte ne colle au badge
+
+                    // Ton badge reste inchangé
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: widget.program.isAllerRetour ? Colors.orange.withOpacity(0.2) : (isDark ? Colors.grey[800] : Colors.grey.shade200), borderRadius: BorderRadius.circular(5)),
+                      decoration: BoxDecoration(
+                          color: widget.program.isAllerRetour
+                              ? Colors.orange.withOpacity(0.2)
+                              : (isDark ? Colors.grey[800] : Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(5)
+                      ),
                       child: Text(
                         widget.program.isAllerRetour ? "Aller-Retour" : "Aller Simple",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: widget.program.isAllerRetour ? Colors.orange : textColor),
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: widget.program.isAllerRetour ? Colors.orange : textColor
+                        ),
                       ),
                     ),
                   ],
                 ),
                 Divider(height: 30, color: dividerColor),
+
+                // --- TRAJET ALLER ---
+                Center(child: Text("Trajet Aller", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold))),
+                const Gap(5),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -795,43 +780,50 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                       ],
                     ),
                   ],
-                )
+                ),
+
+                // --- TRAJET RETOUR (Si applicable) ---
+                if (widget.program.isAllerRetour && widget.returnProgram != null) ...[
+                  const Gap(15),
+                  Divider(height: 1, color: dividerColor, thickness: 1, indent: 30, endIndent: 30),
+                  const Gap(15),
+                  Center(child: Text("Trajet Retour", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold))),
+                  const Gap(5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Départ", style: TextStyle(color: AppColors.grey, fontSize: 10)),
+                          const Gap(5),
+                          Text(widget.returnProgram!.villeDepart, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor)),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          const Icon(Icons.access_time, size: 16, color: Colors.orange),
+                          const Gap(5),
+                          Text(widget.returnProgram!.heureDepart, style: const TextStyle(fontSize: 10, color: AppColors.grey)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text("Arrivée", style: TextStyle(color: AppColors.grey, fontSize: 10)),
+                          const Gap(5),
+                          Text(widget.returnProgram!.villeArrivee, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             const Gap(15),
 
             // 2. ITINÉRAIRE (Visuel Simple)
-            _buildSectionCard(
-              context,
-              title: "Itinéraire",
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 20),
-                        Container(width: 1, height: 25, color: isDark ? Colors.grey[700] : Colors.grey.shade300),
-                        const Icon(Icons.location_on_outlined, color: Colors.grey, size: 20),
-                      ],
-                    ),
-                    const Gap(15),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Départ", style: TextStyle(color: AppColors.grey, fontSize: 10)),
-                        Text(widget.program.villeDepart, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
-                        const Gap(15),
-                        const Text("Destination", style: TextStyle(color: AppColors.grey, fontSize: 10)),
-                        Text(widget.program.villeArrivee, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
-                      ],
-                    )
-                  ],
-                )
-              ],
-            ),
             const Gap(15),
-
             // 3. INFO PASSAGERS
             _buildSectionCard(
               context,
@@ -846,7 +838,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   const Text("Date de départ", style: TextStyle(color: AppColors.grey)),
                   Text(formattedDateDepart, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
                 ]),
-                // Affichage Date Retour
                 if (widget.program.isAllerRetour && formattedDateRetour.isNotEmpty) ...[
                   const Gap(10),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -856,24 +847,22 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 ],
                 Divider(height: 20, color: dividerColor),
 
-                // LISTE DES PASSAGERS AVEC SIÈGES A/R
                 ...List.generate(passengerCount, (index) {
                   final List rawPassengers = widget.bookingData['passagers'] as List;
                   final p = rawPassengers[index] as Map<String, dynamic>;
 
-                  // Récupération des sièges
+                  // 🟢 CORRECTION DE LA CLÉ ICI : 'return_seat_number'
                   final seatAller = p['seat_number'];
-                  final seatRetour = p['seat_number_return']; // Peut être null si aller simple
+                  final seatRetour = p['return_seat_number'];
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.person, size: 16, color: AppColors.primary),
+                        const Icon(Icons.person, size: 16, color: AppColors.primary),
                         const Gap(8),
                         Expanded(child: Text("${p['prenom']} ${p['nom']} ", style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13))),
 
-                        // Badge Sièges
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
@@ -894,7 +883,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
               ],
             ),
             const Gap(15),
-
             // 4. RÉSUMÉ DU PRIX
             _buildSectionCard(
               context,
@@ -905,18 +893,34 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                 _buildPriceRow(context, "Nombre de passagers", "x $passengerCount"),
                 const Gap(10),
                 _buildPriceRow(context, "Sous-total", _formatCurrency(subTotal), isBold: true),
+
+                // 🟢 NOUVEAU : Affichage des frais de siège SEULEMENT s'il y en a
+                if (seatFee > 0) ...[
+                  const Gap(10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Choix de siège (Manuel)", style: TextStyle(color: AppColors.grey, fontSize: 14)),
+                      Text("+ ${_formatCurrency(seatFee)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue)), // En bleu pour ressortir
+                    ],
+                  ),
+                ],
+
                 Divider(height: 20, color: dividerColor),
+
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text("Frais de service (4%)", style: TextStyle(color: AppColors.grey, fontSize: 14)),
+                  const Text("Frais de service (2%)", style: TextStyle(color: AppColors.grey, fontSize: 14)),
                   Text(_formatCurrency(fees), style: TextStyle(fontSize: 14, color: textColor)),
                 ]),
                 const Divider(height: 20, color: AppColors.primary),
+
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Text("Total à payer", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
                   Text(_formatCurrency(total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
                 ])
               ],
             ),
+
             const Gap(40),
           ],
         ),

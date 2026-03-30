@@ -299,24 +299,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _buildModernInput(context, "Contact", _contactController, "assets/images/phone-call.png", isPhone: true),
 
             const Gap(30),
-
-            // --- SECTION 2 : CONTACT URGENCE ---
-            /*_buildSectionTitle("Contact d'Urgence (SOS)"),
-            const Gap(15),
-
-            Row(
-              children: [
-                Expanded(child: _buildModernInput(context, "Nom Contact", _nomUrgenceController, "assets/images/health-insurance.png")), // ou user.png
-                const Gap(10),
-                Expanded(child: _buildModernInput(context, "Prénom Contact", _prenomUrgenceController, "assets/images/health-insurance.png")),
-              ],
-            ),
-            const Gap(15),
-            _buildModernInput(context, "Numéro d'Urgence", _contactUrgenceController, "assets/images/phone-call.png", isPhone: true),
-
-            const Gap(40),*/
-
-
             // --- SECTION 2 : CONTACT URGENCE ---
             _buildSectionTitle("Contact d'Urgence (SOS)"),
             const Gap(15),

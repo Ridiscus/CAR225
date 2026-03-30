@@ -81,6 +81,27 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     }
   }
 
+  // --- LOCALISER UN ITINÉRAIRE (Départ -> Arrivée) ---
+  Future<void> _openMapRoute(String depart, String arrivee) async {
+    // On encode les villes pour l'URL
+    final origin = Uri.encodeComponent(depart);
+    final destination = Uri.encodeComponent(arrivee);
+
+    // URL universelle Google Maps pour générer un itinéraire
+    final Uri mapUrl = Uri.parse(
+        "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination"
+    );
+
+    debugPrint("Ouverture Itinéraire Maps : $mapUrl");
+
+    try {
+      // Mode externalApplication force l'ouverture de l'app Google Maps si elle est installée
+      await launchUrl(mapUrl, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Erreur lors de l'ouverture de Maps : $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -331,7 +352,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     );
   }
 
-  Widget _buildImprovedRouteCard(BuildContext context, ProgrammeModel programme) {
+  /*Widget _buildImprovedRouteCard(BuildContext context, ProgrammeModel programme) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardColor;
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey.shade200;
@@ -398,6 +419,91 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
               ],
             )
           ],
+        ),
+      ),
+    );
+  }*/
+
+  Widget _buildImprovedRouteCard(BuildContext context, ProgrammeModel programme) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
+    final borderColor = isDark ? Colors.grey[800]! : Colors.grey.shade200;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final mutedColor = isDark ? Colors.grey[500] : Colors.grey[600];
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)
+          )
+        ],
+      ),
+      // 🟢 MAGIE : On utilise Material + InkWell pour que toute la carte soit cliquable avec un bel effet
+      child: Material(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _openMapRoute(programme.depart, programme.arrivee), // Appel de notre nouvelle fonction !
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Column(
+                      children: [
+                        Icon(Icons.circle, size: 10, color: AppColors.primary),
+                        Container(height: 30, width: 2, color: isDark ? Colors.grey[800] : Colors.grey[200]),
+                        const Icon(Icons.location_on, size: 14, color: Colors.orange),
+                      ],
+                    ),
+                    const Gap(15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(programme.depart, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
+                          const Gap(15),
+                          Text(programme.arrivee, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
+                        ],
+                      ),
+                    ),
+                    // L'icône chevron prend tout son sens maintenant !
+                    Icon(Icons.map_outlined, color: AppColors.primary), // J'ai changé l'icône pour "map" pour que ce soit plus intuitif, mais tu peux remettre chevron_right si tu préfères !
+                  ],
+                ),
+                const Gap(15),
+                Divider(color: borderColor, height: 1),
+                const Gap(10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.access_time_rounded, size: 16, color: mutedColor),
+                        const Gap(6),
+                        Text(
+                          programme.duree.isNotEmpty ? programme.duree : "-- h --",
+                          style: TextStyle(color: mutedColor, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Text("Disponible", style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                )
+              ],
+            ),
+          ),
         ),
       ),
     );

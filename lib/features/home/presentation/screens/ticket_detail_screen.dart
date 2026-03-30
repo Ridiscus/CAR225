@@ -690,9 +690,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Widget build(BuildContext context) {
     String formatDate(DateTime d) => "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
 
-    // Calcul sécurité pour QR Code
+    // 🟢 1. ON REMET LA LIGNE MANQUANTE ICI :
     final bool isDepartPasse = _departureDateTime != null && DateTime.now().isAfter(_departureDateTime!);
 
+    // 🟢 2. DÉTECTION BLINDÉE DU BILLET RETOUR
+    final bool isVraiRetour = ticket.isReturnLeg || ticket.ticketNumber.toLowerCase().contains('retour');
     return WillPopScope(
         onWillPop: () async {
           // On quitte l'écran en renvoyant l'info : "Est-ce que ça a changé ?"
@@ -751,6 +753,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         _buildTripDetails(ticket, formatDate),
 
                         const Divider(height: 30),
+                        /*Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(child: _buildCityInfo(ticket.departureCity, "Départ")),
+                              const Icon(Icons.arrow_forward, color: Colors.blue, size: 24),
+                              Expanded(child: _buildCityInfo(ticket.arrivalCity, "Arrivée"))
+                            ]
+                        ),
+                        const Divider(height: 30),
+                        _buildRow("Passager", ticket.passengerName),
+                        _buildRow("Siège", ticket.isAllerRetour && ticket.returnSeatNumber != null ? "${ticket.seatNumber} / ${ticket.returnSeatNumber}" : ticket.seatNumber),*/
                         Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -761,7 +774,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         ),
                         const Divider(height: 30),
                         _buildRow("Passager", ticket.passengerName),
-                        _buildRow("Siège", ticket.isAllerRetour && ticket.returnSeatNumber != null ? "${ticket.seatNumber} / ${ticket.returnSeatNumber}" : ticket.seatNumber),
+                        _buildRow("Siège", ticket.seatNumber), // Simplement ticket.seatNumber !
                         _buildRow("Prix", "${ticket.price} F"),
                         _buildRow("Réf", ticket.ticketNumber),
                       ],
@@ -901,7 +914,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     );
   }
 
-  Widget _buildTripDetails(TicketModel t, Function(DateTime) fmt) {
+  /*Widget _buildTripDetails(TicketModel t, Function(DateTime) fmt) {
     return Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
@@ -911,6 +924,66 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Container(width: 1, height: 40, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 10)),
             Expanded(child: Column(children: [const Text("RETOUR", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)), Text(fmt(t.returnDate!), style: const TextStyle(fontWeight: FontWeight.bold)), Text(t.returnTimeRaw ?? "--:--")]))
           ]
+        ])
+    );
+  }*/
+
+  Widget _buildTripDetails(TicketModel t, Function(DateTime) fmt) {
+    // 1. On charge les deux dates du billet
+    DateTime allerDate = t.date;
+    String allerTime = t.departureTimeRaw;
+
+    DateTime? retourDate = t.returnDate;
+    String? retourTime = t.returnTimeRaw;
+
+    // 2. 🟢 MAGIE ABSOLUE : Le tri chronologique infaillible !
+    if (t.isAllerRetour && t.returnDate != null) {
+      DateTime exactDate1 = t.date;
+      DateTime exactDate2 = t.returnDate!;
+
+      try {
+        // On combine la date et l'heure pour être ultra précis
+        final p1 = t.departureTimeRaw.split(':');
+        exactDate1 = DateTime(t.date.year, t.date.month, t.date.day, int.parse(p1[0]), int.parse(p1[1]));
+
+        final p2 = (t.returnTimeRaw ?? "00:00").split(':');
+        exactDate2 = DateTime(t.returnDate!.year, t.returnDate!.month, t.returnDate!.day, int.parse(p2[0]), int.parse(p2[1]));
+      } catch (_) {
+        // Si le format de l'heure est bizarre, on ignore l'erreur
+      }
+
+      // Si la "date 2" est chronologiquement AVANT la "date 1", on remet de l'ordre !
+      if (exactDate2.isBefore(exactDate1)) {
+        allerDate = t.returnDate!;
+        allerTime = t.returnTimeRaw ?? "--:--";
+
+        retourDate = t.date;
+        retourTime = t.departureTimeRaw;
+      }
+    }
+
+    return Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+
+          // --- COLONNE ALLER ---
+          Expanded(child: Column(children: [
+            const Text("ALLER", style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(fmt(allerDate), style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(allerTime)
+          ])),
+
+          // --- COLONNE RETOUR ---
+          if (t.isAllerRetour && retourDate != null) ...[
+            Container(width: 1, height: 40, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 10)),
+            Expanded(child: Column(children: [
+              const Text("RETOUR", style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(fmt(retourDate), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(retourTime ?? "--:--")
+            ]))
+          ]
+
         ])
     );
   }
@@ -923,9 +996,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     ]);
   }
 
-  /*Widget _buildRow(String label, String value) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.grey)), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]));
-  }*/
 
   Widget _buildRow(String label, String value) {
     return Padding(
@@ -955,3 +1025,5 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     );
   }
 }
+
+

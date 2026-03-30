@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +11,14 @@ import '../../../../common/widgets/NotificationIconBtn.dart';
 import '../../../../common/widgets/cube_magic.dart';
 import '../../../../core/providers/notification_provider.dart';
 import '../../../../core/providers/user_provider.dart';
+import '../../../../core/services/device/device_service.dart';
+import '../../../../core/services/networking/api_config.dart';
+import '../../../../core/services/notifications/fcm_service.dart';
 import '../../../../core/theme/app_colors.dart';
 
 // Booking Imports
+import '../../../auth/data/datasources/auth_remote_data_source.dart';
+import '../../../auth/data/repositories/auth_repository_impl.dart';
 import '../../../booking/data/datasources/booking_remote_data_source.dart';
 import '../../../booking/data/models/live_trip_location.dart';
 import '../../../booking/data/models/program_model.dart';
@@ -82,6 +88,16 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   OverlayEntry? _overlayEntry;
 
 
+  // --- ETAT URGENCE (BOTTOM SHEET) ---
+  final _nomUrgenceController = TextEditingController();
+  final _contactUrgenceController = TextEditingController();
+  String? _selectedLienParente;
+  final List<String> _liensParente = [
+    'Père', 'Mère', 'Frère', 'Soeur', 'Conjoint(e)', 'Enfant', 'Ami(e)', 'Autre'
+  ];
+  bool _isSavingUrgence = false;
+
+
   LiveTripLocation? liveTrip; // null au départ
 
 
@@ -107,10 +123,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       if (widget.initialDate != null) {
         departureDate = widget.initialDate;
       }
-
-      // 🔒 VERROUILLAGE DU TYPE DE VOYAGE
-      // Si on modifie, on force la valeur du ticket original
-      //isAllerRetour = widget.ticketWasAllerRetour;
 
     }
 
@@ -147,7 +159,12 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     });
 
     // ✅ On charge les notifs
+    /*WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationProvider>(context, listen: false).fetchUnreadCount();
+    });*/
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPromptEmergencyInfo(); // 🟢 ON REMPLACE L'APPEL ICI
       Provider.of<NotificationProvider>(context, listen: false).fetchUnreadCount();
     });
 
@@ -166,28 +183,282 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
 
 
-
-
-  Future<void> fetchLiveTrip() async {
+  /*Future<void> fetchLiveTrip() async {
     try {
-      final response = await dio.get('/user/tracking/location'); // ton dio
+      print("🌍 [LIVE TRIP] Lancement de la requête API...");
+
+      // 1. Récupération du Token
+      final prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token');
+
+      // 2. Configuration du Dio Global avec ton URL et le Token
+      //dio.options.baseUrl = 'https://car225.com/api/';
+      dio.options.baseUrl = 'https://jingly-lindy-unminding.ngrok-free.dev/api/';
+      if (token != null) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // 3. Lancement de la requête (Maintenant Dio sait où aller !)
+      final response = await dio.get('user/tracking/location');
+
+      print("🌍 [LIVE TRIP] Code HTTP: ${response.statusCode}");
+      print("🌍 [LIVE TRIP] Données brutes: ${response.data}");
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         setState(() {
           liveTrip = LiveTripLocation.fromJson(response.data);
         });
+        print("✅ [LIVE TRIP] liveTrip créé avec succès ! Le badge va s'afficher.");
+      } else {
+        print("⚠️ [LIVE TRIP] Requête OK, mais success est false ou données manquantes.");
       }
     } catch (e) {
-      debugPrint("Erreur fetchLiveTrip: $e");
+      print("🔴 [LIVE TRIP] Erreur : $e");
     }
+  }*/
+
+  Future<void> fetchLiveTrip() async {
+    try {
+      print("🌍 [LIVE TRIP] Lancement de la requête API...");
+
+      // 1. Récupération du Token
+      final prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token');
+
+      // 2. Configuration du Dio Global avec ton URL et le Token
+      // 🟢 UTILISATION DE L'INTERRUPTEUR MAGIQUE
+      dio.options.baseUrl = ApiConfig.baseUrl;
+
+      if (token != null) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // 3. Lancement de la requête
+      final response = await dio.get('user/tracking/location');
+
+      print("🌍 [LIVE TRIP] Code HTTP: ${response.statusCode}");
+      print("🌍 [LIVE TRIP] Données brutes: ${response.data}");
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        setState(() {
+          liveTrip = LiveTripLocation.fromJson(response.data);
+        });
+        print("✅ [LIVE TRIP] liveTrip créé avec succès ! Le badge va s'afficher.");
+      } else {
+        print("⚠️ [LIVE TRIP] Requête OK, mais success est false ou données manquantes.");
+      }
+    } catch (e) {
+      print("🔴 [LIVE TRIP] Erreur : $e");
+    }
+  }
+
+  // ===========================================================================
+  // 🚨 GESTION DU CONTACT D'URGENCE OBLIGATOIRE
+  // ===========================================================================
+
+  Future<void> _checkAndPromptEmergencyInfo() async {
+    final userProvider = context.read<UserProvider>();
+
+    // 1. On s'assure que le user est chargé
+    if (userProvider.user == null) {
+      await userProvider.loadUser();
+    }
+
+    final user = userProvider.user;
+
+    // 2. Si l'utilisateur est connecté, on vérifie ses infos
+    if (user != null) {
+      bool isMissingInfo = (user.nomUrgence == null || user.nomUrgence!.isEmpty) ||
+          (user.lienParenteUrgence == null || user.lienParenteUrgence!.isEmpty) ||
+          (user.contactUrgence == null || user.contactUrgence!.isEmpty);
+
+      if (isMissingInfo) {
+        _showEmergencyBottomSheet();
+      }
+    }
+  }
+
+  void _showEmergencyBottomSheet() {
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false, // 🔒 Empêche de fermer en cliquant à l'extérieur
+        enableDrag: false,    // 🔒 Empêche de fermer en glissant vers le bas
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+          final cardColor = Theme.of(context).cardColor;
+
+          // 🔒 PopScope empêche de fermer avec le bouton "Retour" physique d'Android
+          return PopScope(
+            canPop: false,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: keyboardHeight),
+              child: Container(
+                padding: const EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(30))
+                ),
+                child: StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setModalState) {
+                      return SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                                const Gap(10),
+                                const Text("Sécurité avant tout !", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const Gap(10),
+                            const Text(
+                              "Avant de pouvoir rechercher ou réserver un trajet, vous devez obligatoirement configurer un contact d'urgence.",
+                              style: TextStyle(color: Colors.grey, fontSize: 13),
+                            ),
+                            const Gap(25),
+
+                            // --- CHAMPS DE SAISIE ---
+                            _buildModalInput("Nom & Prénom (Urgence)", _nomUrgenceController, "assets/images/health-insurance.png"),
+                            const Gap(15),
+                            _buildModalDropdown(setModalState),
+                            const Gap(15),
+                            _buildModalInput("Numéro d'Urgence", _contactUrgenceController, "assets/images/phone-call.png", isPhone: true),
+
+                            const Gap(30),
+
+                            // --- BOUTON DE VALIDATION ---
+                            SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton(
+                                onPressed: _isSavingUrgence ? null : () => _saveEmergencyInfo(setModalState),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                    elevation: 0
+                                ),
+                                child: _isSavingUrgence
+                                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Text("Enregistrer et continuer", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            )
+                          ],
+                        ),
+                      );
+                    }
+                ),
+              ),
+            ),
+          );
+        }
+    );
+  }
+
+  Future<void> _saveEmergencyInfo(StateSetter setModalState) async {
+    // 1. Validation locale
+    if (_nomUrgenceController.text.trim().isEmpty || _selectedLienParente == null || _contactUrgenceController.text.trim().length != 10) {
+      _showTopNotification("Veuillez remplir correctement tous les champs (10 chiffres pour le numéro)", isError: true);
+      return;
+    }
+
+    setModalState(() => _isSavingUrgence = true);
+
+    try {
+      // 2. Initialisation du repo Auth (comme dans PersonalInfoScreen)
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: DeviceService(),
+      );
+
+      final userProvider = context.read<UserProvider>();
+      final user = userProvider.user!;
+
+      // 3. Mise à jour via l'API (on garde les anciennes infos perso, on ajoute l'urgence)
+      await repo.updateUserProfile(
+        name: user.name,
+        prenom: user.prenom,
+        email: user.email,
+        contact: user.contact,
+        nomUrgence: _nomUrgenceController.text.trim(),
+        lienParenteUrgence: _selectedLienParente!,
+        contactUrgence: _contactUrgenceController.text.trim(),
+      );
+
+      // 4. On rafraîchit le provider pour que toute l'app soit au courant
+      await userProvider.loadUser();
+
+      _showTopNotification("Informations de sécurité enregistrées !", isError: false);
+
+      // 5. Fermeture de la modale
+      if (mounted) Navigator.pop(context);
+
+    } catch (e) {
+      _showTopNotification("Erreur : ${e.toString().replaceAll("Exception: ", "")}", isError: true);
+    } finally {
+      setModalState(() => _isSavingUrgence = false);
+    }
+  }
+
+  // --- WIDGETS DESIGN POUR LE BOTTOM SHEET ---
+  Widget _buildModalInput(String hint, TextEditingController controller, String imagePath, {bool isPhone = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
+
+    return Container(
+      decoration: BoxDecoration(color: fillColor, borderRadius: BorderRadius.circular(15)),
+      child: TextField(
+        controller: controller,
+        keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+        inputFormatters: isPhone ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)] : null,
+        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87),
+        decoration: InputDecoration(
+          prefixIcon: Padding(padding: const EdgeInsets.all(12.0), child: Image.asset(imagePath, width: 20, height: 20, color: Colors.grey[500])),
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 15),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalDropdown(StateSetter setModalState) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark ? Colors.grey[800] : const Color(0xFFF5F5F5);
+
+    return Container(
+      decoration: BoxDecoration(color: fillColor, borderRadius: BorderRadius.circular(15)),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          prefixIcon: Padding(padding: const EdgeInsets.all(12.0), child: Image.asset("assets/images/user.png", width: 18, height: 18, color: Colors.grey[500])),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+        ),
+        hint: Text("Lien de parenté", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+        value: _selectedLienParente,
+        dropdownColor: fillColor,
+        icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[500], size: 20),
+        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+        isExpanded: true,
+        items: _liensParente.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+        onChanged: (newValue) => setModalState(() => _selectedLienParente = newValue),
+      ),
+    );
   }
 
 
 
   void _initData() async {
     final dio = Dio(BaseOptions(
-      baseUrl: 'https://car225.com/api/',
+      baseUrl: ApiConfig.baseUrl,
+      //baseUrl: 'https://car225.com/api/',
       //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-      headers: {'Content-Type': 'application/json'},
+      /*headers: {'Content-Type': 'application/json'},*/
     ));
 
     final bookingDataSource = BookingRemoteDataSourceImpl(dio: dio);
@@ -272,7 +543,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     } catch (e) { if(mounted) setState(() => isLoadingTrips = false); }
   }
 
-  Future<void> _fetchWalletBalance() async {
+  /*Future<void> _fetchWalletBalance() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? token = prefs.getString('auth_token');
@@ -283,7 +554,65 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
         if (mounted) setState(() { walletBalance = walletData.solde; isLoadingWallet = false; });
       }
     } catch (e) { if (mounted) setState(() => isLoadingWallet = false); }
+  }*/
+
+  Future<void> _fetchWalletBalance() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token');
+
+      if (token != null) {
+        // 🟢 Utilisation de ApiConfig et ajout de "Accept: application/json" par sécurité
+        final dioWallet = Dio(BaseOptions(
+            baseUrl: ApiConfig.baseUrl,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json', // Très important pour forcer le retour en JSON
+            }
+        ));
+
+        final walletRepo = WalletRepository(remoteDataSource: WalletRemoteDataSourceImpl(dio: dioWallet));
+        final walletData = await walletRepo.getWalletData();
+
+        if (mounted) {
+          setState(() {
+            walletBalance = walletData.solde;
+            isLoadingWallet = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => isLoadingWallet = false);
+    }
   }
+
+  /*Future<void> _fetchActiveReservations() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token');
+
+      if (token != null) {
+        final dioAlert = Dio(BaseOptions(
+          baseUrl: ApiConfig.baseUrl,
+         //baseUrl: 'https://car225.com/api/',
+          //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+          /*headers: {'Authorization': 'Bearer $token'},*/
+        ));
+        final alertRepo = AlertRepository(dio: dioAlert);
+        final reservations = await alertRepo.getActiveReservations();
+        if (mounted) {
+          setState(() {
+            activeReservations = reservations;
+            isLoadingLiveTrip = false;
+          });
+        }
+      } else {
+        setState(() => isLoadingLiveTrip = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => isLoadingLiveTrip = false);
+    }
+  }*/
 
   Future<void> _fetchActiveReservations() async {
     try {
@@ -292,8 +621,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
       if (token != null) {
         final dioAlert = Dio(BaseOptions(
-          baseUrl: 'https://car225.com/api/',
-          //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
+          baseUrl: ApiConfig.baseUrl,
           headers: {'Authorization': 'Bearer $token'},
         ));
         final alertRepo = AlertRepository(dio: dioAlert);
@@ -392,8 +720,65 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
 
 
 
-  void _onSearchPressed() async { // ⚠️ Ajoute 'async' ici
+  /*void _onSearchPressed() async { // ⚠️ Ajoute 'async' ici
     // Validation
+    if (departureCity == null || arrivalCity == null || departureDate == null) {
+      _showTopNotification("Veuillez remplir tous les champs", isError: true);
+      return;
+    }
+
+    String dateDepartApi = DateFormat('yyyy-MM-dd').format(departureDate!);
+    final searchParams = {
+      "depart": departureCity,
+      "arrivee": arrivalCity,
+      "date": dateDepartApi
+    };
+
+    // 🟢 NAVIGATION AVEC ATTENTE DE RÉSULTAT (AWAIT)
+    final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => SearchResultsScreen(
+              // On passe le mode modification à l'écran suivant
+              isGuestMode: false,
+              searchParams: searchParams,
+              isModificationMode: widget.isModificationMode,
+
+              // 🚨 C'EST ICI LA SOURCE DU PROBLÈME SI TU L'OUBLIES
+              ticketWasAllerRetour: widget.ticketWasAllerRetour,
+
+            )
+        )
+    );
+
+    // 🟢 GESTION DU RETOUR (Le Relais)
+    // Si on est en mode modif et qu'on a reçu des données de SearchResults -> SeatSelection
+    if (widget.isModificationMode && result != null) {
+      // On ferme HomeTabScreen et on renvoie le résultat à TicketDetailScreen
+      if (mounted) {
+        Navigator.pop(context, result);
+      }
+    }
+  }*/
+
+  void _onSearchPressed() async {
+    // 🛡️ 1. BOUCLIER : VERIFICATION DU CONTACT D'URGENCE
+    final userProvider = context.read<UserProvider>();
+    final user = userProvider.user;
+
+    if (user != null) {
+      bool isMissingInfo = (user.nomUrgence == null || user.nomUrgence!.isEmpty) ||
+          (user.lienParenteUrgence == null || user.lienParenteUrgence!.isEmpty) ||
+          (user.contactUrgence == null || user.contactUrgence!.isEmpty);
+
+      if (isMissingInfo) {
+        _showTopNotification("Contact d'urgence requis avant de chercher un trajet.", isError: true);
+        _showEmergencyBottomSheet(); // On fait sortir la modale
+        return; // ⛔ On stop la fonction ici
+      }
+    }
+
+    // 2. Validation Classique
     if (departureCity == null || arrivalCity == null || departureDate == null) {
       _showTopNotification("Veuillez remplir tous les champs", isError: true);
       return;
@@ -523,8 +908,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
   }
 
 
-
-
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).textTheme.bodyLarge?.color;
@@ -574,17 +957,18 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                 const SizedBox(height: 120),
               ],
             ),
-
             // --- 🔴 3. LE BADGE FLOTTANT PAR-DESSUS TOUT ---
             if (liveTrip != null)
               Positioned(
                 // Calcul : Header (340) - Remontée carte (60) - Moitié du badge (18) = 262
-                top: 262,
+                top: 170, // 🟢 Tu pourras ajuster ce chiffre pour le monter ou le descendre
                 left: 0,
                 right: 0,
-                child: _buildAnimatedBlock(
-                  delay: 0.3, // Il apparaitra juste après la carte
-                  child: _buildLiveTripPulseBadgeFromLocation(liveTrip!),
+                child: Center( // 🟢 AJOUT CRUCIAL ICI POUR CENTRER LE BADGE
+                  child: _buildAnimatedBlock(
+                    delay: 0.3,
+                    child: _buildLiveTripPulseBadgeFromLocation(liveTrip!),
+                  ),
                 ),
               ),
           ],
@@ -639,9 +1023,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       ),
     );
   }
-
-
-
 
 
   Widget _buildItinerairesSection(Color? textColor) {
@@ -792,13 +1173,11 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                             _fetchWalletBalance();
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), // Padding légèrement augmenté
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              // 🟢 CHANGEMENT 1 : Fond noir semi-transparent au lieu de blanc pour maximiser le contraste
                               color: Colors.black.withOpacity(0.45),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.white.withOpacity(0.15)),
-                              // 🟢 CHANGEMENT 2 : Ajout d'une ombre douce pour détacher le bloc de l'image
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.3),
@@ -810,13 +1189,31 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // 🟢 NOUVEAU BOUTON "+" STYLÉ ICI
                                 Container(
-                                  padding: const EdgeInsets.all(5), // Icône très légèrement plus grande
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.secondary,
+                                  padding: const EdgeInsets.all(4), // Ajusté pour le "+"
+                                  decoration: BoxDecoration(
+                                    // Un beau dégradé chaud (Orange vers Rouge)
+                                    gradient: const LinearGradient(
+                                      colors: [Colors.orange, Colors.redAccent],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
                                     shape: BoxShape.circle,
+                                    // Une petite ombre rouge pour donner un effet "Glow" (lueur)
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.redAccent.withOpacity(0.5),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 12),
+                                  child: const Icon(
+                                    Icons.add, // L'icône "+"
+                                    color: Colors.white,
+                                    size: 16, // Légèrement plus grand pour bien se voir
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -824,28 +1221,14 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Text(
-                                        "CarPay",
-                                        style: TextStyle(
-                                          // 🟢 CHANGEMENT 3 : Blanc pur, plus grand, plus gras
-                                          color: Colors.white,
-                                          fontSize: 11, // Passé de 9 à 11
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.5,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                        softWrap: false,
-                                      ),
-                                      const SizedBox(height: 1), // Petit espace de respiration
+                                      const SizedBox(height: 1),
                                       isLoadingWallet
                                           ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
                                           : Text(
                                         walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
                                         style: const TextStyle(
-                                          // 🟢 CHANGEMENT 4 : Solde plus lisible
                                           color: Colors.white,
-                                          fontSize: 13, // Passé de 11 à 13
+                                          fontSize: 13,
                                           fontWeight: FontWeight.bold,
                                         ),
                                         overflow: TextOverflow.ellipsis,
@@ -877,10 +1260,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
               ),
             ),
           ),
-
-          // --- 3. BADGE LIVE TRIP au centre bas du header ---
-          if (liveTrip != null)
-            _buildLiveTripPulseBadgeFromLocation(liveTrip!)
         ],
       ),
     );
@@ -941,7 +1320,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                             children: [
                               Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
                               const SizedBox(width: 6),
-                              const Text("LIVE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                              const Text("EN VOYAGE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
                             ],
                           ),
                           Icon(isLiveExpanded ? Icons.close : Icons.arrow_drop_down, color: Colors.white, size: isLiveExpanded ? 14 : 16),
@@ -972,9 +1351,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       ),
     );
   }
-
-
-
 
 
   Widget _buildWalletButton() {
@@ -1165,11 +1541,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                         child: Text(
                             widget.isModificationMode
                                 ? "Modifier votre voyage"
-                                : "Où souhaitez-vous voyager ?",
+                                : "Où souhaitez-vous aller ?",
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                         )
                     ),
-
                     // --- 2. SOUS-TITRE (Alerte si bloqué) ---
                     if (isRouteLocked)
                       Padding(
@@ -1183,7 +1558,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                         ),
                       )
                     else
-                      const Text("Trouvez votre bus en quelques clics", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text("Trouvez votre car en quelques clics", style: TextStyle(color: Colors.grey, fontSize: 12)),
 
                     const Gap(20),
 
@@ -1193,33 +1568,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                         : Row(
                         children: [
                           // VILLE DÉPART
-                          /*Expanded(
-                              child: _buildRealDropdown(
-                                  context,
-                                  "Départ",
-                                  departureCity,
-                                  cities,
-                                  "assets/images/map.png",
-                                  // 🔒 SI BLOQUÉ : on passe null (ce qui désactive le clic)
-                                  // SINON : on passe la fonction normale
-                                  isRouteLocked ? null : (val) => setState(() => departureCity = val)
-                              )
-                          ),
-                          const Gap(10),
-                          // VILLE ARRIVÉE
-                          Expanded(
-                              child: _buildRealDropdown(
-                                  context,
-                                  "Destination",
-                                  arrivalCity,
-                                  cities,
-                                  "assets/images/map.png",
-                                  // 🔒 IDEM ICI
-                                  isRouteLocked ? null : (val) => setState(() => arrivalCity = val),
-                                  isGreen: true
-                              )
-                          )*/
-
                           Expanded(
                             child: _buildCitySearchSelector(
                               context: context,
@@ -1298,7 +1646,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
                   ]
               )
           ),
-
           // Badge pulse si voyage en cours (Masqué en mode modif pour épurer)
         ]
     );
@@ -1353,16 +1700,19 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     );
   }
 
-
   void _openCitySearchSheet({
     required BuildContext context,
     required String title,
     required List<String> cities,
     required Function(String) onSelected,
   }) {
+    // 🟢 1. On calcule la hauteur souhaitée : 75% de la hauteur totale de l'écran
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double sheetHeight = screenHeight * 0.50; // 3/4 de l'écran
+
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: true, // Toujours à true pour gérer sa propre taille
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1373,72 +1723,79 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
+              // Garde le padding pour le clavier
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade400,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  Text(title,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-
-                  const SizedBox(height: 12),
-
-                  // 🔍 Champ de recherche
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: "Rechercher une ville...",
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+              // 🟢 2. On enveloppe le tout dans une SizedBox avec la hauteur calculée
+              child: SizedBox(
+                height: sheetHeight,
+                child: Column(
+                  // mainAxisSize.max est important ici car on a fixé la hauteur
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    const SizedBox(height: 12),
+                    // Petite barre de glissement (Drag handle)
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      onChanged: (value) {
-                        setModalState(() {
-                          filteredCities = cities
-                              .where((c) =>
-                              c.toLowerCase().contains(value.toLowerCase()))
-                              .toList();
-                        });
-                      },
                     ),
-                  ),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 10),
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
 
-                  // 📜 Liste filtrée
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filteredCities.length,
-                      itemBuilder: (context, index) {
-                        final city = filteredCities[index];
-                        return ListTile(
-                          title: Text(city),
-                          onTap: () {
-                            Navigator.pop(context);
-                            onSelected(city);
-                          },
-                        );
-                      },
+                    const SizedBox(height: 12),
+
+                    // 🔍 Champ de recherche
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: controller,
+                        autofocus: true, // Le clavier va s'ouvrir direct
+                        decoration: InputDecoration(
+                          hintText: "Rechercher une ville...",
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setModalState(() {
+                            filteredCities = cities
+                                .where((c) =>
+                                c.toLowerCase().contains(value.toLowerCase()))
+                                .toList();
+                          });
+                        },
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 10),
+
+                    // 📜 Liste filtrée
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredCities.length,
+                        itemBuilder: (context, index) {
+                          final city = filteredCities[index];
+                          return ListTile(
+                            title: Text(city),
+                            onTap: () {
+                              Navigator.pop(context);
+                              onSelected(city); // Renvoie la ville choisie
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1846,46 +2203,6 @@ class _BranchAndButtonWidget extends StatelessWidget {
 
   const _BranchAndButtonWidget({required this.onBookPressed, required this.cardWidth});
 
-/*  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        CustomPaint(
-          size: Size(cardWidth, 80),
-          painter: _BranchPainter(color: AppColors.primary),
-        ),
-        Positioned(
-          top: 50,
-          left: (cardWidth / 2) - 70, // Centré
-          child: ScaleTransition(
-            scale: const AlwaysStoppedAnimation(1.0),
-            child: SizedBox(
-              width: 140,
-              height: 45,
-              child: ElevatedButton(
-                onPressed: onBookPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 10,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text("Réserver", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Gap(8),
-                    Icon(Icons.arrow_forward, size: 18)
-                  ],
-                ),
-              ),
-            ),
-          ),
-        )
-      ],
-    );
-  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -1947,7 +2264,6 @@ class _BranchAndButtonWidget extends StatelessWidget {
       ],
     );
   }
-
 
 }
 

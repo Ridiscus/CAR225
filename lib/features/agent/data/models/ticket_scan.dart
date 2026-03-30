@@ -29,9 +29,16 @@ class TicketScan {
 
     if (dateString != null && dateString.isNotEmpty) {
       try {
-        parsedDate = DateFormat("dd MMM yyyy 'à' HH:mm", "fr_FR").parse(dateString);
+        // 1. On parse en "en_US" car l'API renvoie "Mar", "Apr", "May" etc.
+        parsedDate = DateFormat("dd MMM yyyy 'à' HH:mm", "en_US").parse(dateString);
       } catch (e) {
-        parsedDate = DateTime.now();
+        try {
+          // 2. Plan B : Si un jour l'API renvoie du français ("mars", "avr.")
+          parsedDate = DateFormat("dd MMM yyyy 'à' HH:mm", "fr_FR").parse(dateString);
+        } catch (e2) {
+          // 3. Dernier recours
+          parsedDate = DateTime.now();
+        }
       }
     } else {
       parsedDate = DateTime.now();

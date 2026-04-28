@@ -46,6 +46,11 @@ class VoyageProgrammeModel {
   final String gareArrivee;
   final double tarif;
   final int capacity;
+  // Coordonnées GPS des gares (pour le tracking)
+  final double? gareDepartLat;
+  final double? gareDepartLng;
+  final double? gareArriveeLat;
+  final double? gareArriveeLng;
 
   VoyageProgrammeModel({
     required this.id,
@@ -57,6 +62,10 @@ class VoyageProgrammeModel {
     required this.gareArrivee,
     required this.tarif,
     required this.capacity,
+    this.gareDepartLat,
+    this.gareDepartLng,
+    this.gareArriveeLat,
+    this.gareArriveeLng,
   });
 
   factory VoyageProgrammeModel.fromJson(Map<String, dynamic> json) {
@@ -66,11 +75,56 @@ class VoyageProgrammeModel {
       pointArrive: json['point_arrive']?.toString() ?? '',
       heureDepart: json['heure_depart']?.toString() ?? '',
       heureArrive: json['heure_arrive']?.toString() ?? '',
-      gareDepart: json['gare_depart']?.toString() ?? '',
-      gareArrivee: json['gare_arrivee']?.toString() ?? '',
+      gareDepart: _gareName(json, 'gare_depart'),
+      gareArrivee: _gareName(json, 'gare_arrivee'),
       tarif: json['montant_billet'] != null ? double.tryParse(json['montant_billet'].toString()) ?? 0.0 : 0.0,
       capacity: json['capacity'] != null ? int.tryParse(json['capacity'].toString()) ?? 0 : 0,
+      gareDepartLat: _gareCoord(json, 'gare_depart', 'lat'),
+      gareDepartLng: _gareCoord(json, 'gare_depart', 'lng'),
+      gareArriveeLat: _gareCoord(json, 'gare_arrivee', 'lat'),
+      gareArriveeLng: _gareCoord(json, 'gare_arrivee', 'lng'),
     );
+  }
+
+  /// Extract gare name: tries nested object first, falls back to string field.
+  static String _gareName(Map<String, dynamic> json, String key) {
+    final val = json[key];
+    if (val is Map) {
+      return val['nom']?.toString() ??
+          val['name']?.toString() ??
+          val['libelle']?.toString() ??
+          '';
+    }
+    return val?.toString() ?? '';
+  }
+
+  /// Extract coordinate from multiple possible field naming conventions.
+  static double? _gareCoord(Map<String, dynamic> json, String prefix, String axis) {
+    // 1. Try flat fields: gare_depart_lat / gare_depart_lng
+    final flat = json['${prefix}_$axis'];
+    if (flat != null) {
+      final v = double.tryParse(flat.toString());
+      if (v != null) return v;
+    }
+    // 2. Try flat latitude/longitude variants
+    final altKey = axis == 'lat' ? 'latitude' : 'longitude';
+    final flat2 = json['${prefix}_$altKey'];
+    if (flat2 != null) {
+      final v = double.tryParse(flat2.toString());
+      if (v != null) return v;
+    }
+    // 3. Try nested gare object: json['gare_depart'] is a Map
+    final nested = json[prefix];
+    if (nested is Map) {
+      final keys = axis == 'lat'
+          ? ['lat', 'latitude', 'gps_lat', 'coordonnee_lat']
+          : ['lng', 'lon', 'longitude', 'gps_lng', 'coordonnee_lng'];
+      for (final k in keys) {
+        final v = double.tryParse(nested[k]?.toString() ?? '');
+        if (v != null) return v;
+      }
+    }
+    return null;
   }
 }
 

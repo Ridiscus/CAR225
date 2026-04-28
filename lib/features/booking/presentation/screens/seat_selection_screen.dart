@@ -521,10 +521,11 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                                     const Gap(15),
 
                                     _buildTextField(
-                                        context, "Email",
+                                        context, "Email (Optionnel)",
                                         controller: controllers["email"]!,
                                         imagePath: "assets/images/email.png",
                                         keyboardType: TextInputType.emailAddress,
+                                        isRequired: false,
                                         hint: "exemple@email.com"
                                     ),
                                     const Gap(15),
@@ -673,7 +674,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 // 👇 WIDGET HELPER MIS À JOUR (VERSION IMAGE)
 // ---------------------------------------------------------------------------
 
-  Widget _buildTextField(
+  /*Widget _buildTextField(
       BuildContext context,
       String label, {
         required TextEditingController controller,
@@ -719,6 +720,90 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
               return "10 chiffres requis"; // Bloque si < 10
             }
             if (label.toLowerCase() == "email" && !value.contains("@")) {
+              return "Email invalide";
+            }
+            return null;
+          },
+
+          // 🎨 3. TON DESIGN INTACT (Couleurs, bordures, image)
+          decoration: InputDecoration(
+            prefixIcon: imagePath != null
+                ? Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Image.asset(imagePath, width: 20, height: 20, color: iconColor),
+            )
+                : null,
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderColor)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
+            filled: true,
+            fillColor: fillColor,
+          ),
+        ),
+      ],
+    );
+  }*/
+
+
+  Widget _buildTextField(
+      BuildContext context,
+      String label, {
+        required TextEditingController controller,
+        String? imagePath,
+        TextInputType keyboardType = TextInputType.text,
+        String? hint,
+        bool isPhone = false,
+        bool isRequired = true, // 🟢 1. AJOUT DU PARAMÈTRE ICI (vrai par défaut)
+      }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final fillColor = isDark ? Colors.grey[800] : Colors.grey[100];
+    final borderColor = isDark ? Colors.transparent : Colors.grey.shade300;
+    final iconColor = Colors.grey;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // --- LE LABEL AU DESSUS DU CHAMP ---
+        Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor)),
+        const Gap(6),
+
+        // --- LE CHAMP DE TEXTE ---
+        TextFormField(
+          controller: controller,
+          // 💡 Astuce : force le clavier numérique automatiquement si c'est un téléphone
+          keyboardType: isPhone ? TextInputType.phone : keyboardType,
+          style: TextStyle(color: textColor, fontSize: 14),
+
+          // 🛡️ 1. BLOQUER LA SAISIE PHYSIQUEMENT (Chiffres uniquement et 10 max)
+          inputFormatters: isPhone
+              ? [
+            FilteringTextInputFormatter.digitsOnly, // Que des chiffres
+            LengthLimitingTextInputFormatter(10),   // Pas plus de 10
+          ]
+              : null,
+
+          // 🛡️ 2. VALIDATION LORS DU CLIC SUR LE BOUTON
+          validator: (value) {
+            // 🟢 NOUVELLE LOGIQUE : Si c'est PAS obligatoire ET que c'est vide -> on valide directement
+            if (!isRequired && (value == null || value.trim().isEmpty)) {
+              return null;
+            }
+
+            // 🔴 Sinon, si c'est vide (alors que c'est obligatoire) -> erreur
+            if (value == null || value.trim().isEmpty) {
+              return "Requis";
+            }
+
+            if (isPhone && value.length != 10) {
+              return "10 chiffres requis";
+            }
+
+            // J'ai mis "contains('email')" au cas où tu écris "Email (Optionnel)" dans le label
+            if (label.toLowerCase().contains("email") && !value.contains("@")) {
               return "Email invalide";
             }
             return null;
@@ -928,7 +1013,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
     List<Map<String, dynamic>> passengersData = [];
 
-    for (int i = 0; i < widget.passengerCount; i++) {
+    /*for (int i = 0; i < widget.passengerCount; i++) {
       final controllers = _passengerControllers[i];
 
       // On fusionne le nom et le lien. Exemple : "DOE Bob (Père)"
@@ -938,6 +1023,34 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
         "nom": controllers["nom"]!.text,
         "prenom": controllers["prenom"]!.text,
         "email": controllers["email"]!.text,
+        "telephone": controllers["telephone"]!.text,
+        "urgence": controllers["tel_urgence"]!.text,
+        "nom_passager_urgence": nomUrgenceComplet,
+        "seat_number": sortedSeatsAller[i],
+      };
+
+      if (widget.program.isAllerRetour && i < sortedSeatsRetour.length) {
+        passager["return_seat_number"] = sortedSeatsRetour[i];
+      }
+      passengersData.add(passager);
+    }*/
+
+    for (int i = 0; i < widget.passengerCount; i++) {
+      final controllers = _passengerControllers[i];
+
+      // On fusionne le nom et le lien. Exemple : "DOE Bob (Père)"
+      String nomUrgenceComplet = "${controllers["nom_urgence"]!.text} (${controllers["lien_urgence"]!.text})";
+
+      // On récupère ce que l'utilisateur a tapé
+      String emailSaisi = controllers["email"]!.text.trim();
+
+      final Map<String, dynamic> passager = {
+        "nom": controllers["nom"]!.text,
+        "prenom": controllers["prenom"]!.text,
+
+        // 🟢 SOLUTION RADICALE : Si c'est vide, on envoie un faux email par défaut
+        "email": emailSaisi.isEmpty ? "contact@car225.com" : emailSaisi,
+
         "telephone": controllers["telephone"]!.text,
         "urgence": controllers["tel_urgence"]!.text,
         "nom_passager_urgence": nomUrgenceComplet,

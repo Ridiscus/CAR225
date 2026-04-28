@@ -64,6 +64,21 @@ abstract class AuthRemoteDataSource {
 
   Future<UserStatsModel> getUserStats();
   Future<TripDetailsModel> getTripDetails();
+
+  // 🟢 CRÉATION D'UNE DEMANDE DE CONVOI
+  Future<Map<String, dynamic>> createConvoi(Map<String, dynamic> payload);
+
+  Future<List<dynamic>> getConvoiCompagnies();
+  Future<List<dynamic>> getConvoiGares(int compagnieId);
+  Future<List<dynamic>> getConvoiItineraires(int compagnieId);
+
+  Future<Map<String, dynamic>> getMyConvois({String? statut, int page = 1});
+  Future<Map<String, dynamic>> getConvoiDetails(int convoiId);
+
+  Future<Map<String, dynamic>> accepterMontantConvoi(int convoiId);
+  Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId);
+  Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data);
+
 }
 
 
@@ -101,6 +116,216 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return handler.next(e);
       },
     ));
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> createConvoi(Map<String, dynamic> payload) async {
+    try {
+      print("🚀 [POST REQUÊTE] Vers: /user/convois");
+      print("📤 [POST PAYLOAD] $payload");
+
+      final response = await dio.post('/user/convois', data: payload);
+
+      print("✅ [POST SUCCÈS] Code: ${response.statusCode}");
+      print("📥 [POST RÉPONSE] ${response.data}");
+
+      return response.data;
+    } on DioException catch (e) {
+      print("❌ [POST ERREUR CONVOI] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+      // On remonte le message d'erreur du backend s'il existe, sinon un message générique
+      throw Exception(e.response?.data['message'] ?? "Erreur lors de la création de la demande de convoi.");
+    } catch (e) {
+      print("🚨 [POST ERREUR INATTENDUE] $e");
+      rethrow;
+    }
+  }
+
+  // Dans AuthRemoteDataSourceImpl
+  @override
+  Future<Map<String, dynamic>> getConvoiDetails(int convoiId) async {
+    try {
+      final response = await dio.get('/user/convois/$convoiId');
+      return response.data['convoi'];
+    } catch (e) {
+      throw Exception("Erreur de chargement des détails");
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiCompagnies() async {
+    try {
+      print("🚀 [GET COMPAGNIES] Appel API: /user/convois-form/compagnies");
+      final response = await dio.get('/user/convois-form/compagnies');
+
+      print("✅ [GET COMPAGNIES] Succès. Données reçues.");
+      return response.data['compagnies'] ?? [];
+
+    } on DioException catch (e) {
+      _logDioError("GET COMPAGNIES", e);
+      throw Exception("Impossible de charger les compagnies : ${e.response?.statusCode}");
+    } catch (e) {
+      print("🚨 [GET COMPAGNIES] Erreur inattendue : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiGares(int compagnieId) async {
+    try {
+      print("🚀 [GET GARES] Appel API: /user/convois-form/compagnies/$compagnieId/gares");
+      final response = await dio.get('/user/convois-form/compagnies/$compagnieId/gares');
+
+      print("✅ [GET GARES] Succès.");
+      return response.data['gares'] ?? [];
+
+    } on DioException catch (e) {
+      _logDioError("GET GARES", e);
+      throw Exception("Impossible de charger les gares : ${e.response?.statusCode}");
+    } catch (e) {
+      print("🚨 [GET GARES] Erreur inattendue : $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiItineraires(int compagnieId) async {
+    try {
+      print("🚀 [GET ITINERAIRES] Appel API: /user/convois-form/compagnies/$compagnieId/itineraires");
+      final response = await dio.get('/user/convois-form/compagnies/$compagnieId/itineraires');
+
+      print("✅ [GET ITINERAIRES] Succès.");
+      return response.data['itineraires'] ?? [];
+
+    } on DioException catch (e) {
+      _logDioError("GET ITINERAIRES", e);
+      throw Exception("Impossible de charger les itinéraires : ${e.response?.statusCode}");
+    } catch (e) {
+      print("🚨 [GET ITINERAIRES] Erreur inattendue : $e");
+      rethrow;
+    }
+  }
+
+  // 🛠 Fonction utilitaire pour centraliser les logs d'erreurs Dio
+  void _logDioError(String action, DioException e) {
+    print("❌ [$action] ERREUR API !");
+    print("❌ Type: ${e.type}");
+    print("❌ Code HTTP: ${e.response?.statusCode}");
+    print("❌ Message Dio: ${e.message}");
+    print("🚨 DATA BACKEND (TRÈS IMPORTANT): ${e.response?.data}");
+  }
+
+
+  // Dans AuthRemoteDataSourceImpl
+  @override
+  Future<Map<String, dynamic>> getMyConvois({String? statut, int page = 1}) async {
+    try {
+      final response = await dio.get(
+        '/user/convois',
+        queryParameters: {
+          'page': page,
+          'per_page': 10,
+          if (statut != null) 'statut': statut,
+        },
+      );
+      return response.data; // On retourne le Map complet pour avoir la pagination + data
+    } on DioException catch (e) {
+      _logDioError("GET MY CONVOIS", e);
+      throw Exception("Erreur lors de la récupération des convois");
+    }
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> accepterMontantConvoi(int convoiId) async {
+    try {
+      print("🚀 [POST API] Appel vers : /user/convois/$convoiId/accepter-montant");
+
+      final response = await dio.post(
+          '/user/convois/$convoiId/accepter-montant',
+          data: {
+            "reglement_accepte": true // <--- LA SOLUTION EST ICI ! On envoie la confirmation au backend.
+          }
+      );
+
+      print("✅ [SUCCÈS API] accepterMontantConvoi : ${response.data}");
+      return response.data;
+
+    } on DioException catch (e) {
+      // 🟢 LOGS DÉTAILLÉS DE L'ERREUR DIO
+      print("❌ [ERREUR DIO] accepterMontantConvoi");
+      print("➡️ Type d'erreur : ${e.type}");
+      print("➡️ Code HTTP : ${e.response?.statusCode}");
+      print("➡️ Données renvoyées par Laravel : ${e.response?.data}");
+      print("➡️ Message : ${e.message}");
+
+      final errorMessage = e.response?.data != null && e.response?.data['message'] != null
+          ? e.response?.data['message']
+          : "Erreur serveur ou réseau.";
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      print("❌ [ERREUR INCONNUE] accepterMontantConvoi : $e");
+      throw Exception("Erreur inattendue lors de l'acceptation : $e");
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId) async {
+    try {
+      print("🚀 [POST API] Appel vers : /user/convois/$convoiId/refuser-montant");
+
+      final response = await dio.post('/user/convois/$convoiId/refuser-montant');
+
+      print("✅ [SUCCÈS API] refuserMontantConvoi : ${response.data}");
+      return response.data;
+
+    } on DioException catch (e) {
+      // 🟢 LOGS DÉTAILLÉS DE L'ERREUR DIO
+      print("❌ [ERREUR DIO] refuserMontantConvoi");
+      print("➡️ Type d'erreur : ${e.type}");
+      print("➡️ Code HTTP : ${e.response?.statusCode}");
+      print("➡️ Données renvoyées par Laravel : ${e.response?.data}");
+      print("➡️ Message : ${e.message}");
+
+      final errorMessage = e.response?.data != null && e.response?.data['message'] != null
+          ? e.response?.data['message']
+          : "Erreur serveur ou réseau.";
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      print("❌ [ERREUR INCONNUE] refuserMontantConvoi : $e");
+      throw Exception("Erreur inattendue lors du refus : $e");
+    }
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data) async {
+    try {
+      print("🚀 [POST API] Appel vers : /user/convois/$convoiId/passagers");
+
+      final response = await dio.post(
+          '/user/convois/$convoiId/passagers',
+          data: data
+      );
+
+      print("✅ [SUCCÈS API] enregistrerPassagers : ${response.data}");
+      return response.data;
+
+    } on DioException catch (e) {
+      print("❌ [ERREUR DIO] enregistrerPassagers");
+      print("➡️ Code HTTP : ${e.response?.statusCode}");
+      print("➡️ Données : ${e.response?.data}");
+
+      final errorMessage = e.response?.data != null && e.response?.data['message'] != null
+          ? e.response?.data['message']
+          : "Erreur lors de l'enregistrement des passagers.";
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      throw Exception("Erreur inattendue : $e");
+    }
   }
 
 

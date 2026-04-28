@@ -120,7 +120,9 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
   void _showImagePreview() {
     final provider = context.read<HostessProfileProvider>();
     final pickedImage = provider.profileImage;
-    final profile = provider.profileData;
+
+    // 🟢 1. On récupère l'URL propre
+    final String cleanImageUrl = provider.cleanProfileImageUrl;
 
     showDialog(
       context: context,
@@ -148,12 +150,12 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(25),
                   image: DecorationImage(
-                    // 🟢 MÊME LOGIQUE POUR L'URL DE L'IMAGE DANS LA PRÉVISUALISATION
-                    image: pickedImage != null
+                    // 🟢 2. LOGIQUE SIMPLIFIÉE AVEC CLEAN URL
+                    image: (pickedImage != null
                         ? FileImage(pickedImage)
-                        : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                        ? NetworkImage('https://car225.com/storage/${profile.profilePicture}')
-                        : const AssetImage('assets/images/hostess_profile.png'))
+                        : (cleanImageUrl.isNotEmpty
+                        ? NetworkImage(cleanImageUrl)
+                        : const AssetImage('assets/images/hostess_profile.jpg')))
                     as ImageProvider,
                     fit: BoxFit.cover,
                   ),
@@ -307,9 +309,12 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
     final profile = provider.profileData;
     final isLoading = provider.isLoading;
 
+    // 🟢 1. On récupère l'URL propre ici aussi
+    final String cleanImageUrl = provider.cleanProfileImageUrl;
+
     final double topPadding = MediaQuery.of(context).padding.top;
 
-    // 🟢 Données dynamiques avec fallbacks pendant le chargement
+    // Données dynamiques avec fallbacks pendant le chargement
     final String firstName = profile?.prenom ?? (isLoading ? '...' : '');
     final String lastName = profile?.name ?? (isLoading ? 'Chargement' : 'Inconnu');
     final String company = profile?.nomCompagnie ?? (isLoading ? '...' : 'Inconnue');
@@ -372,12 +377,12 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                             ),
                           ],
                           image: DecorationImage(
-                            // 🟢 MÊME LOGIQUE D'URL ICI
-                            image: pickedImage != null
+                            // 🟢 2. LOGIQUE D'URL MISE À JOUR ICI
+                            image: (pickedImage != null
                                 ? FileImage(pickedImage)
-                                : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                                ? NetworkImage('https://car225.com/storage/${profile.profilePicture}')
-                                : const AssetImage('assets/images/hostess_profile.png'))
+                                : (cleanImageUrl.isNotEmpty
+                                ? NetworkImage(cleanImageUrl)
+                                : const AssetImage('assets/images/hostess_profile.png')))
                             as ImageProvider,
                             fit: BoxFit.cover,
                           ),
@@ -389,7 +394,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                     bottom: 5,
                     right: 5,
                     child: GestureDetector(
-                      onTap: _showPhotoOptions,
+                      onTap: _showPhotoOptions, // Assure-toi que cette fonction existe bien dans ce fichier
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -408,7 +413,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                 ],
               ),
               const Gap(20),
-              // 🟢 Nom et Prénoms Dynamiques
+              // Nom et Prénoms Dynamiques
               Text(
                 '$firstName $lastName'.trim(),
                 style: const TextStyle(
@@ -437,7 +442,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                   ],
                 ),
                 child: Text(
-                  _role,
+                  _role, // ⚠️ Assure-toi que _role est bien défini dans le State de ton widget !
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -447,7 +452,7 @@ class _HostessProfileScreenState extends State<HostessProfileScreen> {
                 ),
               ),
               const Gap(10),
-              // 🟢 Entreprise Dynamique
+              // Entreprise Dynamique
               Text(
                 'EMPLOYÉE PAR $company'.toUpperCase(),
                 style: TextStyle(

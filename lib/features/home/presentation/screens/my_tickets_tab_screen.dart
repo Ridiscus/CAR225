@@ -27,7 +27,9 @@ import 'profil_screen.dart';
 import 'ticket_detail_screen.dart'; // Ajouté pour la navigation
 
 class MyTicketsTabScreen extends StatefulWidget {
-  const MyTicketsTabScreen({super.key});
+  final VoidCallback? onGoHome; // 🟢 1. Ajout du callback
+
+  const MyTicketsTabScreen({super.key, this.onGoHome});
 
   @override
   State<MyTicketsTabScreen> createState() => _MyTicketsTabScreenState();
@@ -385,20 +387,9 @@ class _MyTicketsTabScreenState extends State<MyTicketsTabScreen>  with SingleTic
                   if (isLoading)
                     SizedBox(height: 200, child: Center(child: CircularProgressIndicator(color: AppColors.primary)))
                   else if (displayedTickets.isEmpty)
-                    Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 50), child: Text("Aucun billet trouvé", style: TextStyle(color: secondaryTextColor))))
+                  // 🟢 ICI ON APPELLE NOTRE NOUVELLE INTERFACE ÉLÉGANTE
+                    _buildEmptyState(context)
                   else ...[
-                      // Utilisation de TA fonction _buildTicketCard intégrée
-                      /*ListView.separated(
-                        padding: EdgeInsets.zero,
-                        physics: const NeverScrollableScrollPhysics(),
-                        shrinkWrap: true,
-                        itemCount: previewTickets.length,
-                        separatorBuilder: (context, index) => const Gap(20),
-                        itemBuilder: (context, index) {
-                          return _buildTicketCard(context, ticket: previewTickets[index]);
-                        },
-                      ),*/
-
                       // Utilisation de TA fonction _buildTicketCard intégrée avec l'animation
                       ListView.separated(
                         padding: EdgeInsets.zero,
@@ -461,6 +452,72 @@ class _MyTicketsTabScreenState extends State<MyTicketsTabScreen>  with SingleTic
           ],
         ),
       ),
+    );
+  }
+
+  // --- ÉTAT VIDE (Empty State) ---
+  Widget _buildEmptyState(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandColor = const Color(0xFFE34001); // 🟢 1. Uniformisé avec l'orange des Convois
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Gap(5), // 🟢 2. Espace du haut réduit pour faire remonter le bloc
+
+        // Titre et sous-titre
+        Text(
+          "Aucune réservation",
+          style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : Colors.black87
+          ),
+        ),
+        const Gap(8),
+        Text(
+          "Vous n'avez pas encore de billets de bus. Recherchez un trajet et planifiez votre prochain voyage !",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        ),
+
+        const Gap(20), // 🟢 Espace réduit (était 30)
+
+        // Le "Sticker" élégant pour les tickets
+        Container(
+          padding: const EdgeInsets.all(20), // 🟢 Padding réduit (était 25)
+          decoration: BoxDecoration(
+            color: brandColor.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.confirmation_number_outlined, size: 65, color: brandColor), // 🟢 Taille de l'icône réduite (était 80)
+        ),
+
+        const Gap(25), // 🟢 Espace réduit (était 35)
+
+        // Le bouton d'action
+        // Le bouton d'action
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              // 🟢 3. On déclenche le changement d'onglet vers l'accueil !
+              if (widget.onGoHome != null) {
+                widget.onGoHome!();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: brandColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.search, size: 20),
+            label: const Text("Rechercher un trajet", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        ),
+      ],
     );
   }
 

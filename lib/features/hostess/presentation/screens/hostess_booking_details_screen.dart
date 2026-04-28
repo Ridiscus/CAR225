@@ -128,7 +128,7 @@ class _HostessBookingDetailsScreenState
     });
   }
 
-  Future<void> _confirmBooking() async {
+  /*Future<void> _confirmBooking() async {
     setState(() => _showErrors = true);
 
     bool allValid = _passengerForms.every((form) => form.isValid());
@@ -229,6 +229,198 @@ class _HostessBookingDetailsScreenState
         setState(() => _isLoading = false);
       }
     }
+  }*/
+
+
+  Future<void> _confirmBooking() async {
+    setState(() => _showErrors = true);
+
+    bool allValid = _passengerForms.every((form) => form.isValid());
+
+    if (!allValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir correctement les informations de tous les passagers.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final int totalPrice = _tripType == 'Aller-Retour'
+          ? _roundTripPrice * _passengerCount
+          : _oneWayPrice * _passengerCount;
+
+      final Map<String, dynamic> payload = {
+        "programme_id": widget.horaireId,
+        "date_voyage": widget.date,
+        "heure_depart": widget.time,
+        "type_voyage": _tripType,
+        "nombre_passagers": _passengerCount,
+        "montant_total": totalPrice,
+        "passenger_details": _passengerForms.map((form) => {
+          "nom": form.lastNameController.text.trim(),
+          "prenom": form.firstNameController.text.trim(),
+          "telephone": form.phoneController.text.trim(),
+          "contact_urgence": form.procheNumberController.text.trim(),
+          "email": form.emailController.text.trim(),
+        }).toList(),
+      };
+
+      final repo = AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: DeviceService(),
+      );
+
+      final response = await repo.bookTicket(payload);
+
+      if (response['success'] == true || response['status'] == 200 || response['status'] == 201) {
+        if (mounted) {
+          // 🟢 1. ON AFFICHE LE POPUP DE SUCCÈS
+          _showAnimatedStatusPopup(
+              context,
+              true,
+              "Génération des billets en cours...",
+                  () {
+                // 🟢 2. LA REDIRECTION SE FAIT APRÈS L'ANIMATION
+                if (mounted) {
+                  // On utilise pushReplacement pour que l'hôtesse ne puisse pas faire "Retour" et re-valider la même vente
+                  Navigator.pushReplacement(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (context) => HostessTicketResultScreen(
+                        isRoundTrip: _tripType == 'Aller-Retour',
+                        passengers: _passengerForms.map((form) => form.toPassengerInfo()).toList(),
+                        departure: widget.departure,
+                        arrival: widget.arrival,
+                        travelDate: widget.time,
+                        totalPrice: totalPrice,
+                      ),
+                    ),
+                  );
+                }
+              }
+          );
+        }
+      } else {
+        // 🔴 POPUP D'ÉCHEC MÉTIER (ex: plus de places)
+        if (mounted) {
+          _showAnimatedStatusPopup(
+              context,
+              false,
+              response['message'] ?? 'Erreur lors de la réservation.',
+                  () {} // Rien à faire après la fermeture
+          );
+        }
+      }
+
+    } catch (e) {
+      // 🔴 POPUP D'ÉCHEC RÉSEAU
+      if (mounted) {
+        _showAnimatedStatusPopup(
+            context,
+            false,
+            'Erreur réseau. Impossible de contacter le serveur.',
+                () {} // Rien à faire après la fermeture
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+
+  void _showAnimatedStatusPopup(BuildContext context, bool isSuccess, String message, VoidCallback onComplete) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Empêche l'utilisateur de fermer en cliquant à côté
+      builder: (context) {
+        return TweenAnimationBuilder(
+          tween: Tween<double>(begin: 0.5, end: 1.0),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.elasticOut, // 🟢 Donne l'effet de rebond (pop) sympa
+          builder: (context, scale, child) {
+            return Transform.scale(
+              scale: scale,
+              child: Dialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                backgroundColor: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icône animée
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isSuccess
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isSuccess ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                          color: isSuccess ? Colors.green : Colors.red,
+                          size: 70,
+                        ),
+                      ),
+                      const Gap(24),
+                      // Titre
+                      Text(
+                        isSuccess ? 'Vente Réussie !' : 'Échec de la vente',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const Gap(12),
+                      // Message
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (isSuccess) ...[
+                        const Gap(24),
+                        const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    // 🟢 Ferme le popup automatiquement après 2 secondes et exécute la suite (ex: redirection)
+    Future.delayed(const Duration(seconds: 2), () {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Ferme le dialog
+        onComplete(); // Exécute la redirection ou autre action
+      }
+    });
   }
 
   @override

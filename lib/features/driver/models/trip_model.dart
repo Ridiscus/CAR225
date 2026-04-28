@@ -19,7 +19,7 @@ class TripModel {
     required this.carRegistration,
     required this.scheduledDepartureTime,
     required this.scheduledArrivalTime,
-    this.status = 'pending',
+    this.status = 'started',
     this.actualDepartureTime,
     this.actualArrivalTime,
     this.price = 0.0,

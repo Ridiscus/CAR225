@@ -68,3 +68,8 @@ google-services.json
 # Configuration locale (Chemin SDK, spécifique à ton PC)
 local.properties
 /android/local.properties
+
+
+# Keystore files
+*.jks
+key.properties

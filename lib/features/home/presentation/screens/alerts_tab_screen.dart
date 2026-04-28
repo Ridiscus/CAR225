@@ -196,106 +196,6 @@ class AlertsTabScreen extends StatefulWidget {
 
 
 
-  /*Future<void> _fetchReservations() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
-
-    debugPrint("🚀 [FETCH] Début récupération des réservations");
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final String? token = prefs.getString('auth_token') ??
-          prefs.getString('access_token') ??
-          prefs.getString('token');
-
-      debugPrint("🔐 [FETCH] Token présent : ${token != null && token.isNotEmpty}");
-
-      if (token == null || token.isEmpty) {
-        throw Exception("Non connecté (Token manquant)");
-      }
-
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        //baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        /*headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },*/
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-      ));
-
-      final repository = AlertRepository(dio: dio);
-
-      debugPrint("📡 [FETCH] Appel API /user/signalements/active-reservations");
-
-      // 1️⃣ Récupération brute
-      final allReservations = await repository.getActiveReservations();
-
-      debugPrint("📦 [FETCH] Réservations reçues : ${allReservations.length}");
-
-      // 🔍 DEBUG CONTENU
-      for (final res in allReservations) {
-        debugPrint(
-          "➡️ ID:${res.id} | Prog:${res.programmeId} | Veh:${res.vehiculeId} | Statut:${res.displayStatut}",
-        );
-      }
-
-      // 2️⃣ FILTRAGE
-      final activeOnly = allReservations.where((res) {
-        final status = res.displayStatut.toLowerCase();
-
-        final isActive = !status.contains("termin") &&
-            !status.contains("annul") &&
-            !status.contains("arriv");
-
-        debugPrint(
-          "🔎 [FILTER] ID:${res.id} | statut='$status' | gardé=$isActive",
-        );
-
-        return isActive;
-      }).toList();
-
-      debugPrint("✅ [FETCH] Réservations actives après filtre : ${activeOnly.length}");
-
-      if (mounted) {
-        setState(() {
-          _reservations = activeOnly;
-          _isLoading = false;
-        });
-      }
-
-      debugPrint("🎬 [FETCH] Lancement animation UI");
-      _entranceController.forward(from: 0.0);
-
-    } catch (e) {
-      debugPrint("❌ [FETCH] Erreur attrapée : $e");
-
-      if (mounted) {
-        setState(() {
-          if (e.toString().contains("Non connecté")) {
-            _errorMessage = "Vous n'êtes pas connecté.";
-          } else if (e is DioException && e.response?.statusCode == 401) {
-            _errorMessage = "Session expirée. Veuillez vous reconnecter.";
-          } else {
-            _errorMessage = "Impossible de charger les voyages.";
-          }
-          _isLoading = false;
-        });
-      }
-    }
-  }*/
-
-
-
-
   @override
   Widget build(BuildContext context) {
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
@@ -458,21 +358,6 @@ class AlertsTabScreen extends StatefulWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                /*Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    "En cours",
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),*/
                 _buildStatusChip(reservation.displayStatut),
               ],
             ),
@@ -581,7 +466,7 @@ class AlertsTabScreen extends StatefulWidget {
   }
 
 
-  Widget _buildEmptyState(BuildContext context) {
+  /*Widget _buildEmptyState(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(30),
       alignment: Alignment.center,
@@ -599,6 +484,70 @@ class AlertsTabScreen extends StatefulWidget {
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text("Actualiser"),
           )
+        ],
+      ),
+    );
+  }*/
+
+  // --- ÉTAT VIDE (Empty State) ---
+  Widget _buildEmptyState(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandColor = const Color(0xFFE34001); // L'orange de ta marque
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 30),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Le "Sticker" élégant
+          Container(
+            padding: const EdgeInsets.all(25),
+            decoration: BoxDecoration(
+              color: brandColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.commute_outlined, size: 70, color: brandColor), // Icône de voyage/transport
+          ),
+
+          const Gap(25),
+
+          // Titre
+          Text(
+            "Aucun voyage actif",
+            style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : Colors.black87
+            ),
+          ),
+
+          const Gap(10),
+
+          // Description
+          Text(
+            "Vous ne pouvez signaler un problème que lors d'un voyage en cours. Actualisez si vous pensez qu'il s'agit d'une erreur.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+
+          const Gap(30),
+
+          // Le bouton d'action (Actualiser)
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _fetchReservations, // Ta fonction d'actualisation existante
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.refresh, size: 20),
+              label: const Text("Actualiser", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+          ),
         ],
       ),
     );

@@ -81,6 +81,19 @@ abstract class AuthRepository {
   // Statistiques
   Future<UserStatsModel> getUserStats();
   Future<TripDetailsModel> getTripDetails();
+
+  // Nouvelles méthodes pour les convois
+  Future<List<dynamic>> getConvoiCompagnies();
+  Future<List<dynamic>> getConvoiGares(int compagnieId);
+  Future<List<dynamic>> getConvoiItineraires(int compagnieId);
+
+  Future<Map<String, dynamic>> getMyConvois({String? statut, int page = 1});
+  Future<Map<String, dynamic>> getConvoiDetails(int convoiId);
+
+  Future<Map<String, dynamic>> accepterMontantConvoi(int convoiId);
+  Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId);
+  Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data);
+
 }
 
 // ===========================================================================
@@ -98,6 +111,21 @@ class AuthRepositoryImpl implements AuthRepository {
     required this.deviceService,
   });
 
+
+  @override
+  Future<List<dynamic>> getConvoiCompagnies() async {
+    return await remoteDataSource.getConvoiCompagnies();
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiGares(int compagnieId) async {
+    return await remoteDataSource.getConvoiGares(compagnieId);
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiItineraires(int compagnieId) async {
+    return await remoteDataSource.getConvoiItineraires(compagnieId);
+  }
 
 
   @override
@@ -415,4 +443,53 @@ class AuthRepositoryImpl implements AuthRepository {
       confirmPassword: confirmPassword,
     );
   }
+
+  @override
+  Future<Map<String, dynamic>> getMyConvois({String? statut, int page = 1}) async {
+    try {
+      return await remoteDataSource.getMyConvois(statut: statut, page: page);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR getMyConvois: $e");
+      rethrow;
+    }
+  }
+
+  // Dans AuthRepositoryImpl (tout en bas)
+  @override
+  Future<Map<String, dynamic>> getConvoiDetails(int convoiId) async {
+    return await remoteDataSource.getConvoiDetails(convoiId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> accepterMontantConvoi(int convoiId) async {
+    try {
+      return await remoteDataSource.accepterMontantConvoi(convoiId);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR accepterMontantConvoi: $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId) async {
+    try {
+      return await remoteDataSource.refuserMontantConvoi(convoiId);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR refuserMontantConvoi: $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data) async {
+    try {
+      return await remoteDataSource.enregistrerPassagers(convoiId, data);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR enregistrerPassagers: $e");
+      rethrow;
+    }
+  }
+
+
+
 }

@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   // Vérifie si le token existe dans le téléphone
 
-  Future<void> _checkLoginStatus() async {
+  /*Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_type'); // 🟢 On récupère le rôle
@@ -64,6 +64,56 @@ class _SplashScreenState extends State<SplashScreen> {
       } else if (_userRole == 'agent') {
         destination = const AgentMainWrapper();
       } else if (_userRole == 'driver') {
+        destination = const DriverMainWrapper();
+      } else {
+        destination = const MainScreen(); // Particulier classique
+      }
+    }
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionDuration: const Duration(milliseconds: 800),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const curve = Curves.easeInOut;
+          return FadeTransition(
+            opacity: animation.drive(Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: curve))),
+            child: child,
+          );
+        },
+      ),
+    );
+  }*/
+
+
+  // ── 1. LA CORRECTION DE LA CLÉ ──
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    // 🟢 On utilise bien 'user_role' comme dans le LoginScreen
+    final role = prefs.getString('user_role');
+
+    if (mounted) {
+      setState(() {
+        _isConnected = token != null && token.isNotEmpty;
+        _userRole = role;
+      });
+    }
+  }
+
+// ── 2. LA CORRECTION DES CONDITIONS (Comme dans le Login) ──
+  void _handleNavigation() {
+    if (!mounted) return;
+
+    // Par défaut : non connecté
+    Widget destination = const OnboardingScreen();
+
+    if (_isConnected) {
+      if (_userRole == 'hotesse' || _userRole == 'hôtesse') {
+        destination = const HostessMainWrapper();
+      } else if (_userRole == 'agent') {
+        destination = const AgentMainWrapper();
+      } else if (_userRole == 'driver' || _userRole == 'chauffeur') {
         destination = const DriverMainWrapper();
       } else {
         destination = const MainScreen(); // Particulier classique

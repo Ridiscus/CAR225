@@ -28,6 +28,10 @@ import '../../../booking/presentation/screens/search_results_screen.dart';
 // ⚠️ Assure-toi que ce chemin d'import est correct par rapport à ton projet
 import '../../../../common/widgets/BookingConfigurationSheet.dart';
 
+
+import 'dart:io';
+import 'package:in_app_update/in_app_update.dart';
+
 // Wallet Imports
 import '../../../wallet/data/datasources/wallet_remote_data_source.dart';
 import '../../../wallet/domain/repositories/wallet_repository.dart';
@@ -36,8 +40,6 @@ import 'wallet_screen.dart';
 // Alert/Live Trip Imports
 import '../../../booking/data/models/active_reservation_model.dart';
 import '../../../booking/domain/repositories/alert_repository.dart';
-
-import 'notification_screen.dart';
 import 'profil_screen.dart';
 
 class HomeTabScreen extends StatefulWidget {
@@ -115,6 +117,9 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     super.initState();
     fetchLiveTrip();
 
+    // 🟢 1. ON VÉRIFIE LES MISES À JOUR DÈS L'OUVERTURE DE L'ÉCRAN
+    _checkForUpdate();
+
     // 🟢 AJOUTE CE BLOC ICI
     if (widget.isModificationMode) {
       departureCity = widget.initialDepart;
@@ -158,10 +163,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       }
     });
 
-    // ✅ On charge les notifs
-    /*WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<NotificationProvider>(context, listen: false).fetchUnreadCount();
-    });*/
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptEmergencyInfo(); // 🟢 ON REMPLACE L'APPEL ICI
@@ -181,41 +182,32 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     super.dispose();
   }
 
+  // ===========================================================================
+  // 🔄 GESTION DES MISES À JOUR (PLAY STORE UNIQUEMENT)
+  // ===========================================================================
+  Future<void> _checkForUpdate() async {
+    // 1. SÉCURITÉ : Si on est sur iOS (ou Web, Windows...), on arrête tout de suite.
+    // Cela évite l'erreur "MissingPluginException".
+    if (!Platform.isAndroid) {
+      return;
+    }
 
-
-  /*Future<void> fetchLiveTrip() async {
     try {
-      print("🌍 [LIVE TRIP] Lancement de la requête API...");
+      // 2. Le code Android s'exécute uniquement ici
+      final info = await InAppUpdate.checkForUpdate();
 
-      // 1. Récupération du Token
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('auth_token');
-
-      // 2. Configuration du Dio Global avec ton URL et le Token
-      //dio.options.baseUrl = 'https://car225.com/api/';
-      dio.options.baseUrl = 'https://jingly-lindy-unminding.ngrok-free.dev/api/';
-      if (token != null) {
-        dio.options.headers['Authorization'] = 'Bearer $token';
-      }
-
-      // 3. Lancement de la requête (Maintenant Dio sait où aller !)
-      final response = await dio.get('user/tracking/location');
-
-      print("🌍 [LIVE TRIP] Code HTTP: ${response.statusCode}");
-      print("🌍 [LIVE TRIP] Données brutes: ${response.data}");
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        setState(() {
-          liveTrip = LiveTripLocation.fromJson(response.data);
-        });
-        print("✅ [LIVE TRIP] liveTrip créé avec succès ! Le badge va s'afficher.");
-      } else {
-        print("⚠️ [LIVE TRIP] Requête OK, mais success est false ou données manquantes.");
+      if (info.updateAvailability == UpdateAvailability.updateAvailable) {
+        // OPTION A : MISE À JOUR IMMÉDIATE (Bloquante)
+        await InAppUpdate.performImmediateUpdate();
       }
     } catch (e) {
-      print("🔴 [LIVE TRIP] Erreur : $e");
+      // On utilise debugPrint au lieu de print pour un code plus propre en Flutter
+      debugPrint("Erreur InAppUpdate: $e");
+      // On ne fait rien en cas d'erreur (ex: pas de réseau), l'utilisateur continue d'utiliser l'appli normalement
     }
-  }*/
+  }
+
+
 
   Future<void> fetchLiveTrip() async {
     try {
@@ -282,8 +274,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        isDismissible: false, // 🔒 Empêche de fermer en cliquant à l'extérieur
-        enableDrag: false,    // 🔒 Empêche de fermer en glissant vers le bas
+        isDismissible: true, // 🔒 Empêche de fermer en cliquant à l'extérieur
+        enableDrag: true,    // 🔒 Empêche de fermer en glissant vers le bas
         backgroundColor: Colors.transparent,
         builder: (context) {
           final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
@@ -543,18 +535,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     } catch (e) { if(mounted) setState(() => isLoadingTrips = false); }
   }
 
-  /*Future<void> _fetchWalletBalance() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('auth_token');
-      if (token != null) {
-        final dioWallet = Dio(BaseOptions(baseUrl: 'https://car225.com/api/', headers: {'Authorization': 'Bearer $token'}));
-        final walletRepo = WalletRepository(remoteDataSource: WalletRemoteDataSourceImpl(dio: dioWallet));
-        final walletData = await walletRepo.getWalletData();
-        if (mounted) setState(() { walletBalance = walletData.solde; isLoadingWallet = false; });
-      }
-    } catch (e) { if (mounted) setState(() => isLoadingWallet = false); }
-  }*/
 
   Future<void> _fetchWalletBalance() async {
     try {
@@ -586,33 +566,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     }
   }
 
-  /*Future<void> _fetchActiveReservations() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('auth_token');
-
-      if (token != null) {
-        final dioAlert = Dio(BaseOptions(
-          baseUrl: ApiConfig.baseUrl,
-         //baseUrl: 'https://car225.com/api/',
-          //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-          /*headers: {'Authorization': 'Bearer $token'},*/
-        ));
-        final alertRepo = AlertRepository(dio: dioAlert);
-        final reservations = await alertRepo.getActiveReservations();
-        if (mounted) {
-          setState(() {
-            activeReservations = reservations;
-            isLoadingLiveTrip = false;
-          });
-        }
-      } else {
-        setState(() => isLoadingLiveTrip = false);
-      }
-    } catch (e) {
-      if (mounted) setState(() => isLoadingLiveTrip = false);
-    }
-  }*/
 
   Future<void> _fetchActiveReservations() async {
     try {
@@ -718,48 +671,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     });
   }
 
-
-
-  /*void _onSearchPressed() async { // ⚠️ Ajoute 'async' ici
-    // Validation
-    if (departureCity == null || arrivalCity == null || departureDate == null) {
-      _showTopNotification("Veuillez remplir tous les champs", isError: true);
-      return;
-    }
-
-    String dateDepartApi = DateFormat('yyyy-MM-dd').format(departureDate!);
-    final searchParams = {
-      "depart": departureCity,
-      "arrivee": arrivalCity,
-      "date": dateDepartApi
-    };
-
-    // 🟢 NAVIGATION AVEC ATTENTE DE RÉSULTAT (AWAIT)
-    final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => SearchResultsScreen(
-              // On passe le mode modification à l'écran suivant
-              isGuestMode: false,
-              searchParams: searchParams,
-              isModificationMode: widget.isModificationMode,
-
-              // 🚨 C'EST ICI LA SOURCE DU PROBLÈME SI TU L'OUBLIES
-              ticketWasAllerRetour: widget.ticketWasAllerRetour,
-
-            )
-        )
-    );
-
-    // 🟢 GESTION DU RETOUR (Le Relais)
-    // Si on est en mode modif et qu'on a reçu des données de SearchResults -> SeatSelection
-    if (widget.isModificationMode && result != null) {
-      // On ferme HomeTabScreen et on renvoie le résultat à TicketDetailScreen
-      if (mounted) {
-        Navigator.pop(context, result);
-      }
-    }
-  }*/
 
   void _onSearchPressed() async {
     // 🛡️ 1. BOUCLIER : VERIFICATION DU CONTACT D'URGENCE
@@ -1122,139 +1033,131 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
             right: 0,
             child: SafeArea(
               bottom: false,
-              // 🟢 CORRECTION 1 : J'ai réduit le padding à droite (right: 10 au lieu de 20)
-              // Ça rapproche naturellement tout le bloc de droite vers le bord
+              // 🟢 Un padding propre et symétrique (16px est le standard Flutter)
               child: Padding(
-                padding: const EdgeInsets.only(left: 20.0, right: 20, top: 15.0, bottom: 15.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Repousse les éléments aux extrémités
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 1. AVATAR
-                    Consumer<UserProvider>(
-                      builder: (context, provider, child) {
-                        final user = provider.user;
-                        return GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.white24,
-                              backgroundImage: user != null
-                                  ? NetworkImage(user.fullPhotoUrl)
-                                  : const AssetImage("assets/images/ci.jpg") as ImageProvider,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
 
-                    const SizedBox(width: 12),
-
-                    // 2. WALLET
-                    Flexible(
-                      fit: FlexFit.loose,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.5,
-                        ),
-                        child: GestureDetector(
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const WalletScreen()),
-                            );
-                            _fetchWalletBalance();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.45),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withOpacity(0.15)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // 🟢 NOUVEAU BOUTON "+" STYLÉ ICI
-                                Container(
-                                  padding: const EdgeInsets.all(4), // Ajusté pour le "+"
+                    // --- BLOC GAUCHE : Avatar + Wallet ---
+                    Expanded(
+                      child: Row(
+                        children: [
+                          // 1. AVATAR
+                          Consumer<UserProvider>(
+                            builder: (context, provider, child) {
+                              final user = provider.user;
+                              return GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                ),
+                                child: Container(
                                   decoration: BoxDecoration(
-                                    // Un beau dégradé chaud (Orange vers Rouge)
-                                    gradient: const LinearGradient(
-                                      colors: [Colors.orange, Colors.redAccent],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
                                     shape: BoxShape.circle,
-                                    // Une petite ombre rouge pour donner un effet "Glow" (lueur)
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.redAccent.withOpacity(0.5),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                                    border: Border.all(color: Colors.white, width: 2),
                                   ),
-                                  child: const Icon(
-                                    Icons.add, // L'icône "+"
-                                    color: Colors.white,
-                                    size: 16, // Légèrement plus grand pour bien se voir
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: Colors.white24,
+                                    backgroundImage: user != null
+                                        ? NetworkImage(user.fullPhotoUrl)
+                                        : const AssetImage("assets/images/ci.jpg") as ImageProvider,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(height: 1),
-                                      isLoadingWallet
-                                          ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
-                                          : Text(
-                                        walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
+                              );
+                            },
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          // 2. WALLET
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const WalletScreen()),
+                                );
+                                _fetchWalletBalance();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.45),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Colors.orange, Colors.redAccent],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                        softWrap: false,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.redAccent.withOpacity(0.5),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                )
-                              ],
+                                      child: const Icon(
+                                        Icons.add,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const SizedBox(height: 1),
+                                          isLoadingWallet
+                                              ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
+                                              : Text(
+                                            walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                            softWrap: false,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
 
-                    // 3. SPACER
-                    const Spacer(),
-
-                    // 4. NOTIFICATION
-                    // 🟢 CORRECTION 2 : Transform.translate force le bouton à se décaler.
-                    // J'ai mis 8 pixels vers la droite. Si tu veux le coller encore plus, augmente ce chiffre (ex: 12).
-                    Transform.translate(
-                      offset: const Offset(8, 0),
-                      child: const NotificationIconBtn(),
-                    ),
+                    // --- BLOC DROITE : Notification ---
+                    // 🟢 L'icône se place naturellement tout à droite grâce au spaceBetween
+                    const NotificationIconBtn(),
                   ],
                 ),
               ),
@@ -1264,8 +1167,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
       ),
     );
   }
-
-
 
 
   Widget _buildLiveTripPulseBadgeFromLocation(LiveTripLocation trip) {
@@ -1352,112 +1253,6 @@ class _HomeTabScreenState extends State<HomeTabScreen> with TickerProviderStateM
     );
   }
 
-
-  Widget _buildWalletButton() {
-    return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const WalletScreen()),
-        );
-        _fetchWalletBalance();
-      },
-      child: Container(
-        // ✅ STOP OVERFLOW : On limite physiquement la largeur max
-        constraints: const BoxConstraints(maxWidth: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min, // Le bouton prend le minimum de place
-          children: [
-            // Icône
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 10),
-            ),
-
-            const SizedBox(width: 8),
-
-            // Texte + Montant
-            // 2. WALLET (CORRIGÉ)
-            Flexible(
-              // FlexFit.loose permet au bouton de garder sa taille naturelle (petite)
-              // mais de rétrécir si l'espace manque.
-              fit: FlexFit.loose,
-              child: GestureDetector(
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const WalletScreen()),
-                  );
-                  _fetchWalletBalance();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min, // Important : le Row colle au contenu
-                    children: [
-                      // Icône Wallet
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppColors.secondary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 10),
-                      ),
-
-                      const SizedBox(width: 8), // Préférable à Gap ici pour éviter des soucis de layout
-
-                      // TEXTE + MONTANT
-                      // C'est ce Flexible interne qui résout l'overflow du texte
-                      Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              "CarPay",
-                              style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              softWrap: false, // Force une seule ligne
-                            ),
-                            isLoadingWallet
-                                ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white))
-                                : Text(
-                              walletBalance != null ? _formatCurrency(walletBalance!) : "0 F",
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              softWrap: false,
-                            ),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
 
   Widget _buildSeeAllCard() {

@@ -257,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: const BoxDecoration(
                     color: Colors.black,
                     image: DecorationImage(
-                      image: AssetImage("assets/images/bus_header.jpg"),
+                      image: AssetImage("assets/images/busheader.jpg"),
                       fit: BoxFit.cover,
                       opacity: 0.8,
                     ),

@@ -1,15 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:car225/core/theme/app_colors.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'dart:io';
+import 'package:car225/core/theme/app_colors.dart';
 import '../providers/driver_provider.dart';
 import '../../data/models/voyage_model.dart';
-import '../widgets/driver_header.dart';
-import '../widgets/success_modal.dart';
+import '../../data/models/convoi_model.dart';
+
+const _kNavy = Color(0xFF0f172a);
 
 class DriverReportsScreen extends StatefulWidget {
   const DriverReportsScreen({super.key});
@@ -20,1055 +20,902 @@ class DriverReportsScreen extends StatefulWidget {
 
 class _DriverReportsScreenState extends State<DriverReportsScreen> {
   String? _selectedType;
-  final TextEditingController _descriptionController = TextEditingController();
-  File? _imageFile;
-  Position? _currentPosition;
-  String? _currentAddress;
-  bool _isLoadingLocation = false;
+  VoyageModel? _selectedVoyage;
+  ConvoiModel? _selectedConvoi;
+  bool _consumedTarget = false;
+  final TextEditingController _descCtrl = TextEditingController();
+  bool _isSubmitting = false;
+  File? _photoFile;
 
-  final List<Map<String, dynamic>> _reportTypes = [
-    {"label": "Accident", "icon": Icons.car_crash_rounded},
-    {"label": "Panne", "icon": Icons.build_rounded},
-    {"label": "Retard", "icon": Icons.access_time_filled_rounded},
-    {"label": "Autre", "icon": Icons.warning_rounded},
+  static const List<_ReportType> _reportTypes = [
+    _ReportType('Panne mécanique', Icons.build_rounded, Color(0xFFEF4444)),
+    _ReportType('Accident', Icons.car_crash_rounded, Color(0xFFDC2626)),
+    _ReportType('Incident passager', Icons.person_off_rounded, Color(0xFFF59E0B)),
+    _ReportType('Problème de route', Icons.alt_route_rounded, Color(0xFF8B5CF6)),
+    _ReportType('Autre', Icons.more_horiz_rounded, Color(0xFF6B7280)),
   ];
 
-  Widget _buildSectionHeader(String number, String title) {
-    return Row(
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              number,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
-        const Gap(12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 17,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    );
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: source,
-        imageQuality: 70,
-      );
-      if (image != null) {
-        setState(() => _imageFile = File(image.path));
-      }
-    } catch (e) {
-      debugPrint("Erreur lors de la sélection de l'image: $e");
+  bool get _isAccident => _selectedType == 'Accident';
+
+  bool get _canSubmit {
+    if (_selectedType == null || _descCtrl.text.trim().isEmpty) return false;
+    if (_isAccident && _photoFile == null) return false;
+    return true;
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 1280,
+    );
+    if (picked != null) {
+      setState(() => _photoFile = File(picked.path));
     }
   }
 
-  void _showImageSourceDialog() {
+  void _showPhotoOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        top: false,
-        bottom: true,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+      backgroundColor: Colors.transparent,
+      builder: (_) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40,
-                height: 5,
+                margin: const EdgeInsets.only(top: 12),
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const Gap(15),
-              const Text(
-                "Ajouter une photo",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const Gap(10),
+              const Gap(12),
               ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  child: const Icon(Icons.camera_alt, color: AppColors.primary),
-                ),
-                title: const Text(
-                  "Prendre une photo",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  child: const Icon(
-                    Icons.photo_library,
-                    color: AppColors.primary,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: Colors.blue, size: 22),
                 ),
-                title: const Text(
-                  "Choisir depuis la galerie",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+                title: const Text('Prendre une photo',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () {
                   Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
+                  _pickPhoto(ImageSource.camera);
                 },
               ),
-              const Gap(30),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: AppColors.primary, size: 22),
+                ),
+                title: const Text('Choisir depuis la galerie',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickPhoto(ImageSource.gallery);
+                },
+              ),
+              const Gap(8),
             ],
           ),
         ),
       ),
     );
-  }
-
-  void _showImagePreviewDialog() {
-    if (_imageFile == null) return;
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(10),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            InteractiveViewer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.file(_imageFile!),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _getLocation() async {
-    setState(() => _isLoadingLocation = true);
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Veuillez activer la localisation")),
-          );
-        }
-        setState(() => _isLoadingLocation = false);
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Permission de localisation refusée"),
-              ),
-            );
-          }
-          setState(() => _isLoadingLocation = false);
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                "La permission est refusée de façon permanente. Veuillez l'activer dans les paramètres.",
-              ),
-            ),
-          );
-        }
-        setState(() => _isLoadingLocation = false);
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-
-      // Récupérer l'adresse lisible (Reverse Geocoding)
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      String address = "Adresse inconnue";
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        // Formatter l'adresse : Rue, Ville, Pays (ou selon besoin)
-        address = [
-          if (place.street != null && place.street!.isNotEmpty) place.street,
-          if (place.locality != null && place.locality!.isNotEmpty)
-            place.locality,
-          if (place.country != null && place.country!.isNotEmpty) place.country,
-        ].join(', ');
-      }
-
-      setState(() {
-        _currentPosition = position;
-        _currentAddress = address;
-        _isLoadingLocation = false;
-      });
-    } catch (e) {
-      debugPrint("Erreur localisation: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Impossible de récupérer la position : $e")),
-        );
-      }
-      setState(() => _isLoadingLocation = false);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _getLocation();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DriverProvider>().loadSignalements();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final driverProvider = Provider.of<DriverProvider>(context);
+    final provider = context.watch<DriverProvider>();
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Column(
-            children: [
-              const DriverHeader(title: "Signalements", showProfile: false),
-              Container(
-                color: AppColors.primary,
-                child: const TabBar(
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  tabs: [
-                    Tab(text: "NOUVEAU"),
-                    Tab(text: "HISTORIQUE"),
-                  ],
+    // Consomme une éventuelle cible pré-sélectionnée (depuis l'écran Convois
+    // ou Voyages — bouton « Faire un signalement »).
+    if (!_consumedTarget) {
+      final targetConvoi = provider.signalementConvoi;
+      final targetVoyage = provider.signalementVoyage;
+      if (targetConvoi != null || targetVoyage != null) {
+        _consumedTarget = true;
+        _selectedConvoi = targetConvoi;
+        _selectedVoyage = targetVoyage;
+        // On efface après usage pour éviter de re-pré-sélectionner au prochain rebuild.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          provider.clearSignalementTarget();
+        });
+      }
+    }
+
+    final activeVoyages = [
+      if (provider.currentVoyage != null) provider.currentVoyage!,
+      ...provider.todayVoyages.where((v) =>
+          v.statut == 'en_cours' && v.id != provider.currentVoyage?.id),
+    ];
+
+    // Convois actifs (en_cours) — utilisés pour la pré-sélection ET le sélecteur.
+    final activeConvois = provider.todayConvois
+        .where((c) => c.statut == 'en_cours')
+        .toList();
+
+    // Si un convoi a été pré-sélectionné mais ne figure pas dans la liste
+    // (par ex. convoi du jour sans en_cours), on l'injecte pour qu'il reste visible.
+    if (_selectedConvoi != null &&
+        !activeConvois.any((c) => c.id == _selectedConvoi!.id)) {
+      activeConvois.insert(0, _selectedConvoi!);
+    }
+
+    final hasConvoiContext = _selectedConvoi != null || activeConvois.isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: Column(
+        children: [
+          // ── En-tête ──
+          Container(
+            color: _kNavy,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded,
+                    color: AppColors.primary, size: 22),
+                Gap(10),
+                Text(
+                  'Signalements',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildNewReportTab(driverProvider),
-                    _buildHistoryTab(driverProvider),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildNewReportTab(DriverProvider driverProvider) {
-    return SafeArea(
-      top: false,
-      bottom: true,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 25,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (driverProvider.selectedTripForReport != null) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
-                        const Gap(8),
-                        Text(
-                          "SIGNALER POUR LE VOYAGE #${driverProvider.selectedTripForReport!.id}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            letterSpacing: 1,
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Bannière contexte (convoi / voyage / aucun) ──
+                  if (_selectedConvoi != null)
+                    _InfoBanner(
+                      icon: Icons.airport_shuttle_rounded,
+                      message: hasConvoiContext
+                          ? 'Convoi en cours détecté. Le signalement sera automatiquement associé à ce convoi.'
+                          : 'Convoi pré-sélectionné. Le signalement sera associé.',
+                      color: AppColors.secondary,
+                    )
+                  else if (activeConvois.isNotEmpty)
+                    _InfoBanner(
+                      icon: Icons.airport_shuttle_rounded,
+                      message:
+                          'Convoi en cours détecté. Sélectionnez le convoi concerné ci-dessous.',
+                      color: AppColors.secondary,
+                    )
+                  else if (activeVoyages.isEmpty)
+                    _InfoBanner(
+                      icon: Icons.info_outline_rounded,
+                      message:
+                          'Aucun voyage ni convoi en cours. Vous pouvez quand même soumettre un signalement.',
+                      color: Colors.blue,
+                    )
+                  else
+                    _InfoBanner(
+                      icon: Icons.check_circle_outline_rounded,
+                      message:
+                          'Voyage en cours détecté. Le signalement sera automatiquement associé.',
+                      color: AppColors.secondary,
+                    ),
+
+                  const Gap(20),
+
+                  // Sélecteur convoi (s'il y a un contexte convoi)
+                  if (hasConvoiContext) ...[
+                    _SectionLabel(label: 'CONVOI CONCERNÉ'),
+                    const Gap(10),
+                    _ConvoiSelector(
+                      convois: activeConvois,
+                      selected: _selectedConvoi,
+                      onChanged: (c) => setState(() {
+                        _selectedConvoi = c;
+                        if (c != null) _selectedVoyage = null;
+                      }),
+                    ),
+                    const Gap(20),
+                  ] else if (activeVoyages.length > 1) ...[
+                    _SectionLabel(label: 'VOYAGE CONCERNÉ'),
+                    const Gap(10),
+                    _VoyageSelector(
+                      voyages: activeVoyages,
+                      selected: _selectedVoyage,
+                      onChanged: (v) => setState(() => _selectedVoyage = v),
+                    ),
+                    const Gap(20),
+                  ],
+
+                  // ── Type ──
+                  _SectionLabel(label: 'TYPE DE PROBLÈME'),
+                  const Gap(12),
+                  ...List.generate(
+                    _reportTypes.length,
+                    (i) => _TypeTile(
+                      type: _reportTypes[i],
+                      isSelected: _selectedType == _reportTypes[i].label,
+                      onTap: () =>
+                          setState(() => _selectedType = _reportTypes[i].label),
+                    ),
+                  ),
+
+                  const Gap(20),
+
+                  // ── Description ──
+                  _SectionLabel(label: 'DESCRIPTION DÉTAILLÉE'),
+                  const Gap(10),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: TextField(
+                      controller: _descCtrl,
+                      maxLines: 5,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Décrivez ce qu\'il se passe en détail...',
+                        hintStyle:
+                            TextStyle(color: Colors.grey[400], fontSize: 13),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.all(14),
+                      ),
+                    ),
+                  ),
+
+                  const Gap(20),
+
+                  // ── Photo ──
+                  Row(
+                    children: [
+                      _SectionLabel(
+                          label: _isAccident
+                              ? 'PHOTO (REQUISE POUR ACCIDENT)'
+                              : 'PHOTO (OPTIONNELLE)'),
+                      if (_isAccident && _photoFile == null) ...[
+                        const Gap(6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: () => driverProvider.setSelectedTripForReport(null),
-                          icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+                          child: const Text(
+                            'REQUISE',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                    const Gap(10),
-                    Text(
-                      "${driverProvider.selectedTripForReport!.departureStation} → ${driverProvider.selectedTripForReport!.arrivalStation}",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    Text(
-                      "${driverProvider.selectedTripForReport!.carRegistration} • ${driverProvider.selectedTripForReport!.scheduledDepartureTime.day}/${driverProvider.selectedTripForReport!.scheduledDepartureTime.month}",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const Gap(30),
-            ],
-            _buildSectionHeader("1", "Type d'incident"),
-            const Gap(15),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: _reportTypes.map((typeObj) {
-                  final type = typeObj["label"] as String;
-                  final icon = typeObj["icon"] as IconData;
-                  bool isSelected = _selectedType == type;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: InkWell(
-                      onTap: () => setState(() => _selectedType = type),
-                      borderRadius: BorderRadius.circular(30),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : Colors.grey[50],
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : Colors.grey[200]!,
-                            width: 1.5,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                              : [],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              icon,
-                              size: 18,
-                              color: isSelected ? Colors.white : AppColors.primary,
-                            ),
-                            const Gap(8),
-                            Text(
-                              type,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black87,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const Gap(35),
-            _buildSectionHeader("2", "Décrivez la situation"),
-            const Gap(20),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 4,
-              style: const TextStyle(fontSize: 15),
-              decoration: InputDecoration(
-                hintText: "Ex: Le véhicule a une crevaison sur l'autoroute du nord...",
-                hintStyle: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                contentPadding: const EdgeInsets.all(18),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: const BorderSide(
-                    color: Color.fromARGB(255, 211, 210, 210),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
-            ),
-            const Gap(35),
-            _buildSectionHeader("3", "Preuves & Localisation"),
-            const Gap(20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color.fromARGB(255, 211, 210, 210),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Gap(20),
-                  // Photo Section
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "PHOTO DE L'INCIDENT",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black54,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          if (_imageFile != null)
-                            Row(
-                              children: [
-                                InkWell(
-                                  onTap: _showImageSourceDialog,
-                                  child: const Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.blue,
-                                    size: 20,
-                                  ),
-                                ),
-                                const Gap(15),
-                                InkWell(
-                                  onTap: () => setState(
-                                    () => _imageFile = null,
-                                  ),
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.redAccent,
-                                    size: 20,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                      const Gap(15),
-                      GestureDetector(
-                        onTap: () => _imageFile == null ? _showImageSourceDialog() : _showImagePreviewDialog(),
-                        child: Container(
-                          width: double.infinity,
-                          height: _imageFile == null ? 100 : 180,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(
-                              color: Colors.grey[200]!,
-                              style: _imageFile == null ? BorderStyle.solid : BorderStyle.none,
-                            ),
-                          ),
-                          child: _imageFile == null
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_a_photo_outlined,
-                                      color: Colors.grey[400],
-                                      size: 24,
-                                    ),
-                                    const Gap(12),
-                                    Text(
-                                      "Ajouter une preuve visuelle",
-                                      style: TextStyle(
-                                        color: Colors.grey[500],
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    15,
-                                  ),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      Image.file(
-                                        _imageFile!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                      Positioned(
-                                        right: 10,
-                                        bottom: 10,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.5,
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.fullscreen_rounded,
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                      ),
                     ],
                   ),
                   const Gap(10),
-                  Divider(color: Colors.grey[100], thickness: 1),
-                  const Gap(10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _currentAddress != null ? AppColors.secondary.withValues(alpha: 0.05) : Colors.grey[50],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: _currentAddress != null ? AppColors.secondary.withValues(alpha: 0.1) : Colors.grey[200]!,
+                  // Warning when accident selected but no photo
+                  if (_isAccident && _photoFile == null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.withOpacity(0.25)),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _currentAddress != null ? AppColors.secondary : Colors.grey[300],
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.location_on_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                        const Gap(12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "POSITION ACTUELLE",
-                                style: TextStyle(
-                                  color: _currentAddress != null ? AppColors.secondary : Colors.grey[500],
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const Gap(2),
-                              Text(
-                                _currentAddress ?? "Recherche de position...",
-                                style: TextStyle(
-                                  color: _currentAddress != null ? Colors.black87 : Colors.grey[400],
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        InkWell(
-                          onTap: _getLocation,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_rounded,
+                              color: Colors.red, size: 16),
+                          const Gap(8),
+                          Expanded(
+                            child: Text(
+                              'Une photo est requise pour les signalements de type Accident.',
+                              style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 12,
+                                  height: 1.4),
                             ),
-                            child: _isLoadingLocation
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.my_location_rounded,
-                                    color: AppColors.primary,
-                                    size: 18,
-                                  ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Gap(30),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.amber.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: Colors.amber,
-                    size: 20,
-                  ),
-                  const Gap(12),
-                  Expanded(
-                    child: Text(
-                      "Ce signalement sera immédiatement visible par la compagnie et les secours si nécessaire.",
-                      style: TextStyle(
-                        color: Colors.amber[900],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Gap(30),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _canSubmit() ? () => _submitReport(context, driverProvider) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  elevation: 5,
-                  shadowColor: AppColors.primary.withValues(
-                    alpha: 0.3,
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    Gap(10),
-                    Text(
-                      "Envoyer le Signalement",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        ],
                       ),
                     ),
                   ],
-                ),
+                  _PhotoPicker(
+                    photo: _photoFile,
+                    required: _isAccident,
+                    onTap: _showPhotoOptions,
+                    onRemove: () => setState(() => _photoFile = null),
+                  ),
+
+                  const Gap(24),
+
+                  // ── Soumettre ──
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _canSubmit && !_isSubmitting
+                          ? () {
+                              // Priorité au convoi sélectionné, sinon convoi
+                              // unique dispo, sinon voyage sélectionné/par défaut.
+                              final convoi = _selectedConvoi ??
+                                  (hasConvoiContext && activeConvois.length == 1
+                                      ? activeConvois.first
+                                      : null);
+                              final voyage = convoi != null
+                                  ? null
+                                  : (activeVoyages.isNotEmpty
+                                      ? (_selectedVoyage ?? activeVoyages.first)
+                                      : null);
+                              _submit(context, provider,
+                                  voyage: voyage, convoi: convoi);
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        disabledBackgroundColor: Colors.grey[300],
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.send_rounded,
+                              color: Colors.white, size: 20),
+                      label: Text(
+                        _isSubmitting ? 'Envoi...' : 'ENVOYER LE RAPPORT',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Gap(25),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryTab(DriverProvider provider) {
-    if (provider.isLoading && provider.signalements.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (provider.signalements.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_rounded, size: 60, color: Colors.grey[300]),
-            const Gap(16),
-            Text(
-              "Aucun historique",
-              style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              "Vos signalements s'afficheront ici",
-              style: TextStyle(color: Colors.grey[400], fontSize: 13),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () => provider.loadSignalements(),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: provider.signalements.length,
-        itemBuilder: (context, index) {
-          final signalement = provider.signalements[index];
-          return _buildSignalementCard(signalement);
-        },
-      ),
-    );
-  }
-
-  Widget _buildSignalementCard(dynamic s) {
-    Color statusColor;
-    String statusLabel;
-    switch (s.statut.toLowerCase()) {
-      case 'traité':
-      case 'resolved':
-        statusColor = Colors.green;
-        statusLabel = "Traité";
-        break;
-      case 'en_cours':
-        statusColor = Colors.blue;
-        statusLabel = "En cours";
-        break;
-      case 'annulé':
-        statusColor = Colors.red;
-        statusLabel = "Annulé";
-        break;
-      default:
-        statusColor = Colors.orange;
-        statusLabel = "Transmis";
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[100]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => _showSignalementDetails(s),
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Text(
-                    s.createdAt,
-                    style: TextStyle(color: Colors.grey[400], fontSize: 11),
-                  ),
-                ],
-              ),
-              const Gap(12),
-              Row(
-                children: [
-                  Icon(_getIconForType(s.type), color: AppColors.primary, size: 20),
-                  const Gap(10),
-                  Text(
-                    s.type,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
-              const Gap(8),
-              Text(
-                s.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-              ),
-              if (s.voyage != null) ...[
-                const Gap(12),
-                const Divider(height: 1),
-                const Gap(8),
-                Row(
-                  children: [
-                    Icon(Icons.directions_bus_filled_outlined, size: 14, color: Colors.grey[400]),
-                    const Gap(6),
-                    Text(
-                      "Voyage #${s.voyage.id}",
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'accident': return Icons.car_crash_rounded;
-      case 'panne': return Icons.build_rounded;
-      case 'retard': return Icons.access_time_filled_rounded;
-      default: return Icons.warning_rounded;
+  /// Récupère la position GPS courante (best-effort) pour que le backend
+  /// puisse :
+  /// - dispatcher le signalement « accident » au sapeur-pompier le plus proche
+  /// - géolocaliser le rapport pour la compagnie
+  Future<({double? lat, double? lng})> _captureCurrentLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return (lat: null, lng: null);
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return (lat: null, lng: null);
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      ).timeout(const Duration(seconds: 8));
+      return (lat: pos.latitude, lng: pos.longitude);
+    } catch (_) {
+      return (lat: null, lng: null);
     }
   }
 
-  void _showSignalementDetails(dynamic s) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+  Future<void> _submit(
+    BuildContext context,
+    DriverProvider provider, {
+    VoyageModel? voyage,
+    ConvoiModel? convoi,
+  }) async {
+    setState(() => _isSubmitting = true);
+    try {
+      // GPS optionnel mais essentiel pour le sapeur-pompier (accidents).
+      final loc = await _captureCurrentLocation();
+
+      await provider.submitReport(
+        type: _selectedType!,
+        description: _descCtrl.text.trim(),
+        voyageId: voyage?.id,
+        convoiId: convoi?.id,
+        latitude: loc.lat,
+        longitude: loc.lng,
+        photo: _photoFile,
+      );
+      if (!mounted) return;
+      _showSuccess(context);
+      setState(() {
+        _selectedType = null;
+        _selectedVoyage = null;
+        _selectedConvoi = null;
+        _photoFile = null;
+        _descCtrl.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception:', '').trim()),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _showSuccess(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_rounded,
+                  color: AppColors.secondary, size: 48),
             ),
-            const Gap(24),
-            Text(s.type.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 12, letterSpacing: 1.5)),
+            const Gap(16),
+            const Text('Rapport envoyé',
+                style:
+                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Gap(8),
-            Text("Détails du Signalement", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.blueGrey[900])),
-            const Gap(20),
-            Text(s.description, style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87)),
-            const Gap(24),
-            if (s.photo != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.network(
-                  s.photo!.startsWith('http') ? s.photo! : "https://car225.com/storage/${s.photo}",
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 200,
-                    width: double.infinity,
-                    color: Colors.grey[100],
-                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                  ),
-                ),
+            Text(
+              'Votre signalement a bien été transmis aux équipes concernées.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const Gap(24),
-            ],
-            _buildDetailRow(Icons.calendar_today_outlined, "Date", s.createdAt),
-            const Gap(12),
-            if (s.vehicule != null) _buildDetailRow(Icons.directions_bus_rounded, "Véhicule", s.vehicule),
-            const Gap(32),
-            SizedBox(
+              child: const Text('OK',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHOTO PICKER WIDGET
+// ─────────────────────────────────────────────────────────────────────────────
+class _PhotoPicker extends StatelessWidget {
+  final File? photo;
+  final bool required;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  const _PhotoPicker({
+    required this.photo,
+    required this.onTap,
+    required this.onRemove,
+    this.required = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (photo != null) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.file(
+              photo!,
+              height: 180,
               width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
                 ),
-                child: const Text("FERMER", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 18),
               ),
             ),
-            const Gap(10),
+          ),
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: onTap,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.edit_rounded, color: Colors.white, size: 13),
+                    SizedBox(width: 4),
+                    Text('Changer',
+                        style:
+                            TextStyle(color: Colors.white, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 110,
+        decoration: BoxDecoration(
+          color: required ? Colors.red.withOpacity(0.03) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: required ? Colors.red.withOpacity(0.4) : const Color(0xFFE2E8F0),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_a_photo_rounded,
+                  color: AppColors.primary, size: 26),
+            ),
+            const Gap(8),
+            const Text('Ajouter une photo',
+                style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13)),
+            Text('Appareil photo ou galerie',
+                style:
+                    TextStyle(color: Colors.grey[400], fontSize: 11)),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Colors.grey[400]),
-        const Gap(12),
-        Text("$label : ", style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// SOUS-WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
+class _ReportType {
+  final String label;
+  final IconData icon;
+  final Color color;
+  const _ReportType(this.label, this.icon, this.color);
+}
 
-  bool _canSubmit() {
-    if (_selectedType == null || _descriptionController.text.trim().isEmpty) {
-      return false;
-    }
-    if (_selectedType == "Accident") {
-      return _imageFile != null && _currentAddress != null;
-    }
-    return true;
-  }
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
 
-  void _submitReport(BuildContext context, DriverProvider provider) async {
-    // Déterminer le voyage à utiliser : selectedTripForReport en priorité, sinon currentTrip
-    final trip = provider.selectedTripForReport ?? provider.currentTrip;
-    if (trip == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Aucun voyage actif trouvé pour ce signalement."),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final success = await provider.submitReport(
-      type: _selectedType!,
-      description: _descriptionController.text,
-      tripId: trip.id.toString(),
-      image: _imageFile,
-      latitude: _currentPosition?.latitude,
-      longitude: _currentPosition?.longitude,
-    );
-
-    if (!mounted) return;
-
-    Navigator.pop(context); // Fermer le dialog de chargement
-
-    if (success) {
-      SuccessModal.show(
-        context: context,
-        title: "Rapport envoyé",
-        message:
-            "Votre signalement a été transmis avec succès et sera traité dans les plus brefs délais.",
-        onPressed: () {
-          setState(() {
-            _selectedType = null;
-            _descriptionController.clear();
-            _imageFile = null;
-            _currentPosition = null;
-            _currentAddress = null;
-          });
-        },
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.errorMessage ?? "Erreur lors de l'envoi du signalement"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  @override
+  Widget build(BuildContext context) {
+    return Text(label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF64748B),
+          letterSpacing: 0.8,
+        ));
   }
 }
 
+class _TypeTile extends StatelessWidget {
+  final _ReportType type;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TypeTile(
+      {required this.type,
+      required this.isSelected,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: isSelected ? type.color.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? type.color : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: type.color.withOpacity(isSelected ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(type.icon, color: type.color, size: 18),
+            ),
+            const Gap(12),
+            Expanded(
+              child: Text(
+                type.label,
+                style: TextStyle(
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 14,
+                  color: isSelected
+                      ? type.color
+                      : const Color(0xFF1E293B),
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_rounded,
+                  color: type.color, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final Color color;
+
+  const _InfoBanner(
+      {required this.icon,
+      required this.message,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const Gap(10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                  color: color.withOpacity(0.9),
+                  fontSize: 12,
+                  height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoyageSelector extends StatelessWidget {
+  final List<VoyageModel> voyages;
+  final VoyageModel? selected;
+  final ValueChanged<VoyageModel?> onChanged;
+
+  const _VoyageSelector(
+      {required this.voyages,
+      required this.selected,
+      required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<VoyageModel>(
+          value: selected,
+          isExpanded: true,
+          hint: const Text('Sélectionner un voyage'),
+          items: voyages.map((v) {
+            final depart = v.programme?.gareDepart ??
+                v.programme?.pointDepart ??
+                '—';
+            final arrivee = v.programme?.gareArrivee ??
+                v.programme?.pointArrive ??
+                '—';
+            return DropdownMenuItem(
+              value: v,
+              child:
+                  Text('$depart → $arrivee', overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _ConvoiSelector extends StatelessWidget {
+  final List<ConvoiModel> convois;
+  final ConvoiModel? selected;
+  final ValueChanged<ConvoiModel?> onChanged;
+
+  const _ConvoiSelector(
+      {required this.convois,
+      required this.selected,
+      required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    // Si un seul convoi est dispo et sélectionné, afficher une carte
+    // statique (plus lisible qu'un dropdown).
+    if (convois.length <= 1 && selected != null) {
+      final c = selected!;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.airport_shuttle_rounded,
+                  color: AppColors.primary, size: 18),
+            ),
+            const Gap(10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${c.trajet.depart} → ${c.trajet.arrivee}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Gap(2),
+                  Text(
+                    [
+                      if (c.reference != null && c.reference!.isNotEmpty)
+                        c.reference!,
+                      if (c.vehicule != null) c.vehicule!.immatriculation,
+                    ].join(' · '),
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.check_circle_rounded,
+                color: AppColors.secondary, size: 20),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<ConvoiModel>(
+          value: selected,
+          isExpanded: true,
+          hint: const Text('Sélectionner un convoi'),
+          items: convois.map((c) {
+            return DropdownMenuItem(
+              value: c,
+              child: Text(
+                '${c.trajet.depart} → ${c.trajet.arrivee}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}

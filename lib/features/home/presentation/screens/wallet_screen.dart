@@ -103,9 +103,10 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(
       backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: Text(
-            "CarPay",
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
+        // 🟢 NOUVEAU : Remplacement du Text par Image.asset
+        title: Image.asset(
+          "assets/images/carpay_logo.png", // 👈 Mets le bon chemin ici
+          height: 75, // Ajuste la taille pour que ça rentre bien dans l'AppBar
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -292,26 +293,67 @@ class _WalletScreenState extends State<WalletScreen> {
                     final transac = walletData!.transactions[index];
                     DateTime? dateT = DateTime.tryParse(transac.date);
 
-                    // 🟢 On passe toutes les infos, y compris le statut
                     return _buildTransactionTile(
                       context: context,
                       title: transac.titre,
                       amountText: "${transac.isCredit ? '+' : '-'} ${transac.montant} F",
                       date: dateT ?? DateTime.now(),
                       isCredit: transac.isCredit,
-                      status: transac.status, // On envoie "completed", "pending", ou "failed"
+                      status: transac.status,
                     );
                   }
               )
             else
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text("Aucune transaction récente", style: TextStyle(color: Colors.grey)),
-                ),
-              )
+            // 🟢 ICI ON APPELLE NOTRE NOUVELLE INTERFACE ÉLÉGANTE
+              _buildEmptyTransactions(context),
+
           ],
         ),
+      ),
+    );
+  }
+
+  // --- ÉTAT VIDE POUR LES TRANSACTIONS ---
+  Widget _buildEmptyTransactions(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandColor = const Color(0xFFE64A19); // La même couleur que ton bouton Recharger
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Le "Sticker" élégant pour les transactions
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: brandColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.receipt_long_outlined, size: 60, color: brandColor), // Icône de reçu/historique
+          ),
+
+          const Gap(20),
+
+          // Titre
+          Text(
+            "Aucune transaction",
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : Colors.black87
+            ),
+          ),
+
+          const Gap(8),
+
+          // Description
+          Text(
+            "Votre historique est vide. Effectuez une recharge ou achetez un billet pour voir vos opérations ici.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+        ],
       ),
     );
   }

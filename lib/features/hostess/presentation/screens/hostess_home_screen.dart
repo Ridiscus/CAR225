@@ -390,9 +390,8 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
       ],
     );
   }
-
   Widget _buildRecentSales() {
-    // 🟢 Gestion du cas où la liste est vide
+    // 🟢 1. On garde ton excellente gestion du cas où la liste est vide
     if (_recentSales.isEmpty) {
       return Container(
         width: double.infinity,
@@ -415,14 +414,22 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
       );
     }
 
-    return Column(
-      children: _recentSales.map((sale) => _buildSaleCard(sale)).toList(),
+    // 🟢 2. On remplace la Column par le ListView.builder pour régler le bug des 99000 pixels
+    return ListView.builder(
+      shrinkWrap: true, // CRUCIAL : Force la liste à s'adapter à son contenu
+      physics: const NeverScrollableScrollPhysics(), // CRUCIAL : Laisse le parent scroller
+      itemCount: _recentSales.length,
+      itemBuilder: (context, index) {
+        final sale = _recentSales[index];
+        // On réutilise ton widget de carte de vente exactement comme avant !
+        return _buildSaleCard(sale);
+      },
     );
   }
 
 
 
-  Widget _buildSaleCard(dynamic sale) {
+  /*Widget _buildSaleCard(dynamic sale) {
     // 🟢 3. On utilise les VRAIES clés renvoyées par ton API
     final id = sale['reference']?.toString() ?? sale['id']?.toString() ?? 'N/A';
 
@@ -579,6 +586,161 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
         ),
       ),
     );
+  }*/
+
+  Widget _buildSaleCard(dynamic sale) {
+    // 🟢 On utilise les VRAIES clés renvoyées par ton API Dashboard
+    final ticketNo = sale['ticket_no']?.toString() ?? 'N/A';
+    final passenger = sale['passager']?.toString() ?? 'Client inconnu';
+    final route = sale['trajet']?.toString() ?? 'Trajet inconnu';
+    final date = sale['date']?.toString() ?? '--';
+    final time = sale['heure']?.toString() ?? '--';
+    final seat = sale['siege']?.toString() ?? '--';
+    final price = sale['prix']?.toString() ?? '--';
+
+    return GestureDetector(
+      onTap: () => _showSaleDetails(context, sale), // 🟢 Action au clic !
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // En-tête de la carte : Numéro du ticket et Prix
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    ticketNo,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+              ],
+            ),
+
+            const Gap(12),
+
+            // Ligne 1 : Passager et Siège
+            Row(
+              children: [
+                const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                const Gap(6),
+                Expanded(
+                  child: Text(
+                    passenger,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    seat,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const Gap(8),
+
+            // Ligne 2 : Trajet
+            Row(
+              children: [
+                const Icon(Icons.directions_bus_outlined, size: 16, color: Colors.grey),
+                const Gap(6),
+                Expanded(
+                  child: Text(
+                    route.replaceAll('→', '->'), // Sécurité anti-bug d'affichage
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF757575),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+
+            const Gap(12),
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            const Gap(12),
+
+            // Ligne 3 : Date et Heure
+            Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey),
+                const Gap(6),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                const Gap(6),
+                Text(
+                  time,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSaleDetails(BuildContext context, dynamic sale) {
@@ -590,41 +752,18 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
     );
   }
   Widget _buildSaleDetailsContent(BuildContext context, dynamic sale) {
-    // 🟢 1. Mapping sécurisé avec les VRAIES clés de ton API
-    final id = sale['reference']?.toString() ?? sale['id']?.toString() ?? 'N/A';
+    // 🟢 1. Mapping direct avec les clés de l'API (plus besoin de formater, l'API s'en charge !)
+    final id = sale['ticket_no']?.toString() ?? 'N/A';
+    final reference = sale['reference']?.toString() ?? 'N/A';
+    final passenger = sale['passager']?.toString() ?? 'Client inconnu';
+    final route = sale['trajet']?.toString() ?? 'Trajet standard';
+    final date = sale['date']?.toString() ?? '--';
+    final time = sale['heure']?.toString() ?? '--';
+    final seat = sale['siege']?.toString() ?? '-';
+    final amount = sale['prix']?.toString() ?? '-- FCFA';
+    final status = sale['statut']?.toString() ?? 'Terminé';
 
-    // Concaténation du nom et prénom pour le passager
-    final nom = sale['passager_nom']?.toString() ?? '';
-    final prenom = sale['passager_prenom']?.toString() ?? '';
-    final passenger = '$nom $prenom'.trim().isEmpty ? 'Client inconnu' : '$nom $prenom';
-
-    // Ton API ne renvoyant pas les noms des gares dans ce payload, on met une valeur par défaut
-    final route = 'Trajet standard';
-
-    // Formatage de la date (ex: 2026-03-12T00:00:00.000000Z -> 12/03/2026)
-    String date = '--';
-    if (sale['date_voyage'] != null) {
-      try {
-        final parsedDate = DateTime.parse(sale['date_voyage'].toString());
-        date = DateFormat('dd/MM/yyyy').format(parsedDate);
-      } catch (e) {
-        // En cas d'erreur de parsing, on prend juste la partie YYYY-MM-DD
-        date = sale['date_voyage'].toString().substring(0, 10);
-      }
-    }
-
-    // Récupération de l'heure et de la place
-    final time = sale['heure_depart']?.toString() ?? '--';
-    final seat = sale['seat_number']?.toString() ?? '-';
-
-    // Formatage propre du montant (enlève les .00 inutiles et ajoute les espaces)
-    final amountDouble = num.tryParse(sale['montant'].toString()) ?? 0;
-    final amount = NumberFormat('#,###', 'fr_FR').format(amountDouble);
-
-    // Récupération du statut (ex: "confirmee")
-    final status = sale['statut']?.toString() ?? 'en attente';
-
-    // 🟢 2. Le reste de l'UI reste identique, les variables sont maintenant pleines !
+    // 🟢 2. Construction de l'UI
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -660,11 +799,13 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
-                _buildStatusBadge(status),
+                _buildStatusBadge(status), // Assure-toi d'avoir cette fonction !
               ],
             ),
             const Gap(24),
             _buildDetailRow('N° Billet', id, isHighlight: true),
+            const Gap(16),
+            _buildDetailRow('Référence', reference), // On ajoute la référence UTB...
             const Divider(height: 32, color: Color(0xFFEEEEEE)),
             _buildDetailRow('Passager', passenger),
             const Gap(16),
@@ -688,7 +829,7 @@ class _HostessHomeScreenState extends State<HostessHomeScreen> {
                   ),
                 ),
                 Text(
-                  '$amount FCFA',
+                  amount, // Le montant contient déjà "FCFA" depuis l'API
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,

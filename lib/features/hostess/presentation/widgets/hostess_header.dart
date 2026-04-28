@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
@@ -9,7 +11,6 @@ import '../screens/hostess_main_wrapper.dart';
 class HostessHeader extends StatefulWidget {
   final bool initialIsOnline;
 
-  // 🟢 On a retiré les anciens paramètres "en dur" (nom, rôle, image)
   const HostessHeader({
     super.key,
     this.initialIsOnline = true,
@@ -35,9 +36,13 @@ class _HostessHeaderState extends State<HostessHeader> {
     final profile = profileProvider.profileData;
     final isLoading = profileProvider.isLoading;
     final pickedImage = profileProvider.profileImage;
+
+    // 🟢 L'URL de l'image est nettoyée directement depuis le provider
+    final String cleanImageUrl = profileProvider.cleanProfileImageUrl;
+
     final safeAreaTop = MediaQuery.paddingOf(context).top;
 
-    // 🟢 Variables dynamiques avec effet "Chargement..."
+    // Variables dynamiques
     final String firstName = profile?.prenom ?? (isLoading ? '...' : '');
     final String lastName = profile?.name ?? (isLoading ? 'Chargement' : 'Inconnu');
     final String company = profile?.nomCompagnie ?? (isLoading ? '...' : 'Inconnue');
@@ -66,20 +71,18 @@ class _HostessHeaderState extends State<HostessHeader> {
       ),
       child: Row(
         children: [
-          // PROFIL AVATAR AVEC DESIGN DISTINCT
+          // PROFIL AVATAR
           InkWell(
             onTap: () {
               final state = context.findAncestorStateOfType<HostessMainWrapperState>();
               if (state != null) {
-                // 🟢 CHANGE LE 4 PAR LE BON INDEX (sûrement 3 ou 2)
+                // CHANGE LE 4 PAR LE BON INDEX (sûrement 3 ou 2)
                 state.setIndex(3);
               }
             },
             child: Stack(
               children: [
                 Container(
-                  height: 64,
-                  width: 64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -94,32 +97,24 @@ class _HostessHeaderState extends State<HostessHeader> {
                       ),
                     ],
                   ),
-                  child: ClipOval(
-                    // 🟢 LOGIQUE DE L'IMAGE DYNAMIQUE
-                    child: pickedImage != null
-                        ? Image.file(pickedImage, fit: BoxFit.cover, width: 64, height: 64)
-                        : (profile?.profilePicture != null && profile!.profilePicture!.isNotEmpty
-                        ? Image.network(
-                      'https://car225.com/storage/${profile.profilePicture}',
-                      fit: BoxFit.cover,
-                      width: 64,
-                      height: 64,
-                      // En cas d'erreur de chargement (ex: serveur éteint), on affiche l'image par défaut
-                      errorBuilder: (context, error, stackTrace) => Image.asset(
-                        'assets/images/hostess_profile.png',
-                        fit: BoxFit.cover,
-                        width: 64,
-                        height: 64,
-                      ),
-                    )
-                        : Image.asset(
-                      'assets/images/hostess_profile.png',
-                      fit: BoxFit.cover,
-                      width: 64,
-                      height: 64,
-                    )),
+                  // 🟢 REMPLACEMENT DU CLIP OVAL PAR LE CIRCLE AVATAR (PLUS SÉCURISÉ)
+                  child: CircleAvatar(
+                    radius: 32, // Correspond à height/width 64 (rayon de 32 = diamètre de 64)
+                    backgroundColor: Colors.white24,
+                    backgroundImage: pickedImage != null
+                        ? FileImage(pickedImage) // 1. Priorité à l'image locale (File)
+                        : (cleanImageUrl.isNotEmpty
+                        ? NetworkImage(cleanImageUrl) // 2. Ensuite l'URL réseau
+                        : const AssetImage('assets/images/hostess_profile.jpg') as ImageProvider), // 3. Fallback
+
+                    // Gestion de l'erreur réseau invisible
+                    onBackgroundImageError: (exception, stackTrace) {
+                      print("⚠️ Erreur image HostessHeader : $exception");
+                    },
                   ),
                 ),
+
+                // Pastille En ligne / Hors ligne
                 Positioned(
                   right: 0,
                   bottom: 2,
@@ -152,7 +147,6 @@ class _HostessHeaderState extends State<HostessHeader> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                // 🟢 NOM DYNAMIQUE
                 Text(
                   fullName,
                   style: const TextStyle(
@@ -162,10 +156,9 @@ class _HostessHeaderState extends State<HostessHeader> {
                     letterSpacing: -0.5,
                   ),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis, // Coupe proprement si le nom est trop long
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const Gap(4),
-                // 🟢 RÔLE ET COMPAGNIE DYNAMIQUES
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -190,7 +183,7 @@ class _HostessHeaderState extends State<HostessHeader> {
               ],
             ),
           ),
-          // ONLINE/OFFLINE SWITCH - Minimal
+          // ONLINE/OFFLINE SWITCH
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -29,10 +29,13 @@ class BookingSummaryScreen extends StatefulWidget {
   State<BookingSummaryScreen> createState() => _BookingSummaryScreenState();
 }
 
-class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
+class _BookingSummaryScreenState extends State<BookingSummaryScreen> with WidgetsBindingObserver {
   bool isSubmitting = false;
   int? userWalletBalance;
   bool isLoadingBalance = true;
+
+  String? currentWaveTransactionId;
+  bool isWaitingForWavePayment = false;
 
 
 
@@ -44,49 +47,72 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   void initState() {
     super.initState();
     _fetchRealWalletBalance();
+    WidgetsBinding.instance.addObserver(this);
     _initDeepLinks();
   }
 
   @override
   void dispose() {
     _linkSubscription?.cancel(); // ⚠️ Toujours annuler l'écoute !
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  // --- 1. RÉCUPÉRATION DU SOLDE RÉEL ---
-  /*Future<void> _fetchRealWalletBalance() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      if (token == null) return;
 
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        //baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        /*headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },*/
-      ));
+  // --- 🕵️ ÉCOUTE DU CYCLE DE VIE (Détecte le retour sur l'app) ---
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Si l'application revient au premier plan ET qu'on attendait Wave
+    if (state == AppLifecycleState.resumed && isWaitingForWavePayment) {
+      isWaitingForWavePayment = false; // On reset pour ne pas redemander en boucle
 
-      final response = await dio.get('/user/wallet');
-
-      if (response.statusCode == 200) {
-        final data = response.data['data'] ?? response.data;
-        double soldeDouble = double.tryParse(data['solde'].toString()) ?? 0.0;
-        if (mounted) {
-          setState(() {
-            userWalletBalance = soldeDouble.toInt();
-            isLoadingBalance = false;
-          });
+      // On laisse une petite seconde à l'appli pour voir si un Deep Link arrive entre temps
+      Future.delayed(const Duration(seconds: 1), () {
+        if (currentWaveTransactionId != null && mounted) {
+          _askUserAboutPaymentStatus();
         }
-      }
-    } catch (e) {
-      print("Erreur chargement solde: $e");
-      if (mounted) setState(() => isLoadingBalance = false);
+      });
     }
-  }*/
+  }
+
+  // --- 🗣️ DIALOGUE DE VÉRIFICATION ---
+  void _askUserAboutPaymentStatus() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Statut du paiement", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text("Avez-vous pu finaliser votre paiement sur Wave ou l'avez-vous annulé ?"),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          // BOUTON ANNULER
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              print("🛑 L'utilisateur a déclaré avoir annulé manuellement.");
+              _cancelWavePayment(currentWaveTransactionId!);
+              currentWaveTransactionId = null; // On vide l'ID
+              _showTopNotification("Paiement annulé. Sièges libérés.", isError: true);
+            },
+            child: const Text("J'ai annulé", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+          // BOUTON PAYÉ
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Navigator.pop(context);
+              // Si l'utilisateur dit qu'il a payé, on le croit et on attend que le backend valide.
+              currentWaveTransactionId = null;
+              _showTopNotification("Vérification de votre paiement en cours...", isError: false);
+            },
+            child: const Text("J'ai payé", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Future<void> _fetchRealWalletBalance() async {
     try {
@@ -135,7 +161,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }
 
   // --- 🛠️ TRAITEMENT DU LIEN REÇU ---
-  void _handleDeepLink(Uri uri) {
+  /*void _handleDeepLink(Uri uri) {
     // 1. On vérifie d'abord que le lien est bien un lien de NOTRE application
     // Remplace 'car225' et 'payment' par ce que tu as configuré dans ton AndroidManifest.xml
     if (uri.scheme != 'car225' || uri.host != 'payment') {
@@ -164,9 +190,51 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
         _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
       }
     }
+  }*/
+
+
+  // --- 🛠️ TRAITEMENT DU LIEN REÇU (DEEP LINK) ---
+  void _handleDeepLink(Uri uri) {
+    // 1. Vérification : On s'assure que le lien correspond à notre application
+    if (uri.scheme != 'car225' || uri.host != 'payment') {
+      print("⚠️ Lien ignoré car il n'appartient pas au flow de paiement : $uri");
+      return;
+    }
+
+    final urlString = uri.toString().toLowerCase();
+    print("🔗 LIEN DE RETOUR PAIEMENT INTERCEPTÉ : $urlString");
+
+    // 2. Cas du SUCCÈS du paiement
+    if (uri.path.contains('success') || urlString.contains('success')) {
+      if (mounted) {
+        _showTopNotification("Paiement réussi ! 🎉");
+      }
+
+      // ✅ Le paiement a réussi, on n'a plus besoin d'annuler la transaction, on nettoie l'ID
+      currentWaveTransactionId = null;
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _showSuccessDialog();
+        }
+      });
+    }
+
+    // 3. Cas de l'ÉCHEC ou de l'ANNULATION du paiement
+    else if (uri.path.contains('error') || uri.path.contains('cancel') || urlString.contains('fail')) {
+      if (mounted) {
+        _showTopNotification("Le paiement a échoué ou a été annulé.", isError: true);
+      }
+
+      // 🟢 ACTION REQUISE : On prévient le backend de libérer les sièges
+      if (currentWaveTransactionId != null) {
+        print("🛑 Déclenchement de l'annulation pour libérer les sièges...");
+        _cancelWavePayment(currentWaveTransactionId!);
+        currentWaveTransactionId = null; // On réinitialise pour éviter les doubles appels
+      }
+    }
   }
 
-  // --- 3. VÉRIFICATION SÉCURISÉE DU PAIEMENT CÔTÉ SERVEUR ---
 
   void _showTopNotification(String message, {bool isError = false}) {
     if (!mounted) return;
@@ -230,6 +298,54 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
 
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 3), () => overlayEntry.remove());
+  }
+
+// --- NOUVELLE FONCTION : ANNULER LE PAIEMENT WAVE ---
+  Future<void> _cancelWavePayment(String transactionId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      ));
+
+      print("========================================");
+      print("🛑 DÉBUT ANNULATION WAVE");
+      print("➡️ TRANSACTION ID : $transactionId");
+      print("➡️ ENDPOINT : ${ApiConfig.baseUrl}/user/payment/wave/cancel");
+      print("========================================");
+
+      final response = await dio.post(
+        '/user/payment/wave/cancel',
+        data: {
+          "transaction_id": transactionId
+        },
+      );
+
+      print("✅ STATUT RÉPONSE API : ${response.statusCode}");
+      print("✅ DATA RÉPONSE API : ${response.data}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print("🎉 Paiement annulé avec succès côté serveur. Sièges libérés.");
+      }
+    } catch (e) {
+      print("========================================");
+      print("❌ CRASH LORS DE L'ANNULATION WAVE");
+
+      if (e is DioException) {
+        print("❌ CODE HTTP : ${e.response?.statusCode}");
+        print("❌ RÉPONSE DE L'API : ${e.response?.data}"); // C'est CA qui va te dire pourquoi le backend refuse
+      } else {
+        print("❌ ERREUR LOCALE FLUTTER : $e");
+      }
+      print("========================================");
+    }
   }
 
 
@@ -319,7 +435,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
 
       final response = await dio.post('/user/reservations', data: finalData);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      /*if (response.statusCode == 200 || response.statusCode == 201) {
         // Wave payment flow
         if (response.data['requires_payment'] == true && response.data['payment_details'] != null) {
           // Wave usually returns a wave_launch_url or similar. Adjust the key based on the actual response.
@@ -329,7 +445,23 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
           // Wallet or successful booking without external redirect
           if (mounted) _showSuccessDialog();
         }
+      }*/
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Wave payment flow
+        if (response.data['requires_payment'] == true && response.data['payment_details'] != null) {
+
+          // 🟢 SAUVEGARDE L'ID DE TRANSACTION (Vérifie la clé exacte dans la réponse de ton API)
+          currentWaveTransactionId = response.data['payment_details']['transaction_id']; // 👈 AJOUT ICI
+
+          final String url = response.data['payment_details']['payment_url'] ?? response.data['payment_details']['wave_launch_url'];
+          await _launchPaymentUrl(url);
+        } else {
+          // Wallet or successful booking without external redirect
+          if (mounted) _showSuccessDialog();
+        }
       }
+
 
     } catch (e) {
       print("❌ ERREUR API : $e");
@@ -362,9 +494,24 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
   }
 
 
-  Future<void> _launchPaymentUrl(String urlString) async {
+  /*Future<void> _launchPaymentUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Impossible d\'ouvrir la page de paiement'))
+        );
+      }
+    }
+  }*/
+
+  Future<void> _launchPaymentUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+
+    isWaitingForWavePayment = true; // 👈 AJOUT ICI : On signale qu'on part sur Wave
+
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      isWaitingForWavePayment = false; // 👈 Annulation si ça n'ouvre pas
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Impossible d\'ouvrir la page de paiement'))
@@ -399,11 +546,10 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   // Barre de poignée
                   Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
                   const Gap(20),
-
                   const Text("Moyen de paiement", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const Gap(20),
 
-                  // 1. OPTION WALLET (CarPay)
+// 1. OPTION WALLET (CarPay)
                   if (isLoadingBalance)
                     const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
                   else
@@ -426,14 +572,16 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                             Navigator.pop(modalContext);
                             _showTopNotification("Solde insuffisant. Rechargez votre compte.");
                           },
+
+                          // 🟢 C'EST ICI QU'ON MET LE LOGO CARPAY (à la place du wallet)
                           leading: Image.asset(
-                            "assets/images/wallet-filled-money-tool.png",
-                            width: 45,
-                            height: 45,
+                            "assets/images/carpay_logo.png", // 👈 Mets le chemin de ton logo ici
+                            width: 90,
+                            height: 90,
                             errorBuilder: (c,o,s) => const Icon(Icons.account_balance_wallet, color: AppColors.primary, size: 35),
                           ),
 
-                          // 🟢 MODIFICATION ICI : Ajout du Badge dans le titre
+                          // 🟢 ON REMET LE TEXTE "CarPay" NORMAL ICI
                           title: Row(
                             children: [
                               const Text("CarPay", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -462,7 +610,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                               ),
                             ],
                           ),
-                          // ---------------------------------------------------
 
                           subtitle: Text(
                               hasEnoughFunds ? "Solde: ${_formatCurrency(currentBalance)}" : "Insuffisant (${_formatCurrency(currentBalance)})",
@@ -474,7 +621,6 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                         ),
                       ),
                     ),
-
                   const Gap(15),
                   // 2. OPTION MOBILE MONEY (WAVE)
                   Container(

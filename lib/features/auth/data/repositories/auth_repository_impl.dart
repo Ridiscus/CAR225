@@ -343,4 +343,73 @@ class AuthRepositoryImpl implements AuthRepository {
     return await remoteDataSource.getHostessDashboard();
   }
 
+  // ===========================================================================
+  // 🚌 CONVOIS (COMPAGNIES, GARES, ITINÉRAIRES)
+  // ===========================================================================
+
+  @override
+  Future<List<dynamic>> getConvoiCompagnies() async {
+    try {
+      return await remoteDataSource.getConvoiCompagnies();
+    } catch (e) {
+      print("❌ REPOSITORY ERROR getConvoiCompagnies: $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiGares(int compagnieId) async {
+    try {
+      return await remoteDataSource.getConvoiGares(compagnieId);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR getConvoiGares: $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getConvoiItineraires(int compagnieId) async {
+    try {
+      return await remoteDataSource.getConvoiItineraires(compagnieId);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR getConvoiItineraires: $e");
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getMyConvois({String? statut, int page = 1}) async {
+    try {
+      return await remoteDataSource.getMyConvois(statut: statut, page: page);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Dans AuthRepositoryImpl (tout en bas)
+  @override
+  Future<Map<String, dynamic>> getConvoiDetails(int convoiId) async {
+    return await remoteDataSource.getConvoiDetails(convoiId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> accepterMontantConvoi(int convoiId) async {
+    return await remoteDataSource.accepterMontantConvoi(convoiId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId) async {
+    return await remoteDataSource.refuserMontantConvoi(convoiId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data) async {
+    try {
+      return await remoteDataSource.enregistrerPassagers(convoiId, data);
+    } catch (e) {
+      print("❌ REPOSITORY ERROR enregistrerPassagers: $e");
+      rethrow;
+    }
+  }
+
 }

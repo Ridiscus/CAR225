@@ -26,6 +26,37 @@ class HostessProfileProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  // 🟢 NOUVEAU : Getter qui nettoie l'URL de l'image automatiquement
+  // 🟢 NOUVEAU : Getter qui nettoie l'URL de l'image automatiquement
+  // 🟢 DANS TON PROVIDER : Getter qui nettoie et construit l'URL complète
+  String get cleanProfileImageUrl {
+    if (_profileData == null || _profileData.profilePicture == null) {
+      return "";
+    }
+
+    String path = _profileData.profilePicture;
+
+    // 1. Si l'API renvoie accidentellement le double storage, on nettoie
+    if (path.contains('/storage/storage/')) {
+      path = path.replaceAll('/storage/storage/', '/storage/');
+    }
+
+    // 2. 🟢 LA CORRECTION EST ICI :
+    // Si l'URL ne commence pas par http (ce qui est le cas actuellement), on ajoute le domaine !
+    if (!path.startsWith('http')) {
+      // Assurons-nous qu'il n'y ait pas de double slash
+      if (path.startsWith('/')) {
+        return "https://car225.com$path";
+      } else {
+        return "https://car225.com/$path";
+      }
+    }
+
+    // Si c'est déjà une URL complète (ex: via Google ou si l'API est corrigée plus tard)
+    return path;
+  }
+
+
   // ==========================================
   // 2. INITIALISATION
   // ==========================================

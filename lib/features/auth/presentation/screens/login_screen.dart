@@ -1,10 +1,10 @@
-
-
 import 'dart:io'; // 🟢 NOUVEAU : Import nécessaire pour Platform.isIOS
+import 'package:car225/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // IMPORTS CLEAN ARCHI
 import '../../../../core/providers/user_provider.dart';
@@ -45,6 +45,8 @@ class _LoginScreenState extends State<LoginScreen> {
   true; // 🟢 MODIF : Activé par défaut (true au lieu de false)
   bool _obscureText = true;
   bool _isLoading = false;
+
+  String _lastInputValue = "";
 
   // --- VARIABLE POUR GÉRER L'OVERLAY ---
   OverlayEntry? _currentOverlayEntry;
@@ -160,7 +162,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return;
 
-        if (response.success) {
+        /*if (response.success) {
+          // 🟢 SAUVEGARDE DU RÔLE DANS LE TÉLÉPHONE
+          final prefs = await SharedPreferences.getInstance();
+          final String role = (response.role ?? '').toLowerCase();
+          await prefs.setString('user_role', role); // <-- Ligne magique
+
           if (response.requiresOtp) {
             _showTopNotification(response.message);
             Navigator.push(
@@ -184,7 +191,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   (route) => false,
             );
           }
+        }*/
+
+        if (response.success) {
+          // 🟢 On force le rôle "user" pour le particulier
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_role', 'user');
+
+          if (response.requiresOtp) {
+            _showTopNotification(response.message);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VerifOtpScreen(
+                  email: identifierClean,
+                  contact: response.contact ?? "",
+                ),
+              ),
+            );
+          }  else {
+            await context.read<UserProvider>().loadUser();
+            _showTopNotification("Connexion réussie !");
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (!mounted) return;
+
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const MainScreen()), // ✅ Normal pour un particulier
+                  (route) => false,
+            );
+          }
         }
+
+
       } else {
         // ---------------------------------------------------------
         // 2️⃣ C'EST UNE HÔTESSE / AGENT (Il a tapé un Code, ex: ZEUS123)
@@ -202,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return;
 
-        if (response.success) {
+        /*if (response.success) {
           await context.read<UserProvider>().loadUser(); // À décommenter si besoin
 
           _showTopNotification("Connexion réussie !");
@@ -234,6 +273,73 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (context) => destination),
                 (route) => false,
           );
+        }*/
+
+
+        if (response.success) {
+          // 🟢 On sauvegarde le rôle renvoyé par l'API
+          final prefs = await SharedPreferences.getInstance();
+          final String role = (response.role ?? '').toLowerCase();
+          await prefs.setString('user_role', role);
+
+          await context.read<UserProvider>().loadUser();
+          _showTopNotification("Connexion réussie !");
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (!mounted) return;
+
+
+          // ✅ REDIRECTION DYNAMIQUE OBLIGATOIRE ICI
+          Widget destination;
+
+          if (role == 'hotesse' || role == 'hôtesse') {
+            destination = const HostessMainWrapper();
+          } else if (role == 'agent') {
+            destination = const AgentMainWrapper();
+          } else if (role == 'driver' || role == 'chauffeur') {
+
+            // 🟢 ON INTERCEPTE LE CHAUFFEUR POUR AFFICHER LE POP-UP GOOGLE
+            bool accepted = await _showLocationDisclosureDialog();
+
+            if (!mounted) return;
+
+            if (!accepted) {
+              _showTopNotification(
+                  "Vous devez accepter la localisation pour vous connecter en tant que chauffeur.",
+                  isError: true
+              );
+              // On arrête tout, il n'est pas redirigé
+              return;
+            }
+
+            destination = const DriverMainWrapper();
+
+          } else {
+            destination = const MainScreen();
+          }
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+                (route) => false,
+          );
+
+          // ✅ REDIRECTION DYNAMIQUE OBLIGATOIRE ICI
+          /*Widget destination;
+          if (role == 'hotesse' || role == 'hôtesse') {
+            destination = const HostessMainWrapper();
+          } else if (role == 'agent') {
+            destination = const AgentMainWrapper();
+          } else if (role == 'driver' || role == 'chauffeur') {
+            destination = const DriverMainWrapper();
+          } else {
+            destination = const MainScreen();
+          }
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+                (route) => false,
+          );*/
         }
 
 
@@ -328,6 +434,69 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+
+  // 🟢 NOUVEAU : Le Pop-up obligatoire de Google pour la localisation
+  Future<bool> _showLocationDisclosureDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // Force l'utilisateur à choisir
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        return AlertDialog(
+          backgroundColor: isDark ? Theme.of(context).cardColor : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_on, color: AppColors.primary),
+              const Gap(10),
+              Expanded(
+                child: Text(
+                  "Utilisation de votre position",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            "CAR225 collecte des données de localisation pour permettre le suivi de vos courses en temps réel par les passagers et calculer le montant du trajet, même lorsque l'application est fermée ou en arrière-plan.",
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[300] : Colors.black87,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false), // Refuse
+              child: const Text(
+                "Refuser",
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => Navigator.of(context).pop(true), // Accepte
+              child: const Text(
+                "Accepter",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+
   @override
   void dispose() {
     _removeOverlay();
@@ -335,6 +504,48 @@ class _LoginScreenState extends State<LoginScreen> {
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+
+  // 🟢 LOGIQUE D'AUTO-COMPLÉTION CORRIGÉE (Gère l'effacement)
+  void _handleIdentifierInput(String value) {
+    // Si l'utilisateur est en train d'effacer, on ne fait rien
+    // et on met juste à jour notre variable de mémorisation.
+    if (value.length < _lastInputValue.length) {
+      _lastInputValue = value;
+      return;
+    }
+
+    // On met à jour la valeur mémorisée
+    _lastInputValue = value;
+
+    // On ne déclenche l'auto-complétion que si c'est exactement la 1ère lettre tapée
+    if (value.length == 1) {
+      final firstChar = value.toUpperCase();
+      String prefix = "";
+
+      if (firstChar == 'U') {
+        prefix = 'USR-';
+      } else if (firstChar == 'A') {
+        prefix = 'AGT-';
+      } else if (firstChar == 'C') {
+        prefix = 'CHF-';
+      } else if (firstChar == 'H') {
+        prefix = 'HTS-';
+      }
+
+      if (prefix.isNotEmpty) {
+        // On remplace le texte par le préfixe
+        _identifierController.value = TextEditingValue(
+          text: prefix,
+          selection: TextSelection.collapsed(offset: prefix.length),
+        );
+
+        // 🔴 TRÈS IMPORTANT : On dit à notre variable qu'on vient d'insérer 4 caractères
+        // pour que la touche effacer fonctionne bien par la suite.
+        _lastInputValue = prefix;
+      }
+    }
   }
 
   @override
@@ -373,15 +584,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // --- CHAMPS ---
               _buildAuthInput(
-                "Tél ou Code ID", // 🟢 Le texte change pour être explicite
-                Icons.person_outline, // 🟢 L'icône change pour être plus générique
+                "Tél ou Code ID",
+                "assets/images/user.png", // 🟢 Ici, on met le chemin de ton Flaticon
                 controller: _identifierController,
+                onChanged: _handleIdentifierInput,
               ),
               const Gap(15),
 
               _buildAuthInput(
                 "Mot de passe",
-                Icons.lock_outline,
+                "assets/images/padlock.png", // 🟢 Pareil ici
                 controller: _passwordController,
                 isPassword: true,
                 obscureText: _obscureText,
@@ -560,7 +772,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // --- HELPER INPUT ---
-  Widget _buildAuthInput(
+  /*Widget _buildAuthInput(
       String hint,
       IconData icon, {
         bool isPassword = false,
@@ -588,6 +800,66 @@ class _LoginScreenState extends State<LoginScreen> {
         style: TextStyle(color: textColor),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: iconColor),
+          suffixIcon: isPassword
+              ? IconButton(
+            icon: Icon(
+              obscureText ? Icons.visibility_off : Icons.visibility,
+              color: iconColor,
+            ),
+            onPressed: onToggleVisibility,
+          )
+              : null,
+          hintText: hint,
+          hintStyle: TextStyle(color: hintColor),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+      ),
+    );
+  }*/
+// --- HELPER INPUT MODIFIÉ ---
+  Widget _buildAuthInput(
+      String hint,
+      String iconPath, { // 🟢 MODIFICATION : On attend un String (chemin) au lieu d'un IconData
+        bool isPassword = false,
+        bool obscureText = false,
+        VoidCallback? onToggleVisibility,
+        TextEditingController? controller,
+        Function(String)? onChanged,
+      }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final hintColor = isDark ? Colors.grey[600] : AppColors.grey;
+    final iconColor = isDark ? Colors.grey[400] : AppColors.grey;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? cardColor : AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey.shade300,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        onChanged: onChanged,
+        style: TextStyle(color: textColor),
+        decoration: InputDecoration(
+          // 🟢 MODIFICATION : On utilise Image.asset avec un Padding
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(14.0), // Ajuste cette valeur pour modifier l'espacement
+            child: Image.asset(
+              iconPath,
+              width: 22, // Ajuste la taille de ton Flaticon ici
+              height: 22,
+              color: iconColor, // Garde la couleur dynamique (clair/sombre) de ton thème
+            ),
+          ),
+
+          // Note: L'icône "œil" pour le mot de passe reste un Icon Flutter classique
+          // car c'est très standard, mais tu peux aussi le changer de la même manière si tu as un Flaticon pour ça !
           suffixIcon: isPassword
               ? IconButton(
             icon: Icon(

@@ -1,3 +1,5 @@
+import 'package:car225/core/services/networking/api_config.dart';
+
 class DriverProfileModel {
   final int id;
   final String? codeId;
@@ -28,6 +30,17 @@ class DriverProfileModel {
     this.compagnie,
     this.gare,
   });
+
+  /// Returns a full HTTPS URL even when the server returns a relative path.
+  /// Uses ApiConfig.socketUrl so it works in both local (ngrok) and production.
+  String? get fullProfilePictureUrl {
+    final url = profilePictureUrl;
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // Relative path like /storage/chauffeurs/profiles/...
+    final path = url.startsWith('/') ? url : '/$url';
+    return '${ApiConfig.socketUrl}$path';
+  }
 
   factory DriverProfileModel.fromJson(Map<String, dynamic> json) {
     return DriverProfileModel(

@@ -1,12 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
+import 'package:provider/provider.dart';
 import 'package:car225/core/theme/app_colors.dart';
-import 'package:car225/features/driver/presentation/widgets/custom_app_bar.dart';
-import 'package:car225/features/driver/presentation/widgets/success_modal.dart';
+import '../providers/driver_provider.dart';
 
 class DriverChangePasswordScreen extends StatefulWidget {
   const DriverChangePasswordScreen({super.key});
+
   @override
   State<DriverChangePasswordScreen> createState() =>
       _DriverChangePasswordScreenState();
@@ -17,7 +18,6 @@ class _DriverChangePasswordScreenState
   final _oldPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
 
   bool _obscureOld = true;
   bool _obscureNew = true;
@@ -33,122 +33,139 @@ class _DriverChangePasswordScreenState
   }
 
   void _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_oldPasswordController.text.isEmpty ||
+        _newPasswordController.text.isEmpty ||
+        _confirmPasswordController.text.isEmpty) {
+      _showSnackBar('Veuillez remplir tous les champs', isError: true);
+      return;
+    }
+
+    if (_newPasswordController.text != _confirmPasswordController.text) {
+      _showSnackBar(
+        'Les nouveaux mots de passe ne correspondent pas',
+        isError: true,
+      );
       return;
     }
 
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
-    // Simulation d'appel API
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-      SuccessModal.show(
-        context: context,
-        message: 'Votre mot de passe a été modifié avec succès.',
-        onPressed: () => Navigator.pop(context),
+    try {
+      final provider = context.read<DriverProvider>();
+      await provider.changePassword(
+        currentPassword: _oldPasswordController.text,
+        newPassword: _newPasswordController.text,
+        confirmPassword: _confirmPasswordController.text,
       );
+      if (mounted) {
+        _showSnackBar('Mot de passe mis à jour avec succès');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(e.toString().replaceFirst('Exception: ', ''),
+            isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : AppColors.secondary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(20),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: CustomAppBar(
-        title: 'Mot de passe',
-        leadingIcon: Icons.arrow_back,
-        leadingOnPressed: () => Navigator.pop(context),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Mot de passe",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 19,
+          ),
+        ),
+        centerTitle: true,
       ),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         behavior: HitTestBehavior.opaque,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Modifier le mot de passe',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.8,
-                  ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Modifier le mot de passe',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF263238),
+                  letterSpacing: -0.8,
                 ),
-                const Gap(12),
-                const Text(
-                  'Votre nouveau mot de passe doit être différent des anciens mots de passe utilisés précédemment.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF78909C),
-                    fontWeight: FontWeight.w500,
-                    height: 1.5,
-                  ),
+              ),
+              const Gap(12),
+              const Text(
+                'Votre nouveau mot de passe doit être différent des anciens mots de passe utilisés précédemment.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF78909C),
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
                 ),
-                const Gap(32),
-                _buildPasswordField(
-                  label: 'Mot de passe actuel',
-                  controller: _oldPasswordController,
-                  obscure: _obscureOld,
-                  onToggle: () => setState(() => _obscureOld = !_obscureOld),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le mot de passe actuel est obligatoire';
-                    }
-                    return null;
-                  },
-                ),
-                const Gap(24),
-                _buildPasswordField(
-                  label: 'Nouveau mot de passe',
-                  controller: _newPasswordController,
-                  obscure: _obscureNew,
-                  onToggle: () => setState(() => _obscureNew = !_obscureNew),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le nouveau mot de passe est obligatoire';
-                    }
-                    if (value.length < 6) {
-                      return 'Le mot de passe doit faire au moins 6 caractères';
-                    }
-                    return null;
-                  },
-                ),
-                const Gap(24),
-                _buildPasswordField(
-                  label: 'Confirmer le nouveau mot de passe',
-                  controller: _confirmPasswordController,
-                  obscure: _obscureConfirm,
-                  onToggle: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'La confirmation est obligatoire';
-                    }
-                    if (value != _newPasswordController.text) {
-                      return 'Les mots de passe ne correspondent pas';
-                    }
-                    return null;
-                  },
-                ),
-                const Gap(40),
-              ],
-            ),
+              ),
+              const Gap(32),
+              _buildPasswordField(
+                label: 'Mot de passe actuel',
+                controller: _oldPasswordController,
+                obscure: _obscureOld,
+                onToggle: () => setState(() => _obscureOld = !_obscureOld),
+              ),
+              const Gap(24),
+              _buildPasswordField(
+                label: 'Nouveau mot de passe',
+                controller: _newPasswordController,
+                obscure: _obscureNew,
+                onToggle: () => setState(() => _obscureNew = !_obscureNew),
+              ),
+              const Gap(24),
+              _buildPasswordField(
+                label: 'Confirmer le nouveau mot de passe',
+                controller: _confirmPasswordController,
+                obscure: _obscureConfirm,
+                onToggle: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+              const Gap(40),
+            ],
           ),
         ),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          padding: const EdgeInsets.all(24),
           child: SizedBox(
             width: double.infinity,
-            height: 56,
+            height: 58,
             child: ElevatedButton(
               onPressed: _isLoading ? null : _handleSubmit,
               style: ElevatedButton.styleFrom(
@@ -156,7 +173,7 @@ class _DriverChangePasswordScreenState
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                 ),
               ),
               child: _isLoading
@@ -165,13 +182,13 @@ class _DriverChangePasswordScreenState
                       width: 24,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2,
+                        strokeWidth: 3,
                       ),
                     )
                   : const Text(
-                      'METTRE à€ JOUR LE MOT DE PASSE',
+                      'Mettre à jour',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
                       ),
@@ -188,119 +205,61 @@ class _DriverChangePasswordScreenState
     required TextEditingController controller,
     required bool obscure,
     required VoidCallback onToggle,
-    String? Function(String?)? validator,
   }) {
-    return FormField<String>(
-      initialValue: controller.text,
-      validator: validator,
-      builder: (state) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color.fromARGB(255, 56, 57, 58),
-                letterSpacing: 0.5,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFB0BEC5),
+            letterSpacing: 1.2,
+          ),
+        ),
+        const Gap(10),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFECEFF1)),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: obscure,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF263238),
             ),
-            const Gap(10),
-            TextFormField(
-              controller: controller,
-              obscureText: obscure,
-              onChanged: (v) {
-                state.didChange(v);
-                if (state.hasError) {
-                  state.validate();
-                }
-              },
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              hintStyle: const TextStyle(color: Color(0xFFCFD8DC)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 15,
               ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                hintText: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
-                hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-                prefixIcon: const Icon(
-                  Icons.lock_outline_rounded,
-                  color: AppColors.primary,
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFFB0BEC5),
+                size: 22,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscure
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                  color: const Color(0xFFB0BEC5),
                   size: 22,
                 ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    obscure
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded,
-                    color: const Color(0xFF94A3B8),
-                    size: 22,
-                  ),
-                  onPressed: onToggle,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0),
-                    width: 1.5,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Colors.redAccent),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: Colors.redAccent,
-                    width: 2,
-                  ),
-                ),
-                errorStyle: const TextStyle(height: 0, fontSize: 0),
+                onPressed: onToggle,
               ),
             ),
-            if (state.hasError)
-              Padding(
-                padding: const EdgeInsets.only(top: 8, left: 4),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      size: 16,
-                      color: Colors.redAccent,
-                    ),
-                    const Gap(8),
-                    Expanded(
-                      child: Text(
-                        state.errorText!,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }
-

@@ -31,41 +31,6 @@ class AgentRemoteDataSourceImpl implements AgentRemoteDataSource {
   late final Dio dio;
 
   // 🟢 1. Constructeur corrigé (plus de point-virgule parasite)
-  /*AgentRemoteDataSourceImpl() {
-    dio = Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        //baseUrl: 'https://car225.com/api/',
-        //baseUrl: 'https://jingly-lindy-unminding.ngrok-free.dev/api/',
-        /*headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },*/
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    // INTERCEPTOR : Injecte le token automatiquement
-    dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('auth_token');
-
-        if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
-          print("🔑 [Interceptor] Token injecté");
-        }
-        return handler.next(options);
-      },
-      onError: (DioException e, handler) {
-        if (e.response?.statusCode == 401) {
-          print("⛔ [Interceptor] Erreur 401: Non autorisé");
-        }
-        return handler.next(e);
-      },
-    ));
-  }*/
 
   AgentRemoteDataSourceImpl() {
     dio = Dio(

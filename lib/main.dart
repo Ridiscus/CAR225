@@ -1,4 +1,4 @@
-import 'package:car225/features/agent/presentation/providers/agent_provider.dart';
+/*import 'package:car225/features/agent/presentation/providers/agent_provider.dart';
 import 'package:car225/features/agent/presentation/providers/agent_profile_provider.dart';
 import 'package:car225/features/driver/presentation/providers/driver_provider.dart';
 import 'package:car225/features/hostess/presentation/providers/hostess_profile_provider.dart';
@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'core/providers/company_provider.dart';
 import 'core/providers/notification_provider.dart';
 import 'core/providers/user_provider.dart';
+import 'core/services/background_location_service.dart';
 import 'core/services/networking/api_config.dart';
 import 'core/services/notifications/global_otp_service.dart';
 import 'core/services/notifications/push_notification_service.dart';
@@ -50,6 +52,11 @@ void main() async {
 
   // 3. Init Notifications
   await PushNotificationService().init();
+
+  BackgroundLocationService.init();
+
+  // 🟢 Initialisation de Google Mobile Ads
+  await MobileAds.instance.initialize();
 
   // 4. ✅ CONFIGURATION DIO (Pour les requêtes HTTP)
   // Remplace 'http://10.0.2.2:8000/api' par ta vraie URL d'API (10.0.2.2 pour Émulateur Android)
@@ -113,6 +120,186 @@ class Car225App extends StatelessWidget {
     return MaterialApp(
       title: 'CAR225',
       navigatorKey: navigatorKey, // 👈 AJOUTE CECI ICI
+      debugShowCheckedModeBanner: false,
+
+      // Gestion des langues
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'), // Français
+        Locale('en', 'US'), // Anglais
+      ],
+      locale: const Locale('fr', 'FR'),
+
+      // Gestion du thème
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(themeProvider.textScaleFactor),
+          ),
+          child: child!,
+        );
+      },
+
+      // Page d'accueil
+      home: const SplashScreen(),
+    );
+  }
+}
+*/
+
+
+
+import 'package:car225/features/agent/presentation/providers/agent_provider.dart';
+import 'package:car225/features/agent/presentation/providers/agent_profile_provider.dart';
+import 'package:car225/features/driver/presentation/providers/driver_provider.dart';
+import 'package:car225/features/hostess/presentation/providers/hostess_profile_provider.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
+
+// --- IMPORTS EXISTANTS (Providers & UI) ---
+import 'core/providers/company_provider.dart';
+import 'core/providers/notification_provider.dart';
+import 'core/providers/user_provider.dart';
+import 'core/services/background_location_service.dart';
+import 'core/services/networking/api_config.dart';
+import 'core/services/notifications/global_otp_service.dart';
+import 'core/services/notifications/push_notification_service.dart';
+import 'core/theme/app_theme.dart';
+import 'core/services/theme_provider.dart';
+import 'features/auth/data/datasources/auth_remote_data_source.dart';
+import 'features/auth/data/repositories/auth_repository_impl.dart';
+import 'features/auth/domain/repositories/auth_repository.dart'
+    hide AuthRepositoryImpl;
+import 'features/booking/data/repositories/notification_repository.dart';
+import 'features/booking/domain/repositories/company_repository.dart';
+import 'features/hostess/presentation/providers/hostess_sales_provider.dart';
+import 'features/onboarding/presentation/screens/splash_screen.dart';
+
+import 'core/services/device/device_service.dart';
+import 'core/services/notifications/fcm_service.dart';
+
+// 👇 NOUVEL IMPORT POUR L'ANNONCE D'OUVERTURE 👇
+import 'core/services/ads/app_open_ad_manager.dart';
+
+// Déclare cette clé en variable globale (hors des classes)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
+  // 1. Initialisations Système
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR', null);
+
+  // 2. Init Firebase
+  await Firebase.initializeApp();
+
+  // Lance l'écoute globale pour l'OTP
+  GlobalOtpService.startListening();
+
+  // 3. Init Notifications & Location
+  await PushNotificationService().init();
+  BackgroundLocationService.init();
+
+  // 🟢 Initialisation de Google Mobile Ads
+  await MobileAds.instance.initialize();
+
+  // 4. CONFIGURATION DIO (Pour les requêtes HTTP)
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: ApiConfig.baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => HostessProfileProvider()),
+        ChangeNotifierProvider(create: (_) => AgentProfileProvider()),
+        ChangeNotifierProvider(create: (_) => DriverProvider()),
+        ChangeNotifierProvider(create: (_) => HostessSalesProvider()),
+        Provider<AuthRepository>(
+          create: (_) => AuthRepositoryImpl(
+            remoteDataSource: AuthRemoteDataSourceImpl(),
+            fcmService: FcmService(),
+            deviceService: DeviceService(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(
+            repository: NotificationRepository(dio: dio),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CompanyProvider(repository: CompanyRepository(dio: dio)),
+        ),
+      ],
+      child: const Car225App(),
+    ),
+  );
+}
+
+// 🟢 TRANSFORMATION EN StatefulWidget
+class Car225App extends StatefulWidget {
+  const Car225App({super.key});
+
+  @override
+  State<Car225App> createState() => _Car225AppState();
+}
+
+// 🟢 AJOUT DE "with WidgetsBindingObserver"
+class _Car225AppState extends State<Car225App> with WidgetsBindingObserver {
+  //late AppOpenAdManager appOpenAdManager;
+
+  @override
+  void initState() {
+    super.initState();
+    // 1. On initialise le manager et on pré-charge la première annonce
+    //appOpenAdManager = AppOpenAdManager()..loadAd();
+
+    // 2. On commence à écouter les ouvertures/fermetures de l'appli
+    //WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    // On arrête d'écouter quand l'appli est complètement tuée
+    //WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // 🟢 LA FONCTION MAGIQUE : Détecte quand l'appli revient à l'écran
+  /*@override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // L'utilisateur vient de rouvrir l'appli ! On affiche la pub.
+      appOpenAdManager.showAdIfAvailable();
+    }
+  }*/
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return MaterialApp(
+      title: 'CAR225',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
 
       // Gestion des langues

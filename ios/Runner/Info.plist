@@ -83,6 +83,20 @@
         </dict>
     </array>
 
+    <key>NSLocationWhenInUseUsageDescription</key>
+        <string>Cette application a besoin de votre position pour signaler le lieu exact de l'accident aux secours.</string>
+        <key>NSLocationAlwaysUsageDescription</key>
+        <string>Cette application a besoin de votre position pour signaler le lieu exact de l'accident aux secours.</string>
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        <string>CAR225 utilise votre position GPS en arrière-plan pour transmettre votre trajet en temps réel lors d'un voyage.</string>
+
+        <!-- Modes d'arrière-plan : GPS continu + flutter_foreground_task -->
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>location</string>
+            <string>fetch</string>
+        </array>
+
 
 
 </dict>

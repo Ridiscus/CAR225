@@ -124,18 +124,28 @@ class _RealTimeSeatInfoState extends State<RealTimeSeatInfo> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Texte Gauche : Réservés (Venant de l'API seats)
-                Text(
+                Flexible( // 🟢 1. On enveloppe avec Flexible
+                  child: Text(
                     "$reservedCount réservés",
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w500)
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis, // 🟢 2. Ajoute "..." si c'est trop long
+                  ),
                 ),
+
+                const SizedBox(width: 5), // 🟢 3. Un tout petit espace de sécurité au milieu
+
                 // Texte Droite : Restants (Calculé)
-                Text(
+                Flexible( // 🟢 1. On enveloppe avec Flexible
+                  child: Text(
                     "$remaining places restantes",
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: statusColor
-                    )
+                    ),
+                    textAlign: TextAlign.right, // 🟢 4. On aligne à droite pour faire propre
+                    overflow: TextOverflow.ellipsis, // 🟢 2. Ajoute "..." si c'est trop long
+                  ),
                 ),
               ],
             ),

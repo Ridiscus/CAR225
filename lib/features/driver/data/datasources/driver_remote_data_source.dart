@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/driver_profile_model.dart';
 import 'package:car225/core/services/networking/api_config.dart';
 import '../models/voyage_model.dart';
+import '../models/convoi_model.dart';
 import '../models/driver_message_model.dart';
 import '../models/signalement_model.dart';
 import '../models/driver_scan_info_model.dart';
@@ -27,6 +28,14 @@ abstract class DriverRemoteDataSource {
   Future<Map<String, dynamic>> cancelVoyage(int voyageId, {String? reason});
   Future<Map<String, dynamic>> updateLocation(int voyageId, double latitude, double longitude, {double? speed, double? heading});
 
+  // ── Convois ──
+  Future<List<ConvoiModel>> getConvois({String? date, String? tab});
+  Future<ConvoiModel> getConvoiDetails(int convoiId);
+  Future<ConvoiModel> startConvoi(int convoiId);
+  Future<Map<String, dynamic>> completeConvoi(int convoiId);
+  Future<Map<String, dynamic>> cancelConvoi(int convoiId, String motif);
+  Future<Map<String, dynamic>> updateConvoiLocation(int convoiId, double latitude, double longitude, {double? speed, double? heading});
+
   Future<Map<String, dynamic>> getMessages({int page = 1});
   Future<DriverMessageModel> getMessageDetails(int id, String source);
   Future<Map<String, dynamic>> sendMessageToGare(String subject, String message);
@@ -39,6 +48,7 @@ abstract class DriverRemoteDataSource {
   Future<DriverScanInfoModel> getScanInfo();
   Future<Map<String, dynamic>> searchReservation(String reference);
   Future<Map<String, dynamic>> confirmEmbarquement(String reference);
+  Future<void> registerFcmToken(String token);
 }
 
 class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
@@ -238,6 +248,89 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
     }
   }
 
+  // ── Convois ───────────────────────────────────────────────────────────────
+
+  @override
+  Future<List<ConvoiModel>> getConvois({String? date, String? tab}) async {
+    try {
+      final response = await dio.get('chauffeur/convois', queryParameters: {
+        if (date != null) 'date': date,
+        if (tab != null) 'tab': tab,
+      });
+      if (response.data['success'] == true) {
+        return ((response.data['convois'] ?? []) as List)
+            .map((c) => ConvoiModel.fromJson(c as Map<String, dynamic>))
+            .toList();
+      }
+      throw Exception(response.data['message'] ?? 'Erreur chargement convois');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<ConvoiModel> getConvoiDetails(int convoiId) async {
+    try {
+      final response = await dio.get('chauffeur/convois/$convoiId');
+      if (response.data['success'] == true) {
+        return ConvoiModel.fromJson(response.data['convoi']);
+      }
+      throw Exception(response.data['message'] ?? 'Erreur détails convoi');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<ConvoiModel> startConvoi(int convoiId) async {
+    try {
+      final response = await dio.post('chauffeur/convois/$convoiId/start');
+      if (response.data['success'] == true) {
+        return ConvoiModel.fromJson(response.data['convoi']);
+      }
+      throw Exception(response.data['message'] ?? 'Erreur démarrage convoi');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> completeConvoi(int convoiId) async {
+    try {
+      final response = await dio.post('chauffeur/convois/$convoiId/complete');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> cancelConvoi(int convoiId, String motif) async {
+    try {
+      final response = await dio.post('chauffeur/convois/$convoiId/annuler', data: {
+        'motif_annulation': motif,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateConvoiLocation(int convoiId, double latitude, double longitude, {double? speed, double? heading}) async {
+    try {
+      final response = await dio.post('chauffeur/convois/$convoiId/update-location', data: {
+        'latitude': latitude,
+        'longitude': longitude,
+        if (speed != null) 'speed': speed,
+        if (heading != null) 'heading': heading,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   @override
   Future<Map<String, dynamic>> getMessages({int page = 1}) async {
     try {
@@ -368,6 +461,15 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
       throw Exception(response.data['message'] ?? 'Erreur confirmation embarquement');
     } on DioException catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<void> registerFcmToken(String token) async {
+    try {
+      await dio.post('chauffeur/fcm-token', data: {'fcm_token': token});
+    } catch (_) {
+      // Fail silently — will retry on next app open
     }
   }
 }

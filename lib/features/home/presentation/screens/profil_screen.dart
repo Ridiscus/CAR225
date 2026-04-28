@@ -132,7 +132,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
 
-
   // Widgets utilitaires pour le BottomSheet
   Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
@@ -159,7 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  @override
+  /*@override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
@@ -319,6 +318,178 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }*/
+
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final cardColor = Theme.of(context).cardColor;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final secondaryTextColor = isDark ? Colors.grey[400] : Colors.grey;
+
+    // ✅ ON ÉCOUTE LE PROVIDER ICI
+    final userProvider = context.watch<UserProvider>();
+    final user = userProvider.user;
+    final isLoading = userProvider.isLoading;
+
+    if (isLoading || user == null) {
+      return Scaffold(backgroundColor: scaffoldColor, body: const Center(child: CircularProgressIndicator()));
+    }
+
+    return Scaffold(
+      backgroundColor: scaffoldColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        // 🟢 AJOUT DU BOUTON RETOUR ICI
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            // --- 1. PHOTO DE PROFIL DYNAMIQUE ---
+            Center(
+              child: Stack(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey.shade300, width: 3),
+                      image: DecorationImage(
+                          fit: BoxFit.cover,
+                          image: NetworkImage(user.fullPhotoUrl),
+                          onError: (_, __) {
+                            print("Erreur affichage image profil");
+                          }
+                      ),
+                    ),
+                  ),
+                  // Le petit bouton "+" (Édition)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _navigateToEdit,
+                      child: Container(
+                        height: 32, width: 32,
+                        decoration: BoxDecoration(
+                            color: cardColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey.shade300),
+                            boxShadow: [BoxShadow(color: isDark ? Colors.black26 : Colors.black.withOpacity(0.1), blurRadius: 5)]
+                        ),
+                        child: Icon(Icons.edit, size: 16, color: textColor),
+                      ),
+                    ),
+                  )
+                ],
+              ),
+            ),
+            const Gap(15),
+
+            // --- 2. NOM DYNAMIQUE ---
+            Text(
+              "${user.prenom} ${user.name}",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+            ),
+            const Gap(5),
+            Text(
+              "MEMBRE CAR 225",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: secondaryTextColor, letterSpacing: 1.0),
+            ),
+            const Gap(25),
+
+            // --- 3. STATISTIQUES ---
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _showTripDetails,
+                    child: _buildStatCard(
+                      context,
+                      _isLoadingStats ? "..." : "${_userStats?.totalReservations ?? 0}",
+                      "VOYAGES",
+                    ),
+                  ),
+                ),
+                const Gap(15),
+                Expanded(
+                    child: _buildStatCard(context, "2.25K", "POINTS", isPoints: true)
+                ),
+              ],
+            ),
+            const Gap(25),
+
+            // --- 4. LISTE DES OPTIONS ---
+            _buildMenuOption(
+              context: context,
+              imagePath: "assets/images/user.png",
+              title: "Mes informations personnelles",
+              onTap: _navigateToEdit,
+            ),
+            const Gap(15),
+
+            _buildMenuOption(
+              context: context,
+              imagePath: "assets/images/wallet.png",
+              title: "Portefeuille Mobile Money",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletScreen())),
+            ),
+            const Gap(15),
+
+            _buildMenuOption(
+              context: context,
+              imagePath: "assets/images/setting.png",
+              title: "Paramètre du compte",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountSettingsScreen())),
+            ),
+            const Gap(15),
+
+            _buildMenuOption(
+              context: context,
+              imagePath: "assets/images/security.png",
+              title: "Sécurité & Confidentialité",
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SecurityScreen())),
+            ),
+            const Gap(15),
+
+            _buildMenuOption(
+              context: context,
+              imagePath: "assets/images/logout.png",
+              title: "Déconnexion",
+              textColor: Colors.red,
+              iconColor: Colors.red,
+              // 🟢 MODIFICATION ICI : Appel de la nouvelle fonction BottomSheet
+              onTap: () => _showLogoutBottomSheet(context),
+            ),
+
+            const Gap(40), // Espace avant la version
+
+            // 🟢 AJOUT DE LA VERSION ICI
+            Text(
+              "Version 1.0.0",
+              style: TextStyle(
+                color: secondaryTextColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+
+            const Gap(40), // Espace après la version pour ne pas coller au bord
+          ],
+        ),
+      ),
+    );
   }
 
   // --- WIDGETS HELPER ---
@@ -394,34 +565,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showLogoutDialog(BuildContext parentContext) {
-    showDialog(
+
+  // 🟢 NOUVEAU BOTTOM SHEET DE DÉCONNEXION
+  void _showLogoutBottomSheet(BuildContext parentContext) {
+    final isDark = Theme.of(parentContext).brightness == Brightness.dark;
+
+    showModalBottomSheet(
       context: parentContext,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text("Déconnexion"),
-        content: const Text("Voulez-vous vraiment vous déconnecter ?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Annuler", style: TextStyle(color: Colors.grey))),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext); // Ferme la popup
-
-              // 1. Appel Logout
-              final repo = AuthRepositoryImpl(
-                remoteDataSource: AuthRemoteDataSourceImpl(),
-                fcmService: FcmService(),
-                deviceService: DeviceService(),
-              );
-              await repo.logout();
-
-              // 2. Navigation Login
-              if (!parentContext.mounted) return;
-              Navigator.pushAndRemoveUntil(parentContext, MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
-            },
-            child: const Text("Déconnexion", style: TextStyle(color: Colors.red)),
-          ),
-        ],
+      backgroundColor: isDark ? Theme.of(parentContext).scaffoldBackgroundColor : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)), // Bords bien arrondis
       ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Prend juste la hauteur nécessaire
+              children: [
+                // 1. Le petit trait gris en haut (Drag handle)
+                Container(
+                  width: 45,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const Gap(25),
+
+                // 2. L'icône rouge dans le cercle clair
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1), // Fond rouge très clair
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.logout_rounded, color: Color(0xFFC60000), size: 30),
+                ),
+                const Gap(20),
+
+                // 3. Le Titre
+                Text(
+                  "Déconnexion",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                const Gap(10),
+
+                // 4. Le sous-titre
+                Text(
+                  "Êtes-vous sûr de vouloir vous déconnecter ?",
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const Gap(30),
+
+                // 5. Les boutons (Annuler / Déconnexion)
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext), // Ferme le menu
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        child: Text(
+                          "Annuler",
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Gap(15),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(sheetContext); // Ferme la popup
+
+                          // 1. Appel Logout
+                          final repo = AuthRepositoryImpl(
+                            remoteDataSource: AuthRemoteDataSourceImpl(),
+                            fcmService: FcmService(),
+                            deviceService: DeviceService(),
+                          );
+                          await repo.logout();
+
+                          // 2. Navigation Login
+                          if (!parentContext.mounted) return;
+                          Navigator.pushAndRemoveUntil(
+                              parentContext,
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                  (route) => false
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC60000), // Rouge sombre
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "Déconnexion",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(10), // Un peu d'espace en bas
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
+
 }

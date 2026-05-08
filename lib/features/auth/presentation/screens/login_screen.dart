@@ -5,6 +5,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 // IMPORTS CLEAN ARCHI
 import '../../../../core/providers/user_provider.dart';
@@ -435,6 +436,111 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
 
+  // --- 5. GESTION CONNEXION APPLE ---
+  Future<void> _handleAppleLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Demander les identifiants à Apple
+      final AuthorizationCredentialAppleID credential =
+      await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // 2. Récupérer les données importantes
+      // Attention : Apple ne renvoie givenName et email que la PREMIÈRE FOIS.
+      final String idToken = credential.identityToken ?? '';
+      final String authCode = credential.authorizationCode;
+      final String? email = credential.email;
+      final String? firstName = credential.givenName;
+      final String? lastName = credential.familyName;
+
+      String? fullName;
+      if (firstName != null && lastName != null) {
+        fullName = "$firstName $lastName";
+      }
+
+      if (idToken.isEmpty) {
+        throw Exception("Impossible de récupérer l'ID Token Apple.");
+      }
+
+      // 3. Récupérer le token FCM pour les notifications
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      // 4. Envoyer le tout au backend
+      await _processBackendAppleLogin(
+        idToken: idToken,
+        authCode: authCode,
+        fcmToken: fcmToken,
+        email: email,
+        fullName: fullName,
+      );
+
+    } catch (e) {
+      _showTopNotification(
+        "Erreur connexion Apple: ${e.toString()}",
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+
+  Future<void> _processBackendAppleLogin({
+    required String idToken,
+    required String authCode,
+    String? fcmToken,
+    String? email,
+    String? fullName,
+  }) async {
+    try {
+      final deviceService = DeviceService();
+      String deviceName = await deviceService.getDeviceName();
+
+      final response = await AuthRepositoryImpl(
+        remoteDataSource: AuthRemoteDataSourceImpl(),
+        fcmService: FcmService(),
+        deviceService: deviceService,
+      ).loginWithApple(
+        idToken: idToken,
+        authCode: authCode,
+        fcmToken: fcmToken ?? "no_fcm",
+        nomDevice: deviceName, // 🟢 On envoie le nom du téléphone
+        email: email,
+        fullName: fullName,
+      );
+
+      if (!mounted) return;
+
+      if (response.success) {
+        // 🟢 SAUVEGARDE DU TOKEN ET CHARGEMENT USER
+        // (Supposant que ton AuthResponseModel gère déjà le stockage du token)
+        await context.read<UserProvider>().loadUser();
+
+        // 🟠 LOGIQUE SPECIALE : Si le contact est manquant
+        if (response.requiresContact == true) {
+          _showTopNotification("Veuillez finaliser votre profil");
+          // Navigator.push(context, MaterialPageRoute(builder: (context) => FinalizeProfileScreen()));
+          // Note: Redirige ici vers un écran où il doit entrer son numéro de téléphone
+        } else {
+          _showTopNotification("Connexion Apple réussie !");
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+                (route) => false,
+          );
+        }
+      }
+    } catch (e) {
+      _showTopNotification(e.toString(), isError: true);
+    }
+  }
+
+
   // 🟢 NOUVEAU : Le Pop-up obligatoire de Google pour la localisation
   Future<bool> _showLocationDisclosureDialog() async {
     return await showDialog<bool>(
@@ -727,11 +833,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Gap(20),
                     _buildSocialBtn(
                       "assets/images/apple.png",
-                      onTap: () {
-                        _showTopNotification(
-                          "Connexion Apple bientôt disponible",
-                        );
-                      },
+                      onTap: _handleAppleLogin, // 🟢 On appelle la nouvelle fonction
                     ),
                   ],
                 ],
@@ -772,51 +874,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // --- HELPER INPUT ---
-  /*Widget _buildAuthInput(
-      String hint,
-      IconData icon, {
-        bool isPassword = false,
-        bool obscureText = false,
-        VoidCallback? onToggleVisibility,
-        TextEditingController? controller,
-      }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = Theme.of(context).cardColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final hintColor = isDark ? Colors.grey[600] : AppColors.grey;
-    final iconColor = isDark ? Colors.grey[400] : AppColors.grey;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? cardColor : AppColors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: isDark ? Colors.grey[800]! : Colors.grey.shade300,
-        ),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        style: TextStyle(color: textColor),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: iconColor),
-          suffixIcon: isPassword
-              ? IconButton(
-            icon: Icon(
-              obscureText ? Icons.visibility_off : Icons.visibility,
-              color: iconColor,
-            ),
-            onPressed: onToggleVisibility,
-          )
-              : null,
-          hintText: hint,
-          hintStyle: TextStyle(color: hintColor),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-      ),
-    );
-  }*/
 // --- HELPER INPUT MODIFIÉ ---
   Widget _buildAuthInput(
       String hint,

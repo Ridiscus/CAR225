@@ -2,7 +2,7 @@ name: car225
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+12
+version: 1.0.0+15
 
 environment:
   sdk: ^3.10.1
@@ -83,6 +83,7 @@ dependencies:
   flutter_foreground_task: ^9.2.2
   google_mobile_ads: ^7.0.0
   in_app_update: ^4.2.5
+  sign_in_with_apple: ^7.0.1
 
 
 dev_dependencies:

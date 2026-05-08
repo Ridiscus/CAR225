@@ -79,6 +79,16 @@ abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId);
   Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data);
 
+
+  Future<AuthResponseModel> loginWithApple({
+    required String idToken,
+    required String authCode,
+    required String fcmToken,
+    required String nomDevice,
+    String? email,
+    String? fullName,
+  });
+
 }
 
 
@@ -868,6 +878,47 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     }
   }
+
+
+  @override
+  Future<AuthResponseModel> loginWithApple({
+    required String idToken,
+    required String authCode,
+    required String fcmToken,
+    required String nomDevice,
+    String? email,
+    String? fullName,
+  }) async {
+    try {
+      print("⏳ [APPLE LOGIN] Envoi des données au backend...");
+
+      final response = await dio.post('/auth/apple', data: {
+        'identity_token': idToken,
+        'authorization_code': authCode,
+        'email': email,
+        'full_name': fullName,
+        'fcm_token': fcmToken,
+        'nom_device': nomDevice,
+      });
+
+      print("✅ [APPLE LOGIN] Succès : ${response.data}");
+
+      // On transforme la réponse JSON en notre modèle AuthResponseModel
+      return AuthResponseModel.fromJson(response.data);
+
+    } on DioException catch (e) {
+      print("❌ [APPLE LOGIN DIO ERROR] Status: ${e.response?.statusCode}, Data: ${e.response?.data}");
+
+      // On récupère le message d'erreur du backend s'il existe
+      final errorMessage = e.response?.data['message'] ?? "Erreur d'authentification avec Apple";
+      throw Exception(errorMessage);
+
+    } catch (e) {
+      print("🚨 [APPLE LOGIN ERROR] Erreur imprévue : $e");
+      rethrow;
+    }
+  }
+
 
 
 }

@@ -94,6 +94,18 @@ abstract class AuthRepository {
   Future<Map<String, dynamic>> refuserMontantConvoi(int convoiId);
   Future<Map<String, dynamic>> enregistrerPassagers(int convoiId, Map<String, dynamic> data);
 
+
+  // 🍎 Apple Login
+  Future<AuthResponseModel> loginWithApple({
+    required String idToken,
+    required String authCode,
+    required String fcmToken,
+    required String nomDevice,
+    String? email,
+    String? fullName,
+  });
+
+
 }
 
 // ===========================================================================
@@ -489,6 +501,38 @@ class AuthRepositoryImpl implements AuthRepository {
       rethrow;
     }
   }
+
+
+  @override
+  Future<AuthResponseModel> loginWithApple({
+    required String idToken,
+    required String authCode,
+    required String fcmToken,
+    required String nomDevice,
+    String? email,
+    String? fullName,
+  }) async {
+    try {
+      // On appelle la source de données Dio
+      final response = await remoteDataSource.loginWithApple(
+        idToken: idToken,
+        authCode: authCode,
+        fcmToken: fcmToken,
+        nomDevice: nomDevice,
+        email: email,
+        fullName: fullName,
+      );
+
+      // Si ton backend renvoie un token, c'est ici que tu peux
+      // le sauvegarder localement via un service de stockage si nécessaire.
+
+      return response;
+    } catch (e) {
+      // On laisse l'erreur remonter vers le Bloc/Provider pour l'affichage UI
+      rethrow;
+    }
+  }
+
 
 
 

@@ -412,4 +412,27 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<AuthResponseModel> loginWithApple({
+    required String idToken,
+    required String authCode,
+    required String fcmToken,
+    required String nomDevice,
+    String? email,
+    String? fullName,
+  }) async {
+    try {
+      return await remoteDataSource.loginWithApple(
+        idToken: idToken,
+        authCode: authCode,
+        fcmToken: fcmToken,
+        nomDevice: nomDevice,
+        email: email,
+        fullName: fullName,
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
 }
